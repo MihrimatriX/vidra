@@ -1,0 +1,29 @@
+<Application x:Class="Vidra.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Vidra.App"
+             xmlns:vm="clr-namespace:Vidra.App.ViewModels"
+             ShutdownMode="OnExplicitShutdown">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!-- İlk sözlük renk paletidir; ThemeService bunu Light/Dark arasında değiştirir -->
+        <ResourceDictionary Source="Themes/Light.xaml" />
+        <ResourceDictionary Source="Themes/Icons.xaml" />
+        <ResourceDictionary Source="Themes/Styles.xaml" />
+        <ResourceDictionary Source="Themes/Generic.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+      <local:BoolVisConverter x:Key="Vis" />
+      <local:InverseBoolConverter x:Key="Not" />
+      <local:BytesConverter x:Key="Bytes" />
+      <local:DurationConverter x:Key="Dur" />
+      <local:RelativeTimeConverter x:Key="Rel" />
+      <local:ThumbConverter x:Key="Thumb" />
+      <local:EqualsConverter x:Key="Eq" />
+      <local:EqualsVisConverter x:Key="EqVis" />
+      <local:StarConverter x:Key="Star" />
+      <local:DescribeConverter x:Key="Desc" />
+      <vm:EnumBoolConverter x:Key="EnumBool" />
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

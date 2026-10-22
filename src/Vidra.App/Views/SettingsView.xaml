@@ -1,0 +1,250 @@
+<UserControl x:Class="Vidra.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Vidra.App.Controls"
+             x:Name="Root">
+  <UserControl.Resources>
+    <Style x:Key="Section" TargetType="Border" BasedOn="{StaticResource Card}">
+      <Setter Property="Padding" Value="22" />
+      <Setter Property="Margin" Value="0,0,0,18" />
+    </Style>
+    <Style x:Key="SectionLink" TargetType="Button" BasedOn="{StaticResource Btn}">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="FontWeight" Value="Normal" />
+      <Setter Property="Foreground" Value="{DynamicResource Text2}" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="12,0" />
+    </Style>
+  </UserControl.Resources>
+
+  <Grid Margin="20,14,20,0">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="210" />
+      <ColumnDefinition Width="28" />
+      <ColumnDefinition Width="*" MaxWidth="900" />
+    </Grid.ColumnDefinitions>
+
+    <!-- Bölüm menüsü -->
+    <StackPanel>
+      <TextBlock Style="{StaticResource H1}" Text="Ayarlar" Margin="0,0,0,14" />
+      <Button Style="{StaticResource SectionLink}" Content="Hesap &amp; çerezler" Click="Jump_Click" CommandParameter="SecAccount" />
+      <Button Style="{StaticResource SectionLink}" Content="İndirme &amp; dosyalar" Click="Jump_Click" CommandParameter="SecFiles" />
+      <Button Style="{StaticResource SectionLink}" Content="Format varsayılanları" Click="Jump_Click" CommandParameter="SecFormat" />
+      <Button Style="{StaticResource SectionLink}" Content="Ağ &amp; performans" Click="Jump_Click" CommandParameter="SecNet" />
+      <Button Style="{StaticResource SectionLink}" Content="Davranış &amp; görünüm" Click="Jump_Click" CommandParameter="SecLook" />
+      <Button Style="{StaticResource SectionLink}" Content="Bileşenler" Click="Jump_Click" CommandParameter="SecTools" />
+    </StackPanel>
+
+    <ScrollViewer x:Name="Scroller" Grid.Column="2" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="0,0,8,48">
+        <Border Style="{StaticResource Notice}" Margin="0,0,0,16" Visibility="{Binding Notice, Converter={StaticResource Vis}}">
+          <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="13" />
+        </Border>
+
+        <!-- Hesap & çerezler -->
+        <Border x:Name="SecAccount" Style="{StaticResource Section}">
+          <StackPanel>
+            <TextBlock Style="{StaticResource H2}" Text="Hesap &amp; çerezler" />
+            <TextBlock Style="{StaticResource Body2}" Margin="0,4,0,16"
+                       Text="yt-dlp YouTube oturumunu nereden alsın? Uygulama içi giriş en kolayı; Google engellerse YouTube'a giriş yaptığın tarayıcıyı seç. Şifren hiçbir zaman sorulmaz." />
+            <ListBox Style="{StaticResource OptionList}" ItemsSource="{Binding CookieChoices}" SelectedItem="{Binding SelectedCookie}">
+              <ListBox.ItemsPanel><ItemsPanelTemplate><c:UniformWrapPanel MinItemWidth="130" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel>
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Hint}" Style="{StaticResource Small}" Margin="0,2,0,0" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <HeaderedContentControl Style="{StaticResource Field}" Header="Tarayıcı profili (boş = varsayılan)" HorizontalAlignment="Left"
+                                    Visibility="{Binding IsBrowserCookie, Converter={StaticResource Vis}}">
+              <TextBox Style="{StaticResource InputMono}" Width="320" Text="{Binding BrowserProfile, UpdateSourceTrigger=LostFocus}" Tag="ör. Profile 1" />
+            </HeaderedContentControl>
+            <Border Style="{StaticResource Notice}" Margin="0,0,0,12" Visibility="{Binding ChromiumWarning, Converter={StaticResource Vis}}">
+              <TextBlock TextWrapping="Wrap" FontSize="13"
+                         Text="Windows'ta Chromium tabanlı tarayıcılar açıkken çerez veritabanını kilitleyebilir. İndirme başlamadan tarayıcıyı kapatman gerekebilir — Firefox ya da uygulama içi giriş daha güvenilir." />
+            </Border>
+            <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="460" Margin="0" IsChecked="{Binding PoliteMode}"
+                      Content="Nazik mod" Tag="Oturum açıkken istekler arasına bekleme ekler (--sleep-requests / --sleep-interval)" />
+          </StackPanel>
+        </Border>
+
+        <!-- İndirme & dosyalar -->
+        <Border x:Name="SecFiles" Style="{StaticResource Section}">
+          <StackPanel>
+            <TextBlock Style="{StaticResource H2}" Text="İndirme &amp; dosyalar" Margin="0,0,0,16" />
+            <HeaderedContentControl Style="{StaticResource Field}" Header="İndirme klasörü" Margin="0,0,0,14">
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Seç…" Command="{Binding PickFolderCommand}" Margin="10,0,0,0" />
+                <TextBox Style="{StaticResource InputMono}" Text="{Binding OutputDir, UpdateSourceTrigger=LostFocus}" />
+              </DockPanel>
+            </HeaderedContentControl>
+            <HeaderedContentControl Style="{StaticResource Field}" Header="Tek video dosya adı" Margin="0,0,0,8">
+              <TextBox Style="{StaticResource InputMono}" Text="{Binding OutputTemplate, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
+            </HeaderedContentControl>
+            <WrapPanel Margin="0,0,0,8">
+              <TextBlock Text="Ekle:" Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="başlık" Command="{Binding InsertTokenCommand}" CommandParameter="%(title)s" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="kanal" Command="{Binding InsertTokenCommand}" CommandParameter="%(uploader)s" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="id" Command="{Binding InsertTokenCommand}" CommandParameter="[%(id)s]" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="yayın tarihi" Command="{Binding InsertTokenCommand}" CommandParameter="%(upload_date)s" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="çözünürlük" Command="{Binding InsertTokenCommand}" CommandParameter="%(height)sp" />
+            </WrapPanel>
+            <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,14">
+              <TextBlock Text="{Binding OutputPreview}" Style="{StaticResource Mono}" TextWrapping="Wrap" />
+            </Border>
+            <HeaderedContentControl Style="{StaticResource Field}" Header="Playlist dosya adı" Margin="0,0,0,8">
+              <TextBox Style="{StaticResource InputMono}" Text="{Binding PlaylistTemplate, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
+            </HeaderedContentControl>
+            <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,14">
+              <TextBlock Text="{Binding PlaylistPreview}" Style="{StaticResource Mono}" TextWrapping="Wrap" />
+            </Border>
+            <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="460" Margin="0" IsChecked="{Binding UseArchive}"
+                      Content="İndirme arşivi" Tag="İndirilen video kimlikleri kaydedilir; aynı video ikinci kez inmez" />
+          </StackPanel>
+        </Border>
+
+        <!-- Format varsayılanları -->
+        <Border x:Name="SecFormat" Style="{StaticResource Section}">
+          <StackPanel>
+            <TextBlock Style="{StaticResource H2}" Text="Format varsayılanları" />
+            <TextBlock Style="{StaticResource Body2}" Margin="0,4,0,16" Text="Her yeni bağlantıda bu seçimlerle başlanır; indirme ekranında tek seferlik değiştirebilirsin." />
+            <c:UniformWrapPanel MinItemWidth="200">
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Video kalitesi">
+                <ComboBox ItemsSource="{Binding Heights}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DefaultHeight}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Kapsayıcı">
+                <ComboBox ItemsSource="{Binding Containers}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DefaultContainer}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Kodek tercihi">
+                <ComboBox ItemsSource="{Binding Codecs}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DefaultCodec}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Ses formatı">
+                <ComboBox ItemsSource="{Binding AudioFormats}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DefaultAudio}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Altyazı dilleri">
+                <TextBox Style="{StaticResource InputMono}" Text="{Binding SubLangs, UpdateSourceTrigger=LostFocus}" Tag="tr, en" />
+              </HeaderedContentControl>
+            </c:UniformWrapPanel>
+            <c:UniformWrapPanel MinItemWidth="230" Margin="0,4,0,8">
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding DefaultSubs}" Content="Altyazı" Tag="Varsayılan olarak indir" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding DefaultSponsor}" Content="SponsorBlock" Tag="Varsayılan olarak kes" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding DefaultThumb}" Content="Kapak &amp; meta" Tag="Dosyaya göm" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding DefaultChapters}" Content="Bölümler" Tag="Bölüm işaretlerini ekle" />
+            </c:UniformWrapPanel>
+            <TextBlock Style="{StaticResource Eyebrow}" Text="SponsorBlock kategorileri" Margin="0,0,0,10" />
+            <ItemsControl ItemsSource="{Binding SponsorCats}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate><ToggleButton Style="{StaticResource Pill}" IsChecked="{Binding IsOn}" Content="{Binding Label}" /></DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <!-- Ağ -->
+        <Border x:Name="SecNet" Style="{StaticResource Section}">
+          <StackPanel>
+            <TextBlock Style="{StaticResource H2}" Text="Ağ &amp; performans" Margin="0,0,0,16" />
+            <c:UniformWrapPanel MinItemWidth="200">
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Aynı anda indirme">
+                <ComboBox ItemsSource="{Binding ConcurrencyChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Concurrency}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Parça eşzamanlılığı (-N)">
+                <ComboBox ItemsSource="{Binding FragmentChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Fragments}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Hız sınırı">
+                <ComboBox ItemsSource="{Binding RateLimits}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding RateLimit}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Yeniden deneme (-R)">
+                <ComboBox ItemsSource="{Binding RetryChoices}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Retries}" />
+              </HeaderedContentControl>
+            </c:UniformWrapPanel>
+            <HeaderedContentControl Style="{StaticResource Field}" Header="Proxy" Margin="0,0,0,8">
+              <TextBox Style="{StaticResource InputMono}" Text="{Binding Proxy, UpdateSourceTrigger=LostFocus}" Tag="socks5://127.0.0.1:1080" />
+            </HeaderedContentControl>
+            <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap"
+                       Text="-N, tek videonun parçalarını paralel indirir; YouTube çok yüksek değerlerde yavaşlatabilir, 4 iyi bir başlangıç." />
+          </StackPanel>
+        </Border>
+
+        <!-- Davranış -->
+        <Border x:Name="SecLook" Style="{StaticResource Section}">
+          <StackPanel>
+            <TextBlock Style="{StaticResource H2}" Text="Davranış &amp; görünüm" Margin="0,0,0,16" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+              <TextBlock Text="Tema" Width="80" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource Text2}" />
+              <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Themes}" SelectedValue="{Binding Theme}" />
+            </StackPanel>
+            <c:UniformWrapPanel MinItemWidth="240">
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding WatchClipboard}" Content="Pano izleme" Tag="Kopyalanan YouTube bağlantısını yakala" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding Notifications}" Content="Bildirimler" Tag="İndirme bitince ya da yeni takip videosu gelince" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding MinimizeToTray}" Content="Sistem tepsisi" Tag="Kapatınca arka planda devam et" />
+            </c:UniformWrapPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Bileşenler -->
+        <Border x:Name="SecTools" Style="{StaticResource Section}">
+          <StackPanel>
+            <DockPanel Margin="0,0,0,12">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding UpdateChannels}" SelectedValue="{Binding UpdateChannel}" Margin="0,0,10,0" />
+                <Button Style="{StaticResource BtnPrimary}" Command="{Binding UpdateYtDlpCommand}" IsEnabled="{Binding Updating, Converter={StaticResource Not}}" Content="yt-dlp'yi güncelle" />
+              </StackPanel>
+              <StackPanel>
+                <TextBlock Style="{StaticResource H2}" Text="Bileşenler" />
+                <TextBlock Style="{StaticResource Body2}" Margin="0,4,16,0" Text="YouTube değiştikçe yt-dlp sık güncellenir. İndirme bozulursa önce güncellemeyi dene." />
+              </StackPanel>
+            </DockPanel>
+            <ItemsControl ItemsSource="{Binding Tools}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><c:UniformWrapPanel MinItemWidth="220" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Style="{StaticResource Tile}" Margin="0,0,10,10">
+                    <StackPanel>
+                      <DockPanel>
+                        <Border DockPanel.Dock="Right">
+                          <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource ChipWarn}">
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding Installed}" Value="True">
+                                  <Setter Property="Background" Value="{DynamicResource OkSoft}" />
+                                  <Setter Property="TextElement.Foreground" Value="{DynamicResource Ok}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Border.Style>
+                          <Grid>
+                            <TextBlock Text="hazır" Visibility="{Binding Installed, Converter={StaticResource Vis}}" />
+                            <TextBlock Text="eksik" Visibility="{Binding Installed, Converter={StaticResource Vis}, ConverterParameter=!}" />
+                          </Grid>
+                        </Border>
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                      </DockPanel>
+                      <TextBlock Text="{Binding Version, TargetNullValue=—}" Style="{StaticResource Mono}" Margin="0,6,0,2" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Purpose}" Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                      <Button Style="{StaticResource BtnSm}" HorizontalAlignment="Left" Content="Yeniden indir"
+                              Command="{Binding DataContext.ReinstallCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBox Text="{Binding UpdateLog, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" FontSize="12"
+                     Height="120" VerticalContentAlignment="Top" Padding="8" Background="{DynamicResource Surface2}" Margin="0,4,0,12"
+                     Visibility="{Binding UpdateLog, Converter={StaticResource Vis}}" VerticalScrollBarVisibility="Auto" />
+            <WrapPanel>
+              <Button Style="{StaticResource BtnSm}" Content="Bileşen klasörünü aç" Command="{Binding OpenBinDirCommand}" Margin="0,0,8,0" />
+              <Button Style="{StaticResource BtnSm}" Content="Veri klasörünü aç" Command="{Binding OpenDataDirCommand}" />
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

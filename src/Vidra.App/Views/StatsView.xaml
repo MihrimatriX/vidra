@@ -1,0 +1,149 @@
+<UserControl x:Class="Vidra.App.Views.StatsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Vidra.App.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="20,14,20,24" MaxWidth="1180">
+      <TextBlock Style="{StaticResource H1}" Text="İstatistik" />
+      <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,6,0,20"
+                 Text="Tamamlanan indirmelerin özeti (geçmişte tutulan son 1000 kayda göre)." />
+
+      <!-- Boş durum -->
+      <Border Style="{StaticResource Card}" Padding="40" Visibility="{Binding HasData, Converter={StaticResource Vis}, ConverterParameter=!}">
+        <StackPanel HorizontalAlignment="Center">
+          <Border Width="48" Height="48" CornerRadius="14" Background="{DynamicResource AccentSoft}" HorizontalAlignment="Center">
+            <c:Icon Data="{StaticResource I.Chart}" Size="22" Foreground="{DynamicResource AccentStrong}" />
+          </Border>
+          <TextBlock Style="{StaticResource H2}" TextAlignment="Center" Margin="0,16,0,6" Text="Henüz tamamlanan indirme yok" />
+          <TextBlock Style="{StaticResource Body2}" TextAlignment="Center" Text="İlk indirmenden sonra burada günlük etkinliğin ve en çok indirdiğin kanallar görünecek." />
+        </StackPanel>
+      </Border>
+
+      <StackPanel Visibility="{Binding HasData, Converter={StaticResource Vis}}">
+        <!-- Öne çıkan sayılar -->
+        <UniformGrid Columns="4" Margin="0,0,-14,0">
+          <Border Style="{StaticResource Tile}" Padding="18,16" Margin="0,0,14,14">
+            <StackPanel>
+              <TextBlock Style="{StaticResource Small}" Text="Toplam indirme" />
+              <TextBlock Text="{Binding CountText}" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Margin="0,4,0,0" />
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Tile}" Padding="18,16" Margin="0,0,14,14">
+            <StackPanel>
+              <TextBlock Style="{StaticResource Small}" Text="Toplam boyut" />
+              <TextBlock Text="{Binding BytesText}" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Margin="0,4,0,0" />
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Tile}" Padding="18,16" Margin="0,0,14,14">
+            <StackPanel>
+              <TextBlock Style="{StaticResource Small}" Text="İçerik süresi" />
+              <TextBlock Text="{Binding DurationText}" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Margin="0,4,0,0" />
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Tile}" Padding="18,16" Margin="0,0,14,14">
+            <StackPanel>
+              <TextBlock Style="{StaticResource Small}" Text="Son 7 gün" />
+              <TextBlock FontFamily="{StaticResource DisplayFont}" Margin="0,4,0,0">
+                <Run Text="{Binding WeekText, Mode=OneWay}" FontSize="30" FontWeight="Bold" />
+                <Run Text="{Binding WeekBytesText, Mode=OneWay}" FontSize="13" Foreground="{DynamicResource Muted}" />
+              </TextBlock>
+            </StackPanel>
+          </Border>
+        </UniformGrid>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*" />
+            <ColumnDefinition Width="14" />
+            <ColumnDefinition Width="2*" />
+          </Grid.ColumnDefinitions>
+
+          <!-- Son 14 gün: tek seri, tek renk; değer ipucunda -->
+          <Border Style="{StaticResource Card}" Padding="16" VerticalAlignment="Top">
+            <StackPanel>
+              <TextBlock Style="{StaticResource H3}" Text="Günlük indirme · son 14 gün" />
+              <TextBlock Style="{StaticResource Small}" Text="Çubuğun üzerine gel: adet ve boyut" Margin="0,2,0,16" />
+              <ItemsControl ItemsSource="{Binding Days}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <!-- İsabet alanı tüm sütun: ince çubuğu tutturmak gerekmez -->
+                    <StackPanel Background="Transparent" ToolTip="{Binding Tip}">
+                      <Grid Height="150">
+                        <Border Height="{Binding Height}" MaxWidth="26" Margin="1,0" VerticalAlignment="Bottom" CornerRadius="4,4,0,0" Background="{DynamicResource Accent}" />
+                      </Grid>
+                      <Border Height="1" Background="{DynamicResource Line2}" />
+                      <TextBlock Text="{Binding Label}" HorizontalAlignment="Center" FontSize="11" Margin="0,6,0,0">
+                        <TextBlock.Style>
+                          <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource Text}" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </TextBlock.Style>
+                      </TextBlock>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <StackPanel Grid.Column="2">
+            <!-- Tür dağılımı: iki sayı, grafik gerekmez -->
+            <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,0,14">
+              <StackPanel>
+                <TextBlock Style="{StaticResource H3}" Text="Tür" Margin="0,0,0,14" />
+                <UniformGrid Columns="2">
+                  <DockPanel Margin="0,0,10,0">
+                    <Border DockPanel.Dock="Left" Width="40" Height="40" CornerRadius="12" Background="{DynamicResource Raised}" Margin="0,0,12,0">
+                      <c:Icon Data="{StaticResource I.Video}" Size="18" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBlock Text="{Binding VideoCount}" FontSize="20" FontWeight="Bold" />
+                      <TextBlock Text="video" Style="{StaticResource Small}" />
+                    </StackPanel>
+                  </DockPanel>
+                  <DockPanel>
+                    <Border DockPanel.Dock="Left" Width="40" Height="40" CornerRadius="12" Background="{DynamicResource Raised}" Margin="0,0,12,0">
+                      <c:Icon Data="{StaticResource I.Music}" Size="18" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBlock Text="{Binding AudioCount}" FontSize="20" FontWeight="Bold" />
+                      <TextBlock Text="ses" Style="{StaticResource Small}" />
+                    </StackPanel>
+                  </DockPanel>
+                </UniformGrid>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="16">
+              <StackPanel>
+                <TextBlock Style="{StaticResource H3}" Text="En çok indirilen kanallar" Margin="0,0,0,14" />
+                <ItemsControl ItemsSource="{Binding Channels}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Margin="0,0,0,14">
+                        <DockPanel Margin="0,0,0,6">
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding Detail}" Style="{StaticResource Small}" />
+                          <TextBlock Text="{Binding Channel}" FontWeight="Medium" FontSize="13" TextTrimming="CharacterEllipsis" Margin="0,0,10,0" />
+                        </DockPanel>
+                        <ProgressBar Maximum="1" Value="{Binding Fraction, Mode=OneWay}" Height="6" Foreground="{DynamicResource Accent}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

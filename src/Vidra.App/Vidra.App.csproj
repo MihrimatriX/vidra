@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Yalnızca sistem tepsisi simgesi (NotifyIcon) için -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Linux/macOS CI'da da derlenebilsin (çalıştırma Windows'ta) -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>Vidra.App</RootNamespace>
+    <AssemblyName>Vidra</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\vidra.ico</ApplicationIcon>
+    <SatelliteResourceLanguages>tr;en</SatelliteResourceLanguages>
+    <!-- WinForms + WPF birlikte: belirsiz isimleri açıkça yazıyoruz -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- WFO0003: DPI ayarı WPF için app.manifest'te kalmalı (WinForms analizörü yalnızca tepsi simgesi yüzünden devrede) -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <!-- dotnet publish -c Release -r win-x64 → tek, bağımsız exe -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Vidra.Core\Vidra.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\vidra.ico" />
+  </ItemGroup>
+
+</Project>

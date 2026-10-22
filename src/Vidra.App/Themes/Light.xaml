@@ -1,0 +1,35 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Açık tema. Tüm stiller bu anahtarlara DynamicResource ile bağlanır; tema değişince anında güncellenir. -->
+  <SolidColorBrush x:Key="Bg" Color="#F5F5F7" />
+  <SolidColorBrush x:Key="Side" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="Surface" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="Surface2" Color="#F8F9FA" />
+  <SolidColorBrush x:Key="Raised" Color="#EEF0F3" />
+  <SolidColorBrush x:Key="Line" Color="#E3E6EB" />
+  <SolidColorBrush x:Key="Line2" Color="#D3D8DF" />
+  <SolidColorBrush x:Key="Text" Color="#14171C" />
+  <SolidColorBrush x:Key="Text2" Color="#4B5563" />
+  <SolidColorBrush x:Key="Muted" Color="#6B7280" />
+  <!-- Dolgu vurgusu (birincil buton, marka) ve beyaz üstünde 5:1 kontrastlı güçlü vurgu (metin, kenarlık, ilerleme) -->
+  <SolidColorBrush x:Key="Accent" Color="#F23D52" />
+  <SolidColorBrush x:Key="AccentHover" Color="#FF5468" />
+  <SolidColorBrush x:Key="AccentInk" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="AccentStrong" Color="#D21F37" />
+  <SolidColorBrush x:Key="AccentSoft" Color="#FFF0F2" />
+  <SolidColorBrush x:Key="Ok" Color="#15803D" />
+  <SolidColorBrush x:Key="OkSoft" Color="#ECFDF3" />
+  <SolidColorBrush x:Key="Info" Color="#2563EB" />
+  <SolidColorBrush x:Key="InfoSoft" Color="#EAF1FE" />
+  <SolidColorBrush x:Key="Warn" Color="#8A4B0A" />
+  <SolidColorBrush x:Key="WarnSoft" Color="#FFF4E5" />
+  <SolidColorBrush x:Key="WarnLine" Color="#F5D7B0" />
+  <SolidColorBrush x:Key="Gold" Color="#F5D77A" />
+  <SolidColorBrush x:Key="GoldInk" Color="#4A3800" />
+  <SolidColorBrush x:Key="ThumbBg" Color="#E7EAEE" />
+  <SolidColorBrush x:Key="Invert" Color="#14171C" />
+  <SolidColorBrush x:Key="InvertInk" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="Danger" Color="#DC2626" />
+  <Color x:Key="ShadowColor">#14171C</Color>
+  <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="ShadowOpacity">0.06</sys:Double>
+</ResourceDictionary>
