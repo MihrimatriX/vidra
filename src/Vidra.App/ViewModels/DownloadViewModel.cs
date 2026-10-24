@@ -27,11 +27,11 @@ public sealed partial class DownloadViewModel : ObservableObject
     /// <summary>Dönüştürülen formatların yaklaşık bit hızı (kbps); null = kopyalanan akışın kendi boyutu.</summary>
     private static readonly Dictionary<AudioFormat, (string Detail, double? Kbps)> AudioMeta = new()
     {
-        [AudioFormat.Original] = ("dönüştürmesiz", null),
-        [AudioFormat.Mp3] = ("dönüştürülür · ~245 kbps", 245),
-        [AudioFormat.M4a] = ("AAC akışı · dönüştürmesiz", null),
-        [AudioFormat.Flac] = ("dönüştürülür · kayıpsız kap", 900),
-        [AudioFormat.Wav] = ("dönüştürülür · ham PCM", 1411),
+        [AudioFormat.Original] = ("en iyi akış", null),
+        [AudioFormat.Mp3] = ("~245 kbps · dönüşüm", 245),
+        [AudioFormat.M4a] = ("AAC akışı", null),
+        [AudioFormat.Flac] = ("kayıpsız · dönüşüm", 900),
+        [AudioFormat.Wav] = ("ham PCM · dönüşüm", 1411),
     };
 
     private readonly AppHost _host;
@@ -292,9 +292,10 @@ public sealed partial class DownloadViewModel : ObservableObject
             var src = AudioFor(f);
             long? size = kbps is { } k && v.Duration is { } dur ? (long)(k * 1000 / 8 * dur) : src?.Size;
             if (kbps is null && src is not null)
+                // Kart dar: kopyalanan akış yalnızca kodek ve bit hızıyla; dönüştürme durumu alttaki satırda yazar
                 detail = Conversion.Reencodes(new DownloadOptions { Mode = DownloadMode.Audio, AudioFormat = f }, src.Codec).Count > 0
-                    ? $"{AudioName(src.Codec)} kaynaktan dönüştürülür"
-                    : $"{AudioName(src.Codec)} {Fmt.Kbps(src.Abr)} · dönüştürmesiz";
+                    ? $"{AudioName(src.Codec)}'tan dönüşüm"
+                    : $"{AudioName(src.Codec)} · {Fmt.Kbps(src.Abr)}";
             AudioCards.Add(new AudioCard(f, f.Label(), detail, "≈ " + Fmt.Bytes(size), size));
         }
         var wantAudio = _host.Settings.Defaults.AudioFormat == AudioFormat.Opus ? AudioFormat.Original : _host.Settings.Defaults.AudioFormat;
