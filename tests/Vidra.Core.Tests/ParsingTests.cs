@@ -193,7 +193,11 @@ public class ProbeParserTests
         Assert.Equal("137", ProbeParser.PickStream(q, CodecPreference.Auto, ContainerFormat.Mp4, true)?.Id);
         Assert.Equal("248", ProbeParser.PickStream(q, CodecPreference.Vp9, ContainerFormat.Mkv, false)?.Id);
         Assert.Equal("299", ProbeParser.PickStream(q, CodecPreference.Av1, ContainerFormat.Mkv, false)?.Id);
+        Assert.Equal("248", ProbeParser.PickStream(q, CodecPreference.Auto, ContainerFormat.Original, true)?.Id); // VP9, H.264'ten önce
     }
+
+    [Fact]
+    public void Aac_audio_kept_for_mp4_and_m4a() => Assert.Equal("140", V.AudioAac?.Id);
 
     [Fact]
     public void Playlist_marks_hidden_entries()

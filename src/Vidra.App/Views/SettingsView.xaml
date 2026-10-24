@@ -112,12 +112,12 @@
         <Border x:Name="SecFormat" Style="{StaticResource Section}">
           <StackPanel>
             <TextBlock Style="{StaticResource H2}" Text="Format varsayılanları" />
-            <TextBlock Style="{StaticResource Body2}" Margin="0,4,0,16" Text="Her yeni bağlantıda bu seçimlerle başlanır; indirme ekranında tek seferlik değiştirebilirsin." />
+            <TextBlock Style="{StaticResource Body2}" Margin="0,4,0,16" Text="Her yeni bağlantıda bu seçimlerle başlanır; indirme ekranında tek seferlik değiştirebilirsin. Orijinal: YouTube'daki akışlar dönüştürülmeden kaydedilir." />
             <c:UniformWrapPanel MinItemWidth="200">
               <HeaderedContentControl Style="{StaticResource Field}" Header="Video kalitesi">
                 <ComboBox ItemsSource="{Binding Heights}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DefaultHeight}" />
               </HeaderedContentControl>
-              <HeaderedContentControl Style="{StaticResource Field}" Header="Kapsayıcı">
+              <HeaderedContentControl Style="{StaticResource Field}" Header="Video biçimi">
                 <ComboBox ItemsSource="{Binding Containers}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DefaultContainer}" />
               </HeaderedContentControl>
               <HeaderedContentControl Style="{StaticResource Field}" Header="Kodek tercihi">

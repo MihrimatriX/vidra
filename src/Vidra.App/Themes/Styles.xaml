@@ -224,6 +224,41 @@
       </Trigger>
     </Style.Triggers>
   </Style>
+  <!-- Çerçevesiz, sola dayalı düğme: tıklanabilir bilgi satırı (ör. kayıt klasörü) -->
+  <Style x:Key="BtnFlat" TargetType="Button">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="10" Padding="8,6">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Raised}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Klavye tuşu etiketi (boş durum ipuçları) -->
+  <Style x:Key="Kbd" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line2}" />
+    <Setter Property="BorderThickness" Value="1,1,1,2" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="Margin" Value="0,0,4,0" />
+    <Setter Property="TextElement.FontFamily" Value="{StaticResource MonoFont}" />
+    <Setter Property="TextElement.FontSize" Value="11.5" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Text2}" />
+  </Style>
+
   <Style x:Key="BtnLink" TargetType="Button" BasedOn="{StaticResource Btn}">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
@@ -327,6 +362,42 @@
     </Setter>
   </Style>
 
+  <!-- Katlanır bölüm başlığı: Content = başlık, Tag = kapalıyken özet; açılınca ok döner -->
+  <Style x:Key="Disclosure" TargetType="ToggleButton">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="10" Padding="10,8" Margin="-10,0">
+            <DockPanel>
+              <c:Icon x:Name="Chev" DockPanel.Dock="Left" Data="{StaticResource I.Chevron}" Size="15" Margin="0,0,8,0"
+                      Foreground="{DynamicResource Muted}" RenderTransformOrigin="0.5,0.5">
+                <c:Icon.RenderTransform><RotateTransform Angle="-90" /></c:Icon.RenderTransform>
+              </c:Icon>
+              <ContentPresenter DockPanel.Dock="Left" VerticalAlignment="Center" TextElement.FontWeight="SemiBold" TextElement.FontSize="13" />
+              <TextBlock x:Name="Sum" Text="{TemplateBinding Tag}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="12,0,0,0"
+                         VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface2}" />
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Chev" Property="RenderTransform">
+                <Setter.Value><RotateTransform Angle="0" /></Setter.Value>
+              </Setter>
+              <Setter TargetName="Sum" Property="Visibility" Value="Collapsed" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <!-- ============ Anahtar (CheckBox → switch kartı). Content = başlık, Tag = açıklama ============ -->
   <Style x:Key="SwitchCard" TargetType="CheckBox">
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
@@ -359,6 +430,46 @@
             </Trigger>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Line2}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Bd" Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Anahtar satırı: SwitchCard'ın çerçevesiz hâli; bir grup kutusunun içinde liste gibi durur -->
+  <Style x:Key="SwitchRow" TargetType="CheckBox">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CheckBox">
+          <Border x:Name="Bd" MinHeight="44" Padding="10,7" Margin="2" CornerRadius="9" Background="Transparent">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                <ContentPresenter TextElement.FontWeight="SemiBold" TextElement.FontSize="13" />
+                <TextBlock Text="{TemplateBinding Tag}" FontSize="12" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+              </StackPanel>
+              <Border x:Name="Track" Grid.Column="1" Width="34" Height="20" CornerRadius="10" Background="{DynamicResource Line2}" VerticalAlignment="Center">
+                <Ellipse x:Name="Knob" Width="14" Height="14" Fill="White" HorizontalAlignment="Left" Margin="3,0" />
+              </Border>
+            </Grid>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentStrong}" />
+              <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface2}" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter TargetName="Bd" Property="Opacity" Value="0.5" />

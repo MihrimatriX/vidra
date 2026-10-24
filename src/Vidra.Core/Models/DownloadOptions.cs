@@ -1,7 +1,10 @@
 namespace Vidra.Core.Models;
 
-/// <summary>"2:15", "135" ya da "01:02:03" — yt-dlp'nin anladığı zaman biçimleri.</summary>
-public sealed record Clip(string Start, string End);
+/// <summary>
+/// "2:15", "135" ya da "01:02:03" — yt-dlp'nin anladığı zaman biçimleri.
+/// Precise: kare hassasiyetinde kesim; videoyu yeniden kodlar. Kapalıyken anahtar karede, kopyalayarak keser.
+/// </summary>
+public sealed record Clip(string Start, string End, bool Precise = false);
 
 /// <summary>İşin geldiği playlist ve videonun listedeki sırası (1 tabanlı) — albüm/parça etiketi için.</summary>
 public sealed record PlaylistRef(string Title, int Index);
@@ -14,7 +17,7 @@ public sealed record DownloadProfile(string Name, DownloadOptions Options, bool 
         new("Müzik · MP3", new() { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.Mp3, MusicMode = true }, true),
         new("1080p · MP4", new() { Height = 1080, Container = ContainerFormat.Mp4 }, true),
         new("Telefon · 720p", new() { Height = 720, Container = ContainerFormat.Mp4, Codec = CodecPreference.H264, MaxFps30 = true }, true),
-        new("En iyi · MKV", new() { Height = null, Container = ContainerFormat.Mkv }, true),
+        new("Orijinal · en iyi", new() { Height = null, Container = ContainerFormat.Original }, true),
     ];
 
     /// <summary>Profil yalnızca biçimi belirler; altyazı, klip gibi videoya özel seçimler kullanıcıda kalır.</summary>
@@ -38,7 +41,8 @@ public sealed record DownloadOptions
     /// <summary>null = en iyi; aksi hâlde hedef yükseklik (px). Videoda yoksa sıralama en yakın düşüğe iner.</summary>
     public int? Height { get; init; } = 1080;
 
-    public ContainerFormat Container { get; init; } = ContainerFormat.Mp4;
+    /// <summary>Varsayılan Original: YouTube'daki akışlar olduğu gibi birleştirilir, kodek zorlanmaz.</summary>
+    public ContainerFormat Container { get; init; } = ContainerFormat.Original;
     public CodecPreference Codec { get; init; } = CodecPreference.Auto;
     public bool MaxFps30 { get; init; }
     public AudioFormat AudioFormat { get; init; } = AudioFormat.Mp3;
@@ -63,10 +67,10 @@ public sealed record DownloadOptions
 
     public string Describe()
     {
-        if (Mode == DownloadMode.Audio) return $"Ses · {AudioFormat.Ext().ToUpperInvariant()}{(MusicMode ? " · müzik" : "")}";
+        if (Mode == DownloadMode.Audio) return $"Ses · {AudioFormat.Label()}{(MusicMode ? " · müzik" : "")}";
         var q = Height is { } h ? $"{h}p" : "En iyi";
         var codec = Codec == CodecPreference.Auto ? "" : $" · {Codec.ToString().ToUpperInvariant()}";
         var clip = Clip is null ? "" : " · klip";
-        return $"{q} · {Container.Ext().ToUpperInvariant()}{codec}{clip}";
+        return $"{q} · {Container.Label()}{codec}{clip}";
     }
 }

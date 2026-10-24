@@ -28,6 +28,17 @@ public class StorageTests
         File.Delete(path);
     }
 
+    /// <summary>Önceki sürümün yazdığı ayar/bekleyen iş: yeni alanlar eksik, eski değerler korunur.</summary>
+    [Fact]
+    public void Old_options_json_still_reads()
+    {
+        var o = System.Text.Json.JsonSerializer.Deserialize<DownloadOptions>(
+            """{"container": "mp4", "audioFormat": "opus", "clip": {"start": "1:00", "end": "2:00"}}""", JsonStore.Options)!;
+        Assert.Equal(ContainerFormat.Mp4, o.Container);
+        Assert.Equal(AudioFormat.Opus, o.AudioFormat);
+        Assert.Equal(new Clip("1:00", "2:00", Precise: false), o.Clip);
+    }
+
     [Fact]
     public void Corrupt_file_returns_default_and_backs_up()
     {

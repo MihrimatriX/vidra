@@ -35,7 +35,6 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _cookieLabel = "";
     [ObservableProperty] private bool _cookieActive;
     [ObservableProperty] private string _diskLabel = "";
-    [ObservableProperty] private double _diskUsedFraction;
     [ObservableProperty] private int _activeCount;
     [ObservableProperty] private string _speedLabel = "";
 
@@ -93,6 +92,14 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public void Go(Page p) => Page = p;
+
+    /// <summary>Kenar çubuğundaki hesap satırı: bağlıysa Hesabım'ı açar, değilse girişi başlatır.</summary>
+    [RelayCommand]
+    private async Task AccountStatus()
+    {
+        if (CookieActive) Go(Page.Account);
+        else await Account.SignInCommand.ExecuteAsync(null);
+    }
 
     /// <summary>Herhangi bir ekrandan bağlantı açma: türüne göre doğru ekrana yönlendirir.</summary>
     public async Task OpenLinkAsync(string url)
@@ -152,7 +159,6 @@ public sealed partial class MainViewModel : ObservableObject
             if (!string.IsNullOrEmpty(root))
             {
                 var d = new DriveInfo(root);
-                DiskUsedFraction = 1 - (double)d.AvailableFreeSpace / d.TotalSize;
                 DiskLabel = $"{d.Name.TrimEnd('\\')} · {Fmt.Bytes(d.AvailableFreeSpace)} boş";
             }
         }

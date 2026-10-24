@@ -12,7 +12,8 @@
 
 ![Vidra](docs/shot-light.png)
 
-- **Tek video, Shorts, canlı yayın:** kalite, kodek, altyazı, klip kesme, SponsorBlock
+- **Orijinal kalite:** YouTube'daki akışlar dönüştürülmeden kaydedilir; bir seçim yeniden kodlamaya yol açıyorsa (MP3, kesin kesim) ekranda yazar
+- **Tek video, Shorts, canlı yayın:** kalite, biçim, kodek, altyazı, klip kesme, SponsorBlock
 - **Playlist ve kanal:** Videolar / Shorts / Canlı / Playlistler / Üyeler sekmeleri, filtreler, seçerek indirme
 - **Üyelere özel içerik:** üye olduğun kanalların üyelere özel videoları ve playlistleri
 - **Müzik modu:** MP3/FLAC, kare kapak, ses eşitleme, sanatçı/albüm/parça etiketleri
@@ -31,7 +32,7 @@ arayüz `Vidra.App` (WPF) içinde. yt-dlp, ffmpeg/ffprobe ve Deno ilk açılış
 
 ```powershell
 dotnet run --project src/Vidra.App            # geliştirme
-dotnet test                                    # 83 birim testi (Core)
+dotnet test                                    # 98 birim testi (Core)
 dotnet publish src/Vidra.App -c Release -r win-x64 -o publish   # tek, bağımsız Vidra.exe (~175 MB)
 
 # Küçük sürüm (.NET 9 Desktop Runtime kurulu makineler için, ~3 MB):
@@ -51,7 +52,7 @@ Geliştirme gereksinimleri: Windows 10 1809+ / 11, .NET 9 SDK, Microsoft Edge We
 
 | Ekran | Neler var |
 |---|---|
-| **Tek video** | Bağlantı yapıştır (birden çok link → hepsi kuyruğa). Kalite kartları (kodek, bit hızı, fps, boyut), MP4/MKV/WebM, kodek tercihi (H.264/VP9/AV1), ≤30 fps; ses (MP3/M4A/Opus/FLAC/WAV); altyazı dilleri (videodaki gerçek liste); **klip kesme** (zaman ya da bölüm, zaman çizelgesi); SponsorBlock kategorileri; bölümlere ayırma; indirilecek akış tablosu; dosya adı önizlemesi. |
+| **İndir** | Tek kutu: bağlantı yapıştır ya da yaz ve ara (birden çok link → hepsi kuyruğa). Video / Sadece ses; kalite kartları (boyut, kodek); biçim **Orijinal**/MP4/MKV/WebM; ses Orijinal/MP3/M4A/FLAC/WAV; **dönüştürme satırı** (kopyalanıyor mu, neyin yeniden kodlandığı). "Diğer seçenekler" altında: kodek (H.264/VP9/AV1), ≤30 fps, altyazı dilleri, **klip kesme** (anahtar karede kopyalayarak ya da kesin kesim), SponsorBlock, bölümler, hazır ayarlar, akış tablosu. |
 | **Ara** | YouTube'da arama; sonuçtan tek tıkla analiz ya da kuyruğa ekleme. |
 | **Playlist & kanal** | Videolar/Shorts/Canlı/Playlistler/**Üyeler** sekmeleri (sekmeli bağlantı doğrudan o sekmeyi açar); aralık, tarih, süre, arama, "indirilmemiş/üye" filtreleri; süre ve boyut tahmini; sanallaştırılmış liste (binlerce video); **Takip et** (yeni videolar otomatik iner); "Playlistlerim" gibi alt listeleri açma. |
 | **Kuyruk & geçmiş** | Eşzamanlılık ±, duraklat/sürdür/iptal/tekrar dene, sıranın başına al, canlı hız grafiği, seçili işin yt-dlp günlüğü, "komutu kopyala" (çerez yolu maskelenir), **bitince uyut**; geçmişte filtre/arama, oynat, klasörde göster, tekrar indir. Bitmemiş işler kapanışta kaydedilir, açılışta duraklatılmış olarak geri gelir. |
@@ -89,7 +90,13 @@ sahte bir yt-dlp ile test edilir. Canlı test için: `VIDRA_BIN_DIR=<yt-dlp/ffmp
 satırlar (`VIDRA:dl|…`) basılır; bitmiş dosya yolu `--print after_move:` ile alınır.
 
 **Kalite seçimi:** `-f bv*+ba/b -S res:1080,fps:30,vcodec:h264,acodec:m4a` — sıralama, `-f "bv[height<=1080]"`
-filtrelerinden dayanıklıdır; çözünürlük → fps → kodek sırası kodek tercihinin asla çözünürlüğü düşürmemesini sağlar.
+filtrelerinden dayanıklıdır. yt-dlp `-S` alanlarını kendi varsayılan sıralamasının *önüne* koyar; bu yüzden "En iyi"
+seçiliyken de `res` en başa yazılır, yoksa kodek tercihi çözünürlüğü ezer (4K varken 1080p H.264 iner).
+
+**Dönüştürme:** video ve ses her zaman kopyalanarak birleştirilir. **Orijinal** biçimde kodek ve kap zorlanmaz
+(`--merge-output-format` yok): VP9/AV1 + Opus → WebM (kapak gömülecekse MKV), H.264 + AAC → MP4. Yeniden kodlama
+yalnızca şu durumlarda olur ve indirme ekranında yazar: ses MP3/FLAC/WAV'a dönüştürülürken ve klipte **kesin kesim**
+(`--force-keyframes-at-cuts`) açıkken. M4A/Opus seçilince o kodekteki akış seçildiği için ses kopyalanır.
 
 ## YouTube girişi nasıl çalışır
 

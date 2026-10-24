@@ -22,11 +22,12 @@ public static partial class ProbeParser
         var formats = Get(r, "formats", out var f) && f.ValueKind == JsonValueKind.Array ? f.EnumerateArray().ToList() : [];
 
         // -drc: dinamik aralık sıkıştırılmış kopyalar; orijinali tercih et
-        var audio = formats
+        var audios = formats
             .Where(x => Str(x, "vcodec") == "none" && Str(x, "acodec") is { } ac && ac != "none" && !(Str(x, "format_id") ?? "").EndsWith("-drc"))
             .OrderByDescending(x => Dbl(x, "tbr") ?? 0)
             .Select(x => new AudioInfo(Str(x, "format_id")!, Str(x, "acodec")!.Split('.')[0], Dbl(x, "abr") ?? Dbl(x, "tbr"), Dbl(x, "asr"), Size(x)))
-            .FirstOrDefault();
+            .ToList();
+        var audio = audios.FirstOrDefault();
 
         var qualities = formats
             .Where(x => Int(x, "height") is > 0 && Str(x, "vcodec") is { } vc && vc != "none")
@@ -93,6 +94,7 @@ public static partial class ProbeParser
             Chapters = chapters,
             Qualities = qualities,
             Audio = audio,
+            AudioAac = audios.FirstOrDefault(x => x.Codec == "mp4a"),
             Subtitles = subs,
             AutoTranslateCount = autoCount,
         };
@@ -164,12 +166,19 @@ public static partial class ProbeParser
             var m = pool.Where(s => s.Codec == w).ToList();
             if (m.Count > 0) pool = m;
         }
-        // HLS kopyalarının boyutu bilinmez; aynı akışın DASH hâlini öne al
+        // yt-dlp'nin YouTube sıralaması: kare hızı → HDR → kodek (AV1 > VP9 > H.264). MP4'te H.264 yoksa (ör. 4K)
+        // -S vcodec:h264 sınıra en yakın olanı, yani VP9'u seçer. HLS kopyalarının boyutu bilinmez; DASH hâlini öne al.
         return pool.OrderByDescending(s => s.Fps ?? 0)
+            .ThenByDescending(s => want is null && s.Hdr)
+            .ThenBy(s => CodecRank(s.Codec, want))
             .ThenByDescending(s => s.Size is not null)
             .ThenByDescending(s => s.Tbr ?? 0)
             .FirstOrDefault();
     }
+
+    private static int CodecRank(CodecFamily c, CodecFamily? want) => want == CodecFamily.H264
+        ? c switch { CodecFamily.H264 => 0, CodecFamily.Vp9 => 1, CodecFamily.Av1 => 2, _ => 3 }
+        : c switch { CodecFamily.Av1 => 0, CodecFamily.Vp9 => 1, CodecFamily.H264 => 2, _ => 3 };
 
     private static string? Thumb(JsonElement e)
     {

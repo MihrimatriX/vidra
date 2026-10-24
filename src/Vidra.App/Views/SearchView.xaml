@@ -120,7 +120,7 @@
                   </Border>
                   <Button Style="{StaticResource BtnGhostIcon}" Width="34" Height="34" MinHeight="34" HorizontalAlignment="Right"
                           Command="{Binding DataContext.OpenCommand, ElementName=Root}" CommandParameter="{Binding}"
-                          ToolTip="Seçeneklerle aç: kalite, altyazı ve kesme için Tek video ekranı" AutomationProperties.Name="Seçeneklerle aç">
+                          ToolTip="Seçeneklerle aç: kalite, biçim, altyazı ve kesme için İndir ekranı" AutomationProperties.Name="Seçeneklerle aç">
                     <c:Icon Data="{StaticResource I.External}" Size="16" />
                   </Button>
                 </Grid>

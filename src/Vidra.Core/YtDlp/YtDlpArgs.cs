@@ -22,20 +22,33 @@ public static class YtDlpArgs
 
     private const string PpTemplate = MarkPp + "%(progress.status)s|%(progress.postprocessor)s";
 
-    /// <summary>Kalite/format seçimi. Sıralama (-S) -f filtrelerinden daha dayanıklıdır.</summary>
+    /// <summary>
+    /// Kalite/format seçimi. Sıralama (-S) -f filtrelerinden daha dayanıklıdır.
+    /// Video ve ses her zaman kopyalanarak birleştirilir; yeniden kodlama yalnızca ses dönüşümünde
+    /// ve kesin kesimde olur (bkz. Conversion.Reencodes).
+    /// </summary>
     public static List<string> Format(DownloadOptions o)
     {
         if (o.Mode == DownloadMode.Audio)
         {
-            var a = new List<string> { "-f", "ba/b", "-x", "--audio-format", o.AudioFormat.Ext() };
-            // Kayıplı formatlarda en iyi VBR; kayıpsızda kalite parametresi anlamsız
+            // M4A/Opus istenirse o kodekteki akışı seç: ffmpeg yeniden kodlamak yerine kopyalar
+            var pick = o.AudioFormat switch
+            {
+                AudioFormat.M4a => "ba[acodec^=mp4a]/ba/b",
+                AudioFormat.Opus => "ba[acodec=opus]/ba/b",
+                _ => "ba/b",
+            };
+            var a = new List<string> { "-f", pick, "-x" };
+            // --audio-format verilmezse yt-dlp "best" kullanır: akışın kendi kodeği, dönüştürme yok
+            if (o.AudioFormat != AudioFormat.Original) a.AddRange(["--audio-format", o.AudioFormat.Ext()]);
+            // Kayıplı formatlarda en iyi VBR (yalnızca dönüştürme gerekirse kullanılır); kayıpsızda anlamsız
             if (o.AudioFormat is AudioFormat.Mp3 or AudioFormat.M4a or AudioFormat.Opus) a.AddRange(["--audio-quality", "0"]);
             return a;
         }
 
-        // Sıra önemli: çözünürlük → kare hızı → kodek. Kodek tercihi asla çözünürlüğü düşürmez.
-        var sort = new List<string>();
-        if (o.Height is { } h) sort.Add($"res:{h}");
+        // Sıra önemli: çözünürlük → kare hızı → kodek. yt-dlp -S alanlarını kendi varsayılan sıralamasının
+        // önüne koyar; "res" yazılmazsa kodek tercihi çözünürlüğü ezer ("En iyi" + MP4 → 4K yerine 1080p H.264).
+        var sort = new List<string> { o.Height is { } h ? $"res:{h}" : "res" };
         if (o.MaxFps30) sort.Add("fps:30");
         var codec = o.Codec switch
         {
@@ -49,8 +62,16 @@ public static class YtDlpArgs
         if (o.Container == ContainerFormat.Mp4) sort.Add("acodec:m4a");
 
         var args = new List<string> { "-f", "bv*+ba/b" };
-        if (sort.Count > 0) args.AddRange(["-S", string.Join(',', sort)]);
-        args.AddRange(["--merge-output-format", o.Container.Ext()]);
+        // Tek başına "res" zaten yt-dlp'nin varsayılanı
+        if (sort.Count > 1 || o.Height is not null) args.AddRange(["-S", string.Join(',', sort)]);
+        var merge = o.Container switch
+        {
+            ContainerFormat.Original => null,
+            // WebM yalnızca VP9/AV1 + Opus taşır; H.264 seçilirse birleştirme hata vermesin, MKV'ye düşsün
+            ContainerFormat.Webm => "webm/mkv",
+            _ => o.Container.Ext(),
+        };
+        if (merge is not null) args.AddRange(["--merge-output-format", merge]);
         return args;
     }
 
@@ -65,8 +86,11 @@ public static class YtDlpArgs
     public static List<string> ClipArgs(Clip? clip)
     {
         if (clip is null || !TimeText.IsTime(clip.Start) || !TimeText.IsTime(clip.End)) return [];
-        // Anahtar karede kesmek hızlı ama kayar; kesin kesim için ffmpeg kesim noktalarına anahtar kare ekler
-        return ["--download-sections", $"*{clip.Start.Trim()}-{clip.End.Trim()}", "--force-keyframes-at-cuts"];
+        var a = new List<string> { "--download-sections", $"*{clip.Start.Trim()}-{clip.End.Trim()}" };
+        // Anahtar karede kesmek kopyalar ama birkaç saniye kayabilir. Kesin kesim kesim noktalarına anahtar kare
+        // ekler, bunun için videoyu yeniden kodlar; bayrak geneldir, SponsorBlock ve bölümlere ayırmayı da etkiler.
+        if (clip.Precise) a.Add("--force-keyframes-at-cuts");
+        return a;
     }
 
     public static List<string> Extras(DownloadOptions o, AppSettings s)

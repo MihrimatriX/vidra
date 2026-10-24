@@ -17,7 +17,7 @@ public sealed partial class SearchResult(PlaylistEntry entry) : ObservableObject
     public PlaylistEntry Entry { get; } = entry;
     public string DurationText => TimeText.Format(Entry.Duration);
 
-    /// <summary>Süresi olmayan sonuç canlı yayındır: hızlı indirme bitmez, yalnızca Tek video'da açılabilir.</summary>
+    /// <summary>Süresi olmayan sonuç canlı yayındır: hızlı indirme bitmez, yalnızca İndir ekranında açılabilir.</summary>
     public bool IsLive => Entry.Duration is null;
     public string Meta => string.Join(" · ", new[] { Entry.Channel, Entry.Views is { } v ? $"{Fmt.Count(v)} görüntülenme" : null }
         .Where(s => !string.IsNullOrEmpty(s)));
@@ -65,7 +65,7 @@ public sealed partial class SearchViewModel(AppHost host, MainViewModel main) : 
         }
     }
 
-    /// <summary>Kalite/altyazı seçmek için Tek video ekranında aç.</summary>
+    /// <summary>Kalite/altyazı seçmek için İndir ekranında aç.</summary>
     [RelayCommand] private Task Open(SearchResult? r) => r is null ? Task.CompletedTask : main.OpenLinkAsync(r.Entry.Url);
 
     [RelayCommand]

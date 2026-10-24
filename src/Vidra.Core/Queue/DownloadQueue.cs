@@ -284,9 +284,10 @@ public sealed partial class DownloadQueue : ObservableObject
         }
         catch (Exception ex)
         {
-            job.Status = JobStatus.Error;
+            // Durum en son: Status'u izleyen (arayüz, testler) hata türünü dolu görsün
             job.ErrorKind = ErrorKind.Unknown;
             job.ErrorMessage = $"yt-dlp başlatılamadı: {ex.Message}";
+            job.Status = JobStatus.Error;
             Schedule();
             return;
         }
@@ -333,12 +334,12 @@ public sealed partial class DownloadQueue : ObservableObject
             }
             else
             {
-                job.Status = JobStatus.Error;
                 job.ErrorKind = lastError?.Kind ?? ErrorKind.Unknown;
                 job.ErrorMessage = lastError is not null
                     ? OutputParser.FriendlyError(lastError.Kind, lastError.Message)
                     : $"yt-dlp {code} koduyla çıktı";
                 job.Stage = "Hata";
+                job.Status = JobStatus.Error;
             }
             UpdateTotalSpeed();
             Schedule();
