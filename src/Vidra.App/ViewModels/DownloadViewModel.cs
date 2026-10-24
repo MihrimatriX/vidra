@@ -14,8 +14,11 @@ using Vidra.Core.YtDlp;
 
 namespace Vidra.App.ViewModels;
 
-/// <summary>Kalite kartı. Height null = en iyi; Detail "≈ 420 MB · AV1".</summary>
-public sealed record QualityCard(int? Height, string Title, string Tag, string Detail, long? Size, StreamInfo? Stream);
+/// <summary>
+/// Kalite kartı. Height indirme seçeneğidir (null = en iyi: listedeki en yüksek kart), Res kartın gösterdiği yükseklik.
+/// Hint: seçilecek akış ("AV1 · 2,6 Mbps · 30 fps"), araç ipucunda.
+/// </summary>
+public sealed record QualityCard(int? Height, int Res, string Title, string Tag, string SizeText, string Hint, long? Size, StreamInfo? Stream);
 
 public sealed record AudioCard(AudioFormat Format, string Title, string Detail, string SizeText, long? Size);
 
@@ -28,7 +31,7 @@ public sealed partial class DownloadViewModel : ObservableObject
     private static readonly Dictionary<AudioFormat, (string Detail, double? Kbps)> AudioMeta = new()
     {
         [AudioFormat.Original] = ("en iyi akış", null),
-        [AudioFormat.Mp3] = ("~245 kbps · dönüşüm", 245),
+        [AudioFormat.Mp3] = ("VBR · dönüşüm", 245),
         [AudioFormat.M4a] = ("AAC akışı", null),
         [AudioFormat.Flac] = ("kayıpsız · dönüşüm", 900),
         [AudioFormat.Wav] = ("ham PCM · dönüşüm", 1411),
@@ -307,28 +310,30 @@ public sealed partial class DownloadViewModel : ObservableObject
     private void RebuildQualities()
     {
         if (Info is null) return;
-        var wantHeight = SelectedQuality?.Height ?? _host.Settings.Defaults.Height;
         var keepBest = SelectedQuality is { Height: null };
+        var wantHeight = keepBest ? null : SelectedQuality?.Res ?? _host.Settings.Defaults.Height;
         Qualities.Clear();
-        // Standart dışı yükseklikler de (ör. geniş 4K → 1974p) listelenir; -S res: en küçük boyuta göre sıralar
+        // 360p altı yalnızca başka seçenek azsa listelenir (kartlar tek satıra sığsın).
+        // Standart dışı yükseklikler de (ör. geniş 4K → 1974p) listelenir; -S res: en küçük boyuta göre sıralar.
+        var list = Info.Qualities.Count(q => q.Height >= 360) >= 3 ? Info.Qualities.Where(q => q.Height >= 360).ToList() : Info.Qualities.ToList();
         var audio = Container == ContainerFormat.Mp4 ? Info.AudioAac ?? Info.Audio : Info.Audio;
-        foreach (var q in Info.Qualities)
+        foreach (var q in list)
         {
             var s = ProbeParser.PickStream(q, Codec, Container, MaxFps30);
             long? total = s?.Size is { } sz ? sz + (audio?.Size ?? 0) : q.Size;
             var label = q.Height switch { >= 4320 => "8K", >= 2160 => "4K", >= 1440 => "2K", _ => null };
-            var tag = string.Join(" ", new[] { label, q.Hdr ? "HDR" : null, q.MaxFps is > 30 ? $"{q.MaxFps.Value:0}fps" : null }.Where(x => x is not null));
-            var detail = string.Join(" · ", new[] { "≈ " + Fmt.Bytes(total), s is null ? null : CodecName(s) }.Where(x => x is not null));
-            Qualities.Add(new QualityCard(q.Height, $"{q.Height}p", tag, detail, total, s));
+            // En yüksek kart "en iyi"dir: Height null → yt-dlp yeni çıkan daha yüksek akışı da alır, profil/varsayılan "en iyi" buna eşlenir
+            var best = Qualities.Count == 0;
+            var tag = string.Join(" · ", new[] { best ? "En iyi" : null, label, q.Hdr ? "HDR" : null, q.MaxFps is > 30 ? $"{q.MaxFps.Value:0}fps" : null }.Where(x => x is not null));
+            var hint = s is null ? "" : string.Join(" · ", new[] { CodecName(s), Fmt.Kbps(s.Tbr), s.Fps is { } f ? $"{f:0} fps" : null }.Where(x => !string.IsNullOrEmpty(x)));
+            Qualities.Add(new QualityCard(best ? null : q.Height, q.Height, $"{q.Height}p", tag, "≈ " + Fmt.Bytes(total), hint, total, s));
         }
-        // "En iyi" başta: yeni bir kalite çıkınca (ör. 8K) da en yükseği alır
-        var top = Qualities.FirstOrDefault();
-        Qualities.Insert(0, new QualityCard(null, "En iyi", top?.Title ?? "", top?.Detail ?? "", top?.Size, top?.Stream));
+        if (Qualities.Count == 0) Qualities.Add(new QualityCard(null, 0, "En iyi", "", "", "", null, null));
 
-        SelectedQuality = keepBest ? Qualities.FirstOrDefault()
-            : Qualities.FirstOrDefault(q => q.Height == wantHeight)
-              ?? Qualities.FirstOrDefault(q => q.Height <= wantHeight)
-              ?? Qualities.FirstOrDefault();
+        SelectedQuality = wantHeight is not { } want ? Qualities.FirstOrDefault()
+            : Qualities.FirstOrDefault(q => q.Res == want)
+              ?? Qualities.FirstOrDefault(q => q.Res <= want)
+              ?? Qualities.LastOrDefault();
         Recalculate();
     }
 
@@ -398,7 +403,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         StreamRows.Clear();
         if (video is { } s)
         {
-            var h = SelectedQuality!.Height ?? v.Qualities.FirstOrDefault()?.Height;
+            var h = SelectedQuality!.Res;
             var res = s.Width is { } w ? $"{w}×{h}" : $"{h}p";
             StreamRows.Add(new StreamRow("Video", s.Id, $"{res}{(s.Fps is { } f ? $" · {f:0}fps" : "")} · {s.VCodec.Split('.')[0]}{(s.Hdr ? " · HDR" : "")}",
                 Fmt.Kbps(s.Tbr), Fmt.Bytes(s.Size)));
@@ -436,7 +441,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         FilePreview = "→ " + Templates.Preview(_host.Settings.OutputTemplate, new Dictionary<string, object?>
         {
             ["title"] = v.Title, ["uploader"] = v.Channel, ["channel"] = v.Channel, ["id"] = v.Id, ["ext"] = ext,
-            ["upload_date"] = v.UploadDate, ["height"] = SelectedQuality?.Height,
+            ["upload_date"] = v.UploadDate, ["height"] = SelectedQuality?.Res,
         });
     }
 
@@ -478,7 +483,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         var audio = o.AudioFormat == AudioFormat.Opus ? AudioFormat.Original : o.AudioFormat;
         SelectedAudio = AudioCards.FirstOrDefault(a => a.Format == audio) ?? SelectedAudio;
         SelectedQuality = o.Height is not { } h ? Qualities.FirstOrDefault()
-            : Qualities.FirstOrDefault(q => q.Height == h) ?? Qualities.FirstOrDefault(q => q.Height < h) ?? Qualities.FirstOrDefault();
+            : Qualities.FirstOrDefault(q => q.Res == h) ?? Qualities.FirstOrDefault(q => q.Res < h) ?? Qualities.LastOrDefault();
     }
 
     [RelayCommand]

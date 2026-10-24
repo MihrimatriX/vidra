@@ -93,6 +93,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void Go(Page p) => Page = p;
 
+    /// <summary>Kenar çubuğundaki hesap satırı: bağlıysa Hesabım'ı açar, değilse girişi başlatır.</summary>
+    [RelayCommand]
+    private async Task AccountStatus()
+    {
+        if (CookieActive) Go(Page.Account);
+        else await Account.SignInCommand.ExecuteAsync(null);
+    }
+
     /// <summary>Herhangi bir ekrandan bağlantı açma: türüne göre doğru ekrana yönlendirir.</summary>
     public async Task OpenLinkAsync(string url)
     {
