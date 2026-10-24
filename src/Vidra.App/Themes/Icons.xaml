@@ -32,5 +32,7 @@
   <Geometry x:Key="I.Chart">M4,20 H20 M7,16 V11 M12,16 V6 M17,16 V13</Geometry>
   <Geometry x:Key="I.WinMin">M6,12 H18</Geometry>
   <Geometry x:Key="I.WinMax">M6,6 H18 V18 H6 Z</Geometry>
+  <Geometry x:Key="I.Chevron">M6,9 L12,15 L18,9</Geometry>
+  <Geometry x:Key="I.Info">M12,3 A9,9 0 1 1 11.99,3 Z M12,11 V16 M12,7.5 V8</Geometry>
   <Geometry x:Key="I.Star">M12,3 L14.6,9 L21,9.5 L16.1,13.7 L17.6,20 L12,16.6 L6.4,20 L7.9,13.7 L3,9.5 L9.4,9 Z</Geometry>
 </ResourceDictionary>

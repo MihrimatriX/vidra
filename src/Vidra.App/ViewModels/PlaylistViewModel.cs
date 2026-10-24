@@ -49,7 +49,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
         var d = host.Settings.Defaults;
         _mode = d.Mode;
         _height = d.Height ?? 0;
-        _audioFormat = d.AudioFormat;
+        _audioFormat = d.AudioFormat == AudioFormat.Opus ? AudioFormat.Original : d.AudioFormat;
         _musicMode = d.MusicMode;
     }
 

@@ -21,12 +21,79 @@ public class ArgsTests
     [Fact]
     public void Mp4_1080_prefers_h264_and_aac()
     {
-        Assert.Equal(["-f", "bv*+ba/b", "-S", "res:1080,vcodec:h264,acodec:m4a", "--merge-output-format", "mp4"], YtDlpArgs.Format(Opts));
+        Assert.Equal(["-f", "bv*+ba/b", "-S", "res:1080,vcodec:h264,acodec:m4a", "--merge-output-format", "mp4"],
+            YtDlpArgs.Format(Opts with { Container = ContainerFormat.Mp4 }));
     }
 
     [Fact]
     public void Mkv_best_has_no_sort() =>
         Assert.Equal(["-f", "bv*+ba/b", "--merge-output-format", "mkv"], YtDlpArgs.Format(Opts with { Height = null, Container = ContainerFormat.Mkv }));
+
+    [Fact]
+    public void Original_is_the_default_and_forces_neither_container_nor_codec()
+    {
+        Assert.Equal(ContainerFormat.Original, Opts.Container);
+        Assert.Equal(["-f", "bv*+ba/b", "-S", "res:1080"], YtDlpArgs.Format(Opts));
+        Assert.Equal(["-f", "bv*+ba/b"], YtDlpArgs.Format(Opts with { Height = null }));
+    }
+
+    /// <summary>yt-dlp -S alanlarını varsayılan sıralamanın önüne koyar: "res" olmadan kodek tercihi çözünürlüğü ezerdi.</summary>
+    [Fact]
+    public void Best_quality_keeps_resolution_ahead_of_codec_preference()
+    {
+        Assert.Equal("res,vcodec:h264,acodec:m4a", After(YtDlpArgs.Format(Opts with { Height = null, Container = ContainerFormat.Mp4 }), "-S"));
+        Assert.Equal("res,fps:30", After(YtDlpArgs.Format(Opts with { Height = null, MaxFps30 = true }), "-S"));
+    }
+
+    [Fact]
+    public void Webm_falls_back_to_mkv_for_incompatible_codecs() =>
+        Assert.Equal("webm/mkv", After(YtDlpArgs.Format(Opts with { Container = ContainerFormat.Webm, Codec = CodecPreference.H264 }), "--merge-output-format"));
+
+    [Fact]
+    public void Original_audio_extracts_without_converting() =>
+        Assert.Equal(["-f", "ba/b", "-x"], YtDlpArgs.Format(Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.Original }));
+
+    [Fact]
+    public void M4a_and_opus_pick_matching_stream_so_ffmpeg_copies()
+    {
+        Assert.Equal("ba[acodec^=mp4a]/ba/b", After(YtDlpArgs.Format(Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.M4a }), "-f"));
+        Assert.Equal("ba[acodec=opus]/ba/b", After(YtDlpArgs.Format(Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.Opus }), "-f"));
+    }
+
+    [Fact]
+    public void Reencodes_lists_only_lossy_steps()
+    {
+        Assert.Empty(Conversion.Reencodes(Opts));
+        Assert.Empty(Conversion.Reencodes(Opts with { Container = ContainerFormat.Mp4, SponsorBlock = true, Clip = new Clip("1:00", "2:00") }));
+        Assert.Empty(Conversion.Reencodes(Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.M4a, MusicMode = true }));
+        Assert.Equal(["ses MP3 biçimine dönüştürülür", "ses yüksekliği eşitlenir"],
+            Conversion.Reencodes(Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.Mp3, MusicMode = true }));
+        Assert.Single(Conversion.Reencodes(Opts with { Clip = new Clip("1:00", "2:00", Precise: true) }));
+        Assert.Empty(Conversion.Reencodes(Opts with { Clip = new Clip("x", "2:00", Precise: true) })); // geçersiz klip uygulanmaz
+        // Videoda AAC akışı yoksa M4A, Opus'tan dönüştürülerek elde edilir
+        Assert.Empty(Conversion.Reencodes(Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.M4a }, "mp4a.40.2"));
+        Assert.Equal(["ses M4A biçimine dönüştürülür"], Conversion.Reencodes(Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.M4a }, "opus"));
+        Assert.Empty(Conversion.Reencodes(Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.Original }, "opus"));
+    }
+
+    [Theory]
+    [InlineData(ContainerFormat.Original, "avc1.640028", "mp4a.40.2", true, "mp4")]
+    [InlineData(ContainerFormat.Original, "vp09.00.40.08", "opus", false, "webm")]
+    [InlineData(ContainerFormat.Original, "av01.0.08M.08", "opus", true, "mkv")] // WebM kapak taşımaz
+    [InlineData(ContainerFormat.Original, "avc1.640028", "opus", false, "mkv")]
+    [InlineData(ContainerFormat.Webm, "avc1.640028", "opus", false, "mkv")]
+    [InlineData(ContainerFormat.Mp4, "vp9", "opus", true, "mp4")]
+    public void Predicts_video_extension(ContainerFormat c, string v, string a, bool thumb, string ext) =>
+        Assert.Equal(ext, Conversion.PredictExt(Opts with { Container = c, EmbedThumbnail = thumb }, v, a));
+
+    [Fact]
+    public void Predicts_audio_extension()
+    {
+        var o = Opts with { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.Original };
+        Assert.Equal("opus", Conversion.PredictExt(o, null, "opus"));
+        Assert.Equal("m4a", Conversion.PredictExt(o, null, "mp4a"));
+        Assert.Equal("mp3", Conversion.PredictExt(o with { AudioFormat = AudioFormat.Mp3 }, null, "opus"));
+    }
 
     [Fact]
     public void Sort_order_is_resolution_fps_codec() =>
@@ -84,7 +151,8 @@ public class ArgsTests
     [Fact]
     public void Clip_args()
     {
-        Assert.Equal(["--download-sections", "*2:15-5:40", "--force-keyframes-at-cuts"], YtDlpArgs.ClipArgs(new Clip("2:15", "5:40")));
+        Assert.Equal(["--download-sections", "*2:15-5:40"], YtDlpArgs.ClipArgs(new Clip("2:15", "5:40")));
+        Assert.Equal(["--download-sections", "*2:15-5:40", "--force-keyframes-at-cuts"], YtDlpArgs.ClipArgs(new Clip("2:15", "5:40", Precise: true)));
         Assert.Empty(YtDlpArgs.ClipArgs(new Clip("abc", "5:40")));
     }
 

@@ -17,10 +17,10 @@ public sealed record Choice(object Value, string Label)
 public static class Choices
 {
     public static readonly IReadOnlyList<Choice> Containers =
-        [new(ContainerFormat.Mp4, "MP4"), new(ContainerFormat.Mkv, "MKV"), new(ContainerFormat.Webm, "WebM")];
+        [new(ContainerFormat.Original, "Orijinal"), new(ContainerFormat.Mp4, "MP4"), new(ContainerFormat.Mkv, "MKV"), new(ContainerFormat.Webm, "WebM")];
 
     public static readonly IReadOnlyList<Choice> Codecs =
-        [new(CodecPreference.Auto, "Otomatik (MP4'te H.264)"), new(CodecPreference.Vp9, "VP9"), new(CodecPreference.Av1, "AV1 (küçük)")];
+        [new(CodecPreference.Auto, "Otomatik"), new(CodecPreference.H264, "H.264"), new(CodecPreference.Vp9, "VP9"), new(CodecPreference.Av1, "AV1")];
 
     public static readonly IReadOnlyList<Choice> Fps = [new(false, "En yüksek"), new(true, "≤ 30")];
 
@@ -29,8 +29,10 @@ public static class Choices
     public static readonly IReadOnlyList<Choice> Heights =
         [new(0, "En iyi"), new(2160, "2160p"), new(1440, "1440p"), new(1080, "1080p"), new(720, "720p"), new(480, "480p"), new(360, "360p")];
 
-    public static readonly IReadOnlyList<Choice> AudioFormats =
-        Enum.GetValues<AudioFormat>().Select(a => new Choice(a, a.ToString().ToUpperInvariant())).ToList();
+    /// <summary>Opus listede yok: Orijinal zaten Opus akışını dönüştürmeden kaydeder (eski ayarlarda kalmışsa yine çalışır).</summary>
+    public static readonly IReadOnlyList<AudioFormat> AudioOrder = [AudioFormat.Original, AudioFormat.Mp3, AudioFormat.M4a, AudioFormat.Flac, AudioFormat.Wav];
+
+    public static readonly IReadOnlyList<Choice> AudioFormats = AudioOrder.Select(a => new Choice(a, a.Label())).ToList();
 
     public static readonly IReadOnlyList<Choice> Themes =
         [new(ThemeMode.Light, "Açık"), new(ThemeMode.Dark, "Koyu"), new(ThemeMode.System, "Sistem")];

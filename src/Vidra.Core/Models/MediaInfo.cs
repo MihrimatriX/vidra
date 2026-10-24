@@ -36,6 +36,9 @@ public sealed record VideoInfo
     public IReadOnlyList<Chapter> Chapters { get; init; } = [];
     public IReadOnlyList<QualityOption> Qualities { get; init; } = [];
     public AudioInfo? Audio { get; init; }
+
+    /// <summary>En iyi AAC akışı: MP4 ve M4A seçimlerinde kopyalanan ses (Audio genelde Opus'tur).</summary>
+    public AudioInfo? AudioAac { get; init; }
     public IReadOnlyList<SubtitleTrack> Subtitles { get; init; } = [];
     public int AutoTranslateCount { get; init; }
 }

@@ -171,7 +171,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     public int DefaultHeight { get => D.Height ?? 0; set => SetDefault(d => d with { Height = value == 0 ? null : value }); }
     public ContainerFormat DefaultContainer { get => D.Container; set => SetDefault(d => d with { Container = value }); }
     public CodecPreference DefaultCodec { get => D.Codec; set => SetDefault(d => d with { Codec = value }); }
-    public AudioFormat DefaultAudio { get => D.AudioFormat; set => SetDefault(d => d with { AudioFormat = value }); }
+    // Opus artık listede yok: eski ayarda kalmışsa aynı işi gören Orijinal olarak göster
+    public AudioFormat DefaultAudio { get => D.AudioFormat == AudioFormat.Opus ? AudioFormat.Original : D.AudioFormat; set => SetDefault(d => d with { AudioFormat = value }); }
     public bool DefaultSubs { get => D.Subtitles; set => SetDefault(d => d with { Subtitles = value }); }
     public bool DefaultSponsor { get => D.SponsorBlock; set => SetDefault(d => d with { SponsorBlock = value }); }
     public bool DefaultThumb { get => D.EmbedThumbnail; set => SetDefault(d => d with { EmbedThumbnail = value, EmbedMetadata = value }); }

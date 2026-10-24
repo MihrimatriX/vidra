@@ -327,6 +327,42 @@
     </Setter>
   </Style>
 
+  <!-- Katlanır bölüm başlığı: Content = başlık, Tag = kapalıyken özet; açılınca ok döner -->
+  <Style x:Key="Disclosure" TargetType="ToggleButton">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="10" Padding="10,8" Margin="-10,0">
+            <DockPanel>
+              <c:Icon x:Name="Chev" DockPanel.Dock="Left" Data="{StaticResource I.Chevron}" Size="15" Margin="0,0,8,0"
+                      Foreground="{DynamicResource Muted}" RenderTransformOrigin="0.5,0.5">
+                <c:Icon.RenderTransform><RotateTransform Angle="-90" /></c:Icon.RenderTransform>
+              </c:Icon>
+              <ContentPresenter DockPanel.Dock="Left" VerticalAlignment="Center" TextElement.FontWeight="SemiBold" TextElement.FontSize="13" />
+              <TextBlock x:Name="Sum" Text="{TemplateBinding Tag}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="12,0,0,0"
+                         VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface2}" />
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Chev" Property="RenderTransform">
+                <Setter.Value><RotateTransform Angle="0" /></Setter.Value>
+              </Setter>
+              <Setter TargetName="Sum" Property="Visibility" Value="Collapsed" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <!-- ============ Anahtar (CheckBox → switch kartı). Content = başlık, Tag = açıklama ============ -->
   <Style x:Key="SwitchCard" TargetType="CheckBox">
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />

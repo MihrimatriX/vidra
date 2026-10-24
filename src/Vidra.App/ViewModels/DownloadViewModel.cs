@@ -14,10 +14,8 @@ using Vidra.Core.YtDlp;
 
 namespace Vidra.App.ViewModels;
 
-public enum OptionTab { Video, Audio, Subs, Advanced }
-
-/// <summary>Kalite kartı.</summary>
-public sealed record QualityCard(int? Height, string Title, string Tag, string Codec, string SizeText, long? Size, StreamInfo? Stream);
+/// <summary>Kalite kartı. Height null = en iyi; Detail "≈ 420 MB · AV1".</summary>
+public sealed record QualityCard(int? Height, string Title, string Tag, string Detail, long? Size, StreamInfo? Stream);
 
 public sealed record AudioCard(AudioFormat Format, string Title, string Detail, string SizeText, long? Size);
 
@@ -26,14 +24,14 @@ public sealed record StreamRow(string Kind, string Id, string Detail, string Rat
 public sealed partial class DownloadViewModel : ObservableObject
 {
 
-    /// <summary>Dönüştürülen formatların yaklaşık bit hızı (kbps); null = orijinal akış boyutu.</summary>
+    /// <summary>Dönüştürülen formatların yaklaşık bit hızı (kbps); null = kopyalanan akışın kendi boyutu.</summary>
     private static readonly Dictionary<AudioFormat, (string Detail, double? Kbps)> AudioMeta = new()
     {
-        [AudioFormat.Mp3] = ("VBR 0 · ~245 kbps", 245),
-        [AudioFormat.M4a] = ("AAC · cihaz dostu", null),
-        [AudioFormat.Opus] = ("orijinal akış", null),
-        [AudioFormat.Flac] = ("kayıpsız dönüşüm", 900),
-        [AudioFormat.Wav] = ("ham PCM 16-bit", 1411),
+        [AudioFormat.Original] = ("dönüştürmesiz", null),
+        [AudioFormat.Mp3] = ("dönüştürülür · ~245 kbps", 245),
+        [AudioFormat.M4a] = ("AAC akışı · dönüştürmesiz", null),
+        [AudioFormat.Flac] = ("dönüştürülür · kayıpsız kap", 900),
+        [AudioFormat.Wav] = ("dönüştürülür · ham PCM", 1411),
     };
 
     private readonly AppHost _host;
@@ -54,7 +52,6 @@ public sealed partial class DownloadViewModel : ObservableObject
         _chapters = d.Chapters;
         _mode = d.Mode;
         _musicMode = d.MusicMode;
-        Tab = d.Mode == DownloadMode.Audio ? OptionTab.Audio : OptionTab.Video;
     }
 
     // Profiller: hazırlar + kullanıcının kaydettikleri
@@ -66,10 +63,16 @@ public sealed partial class DownloadViewModel : ObservableObject
     public IReadOnlyList<Choice> Containers => Choices.Containers;
     public IReadOnlyList<Choice> Codecs => Choices.Codecs;
     public IReadOnlyList<Choice> FpsChoices => Choices.Fps;
-    public IReadOnlyList<Choice> Tabs { get; } =
-        [new(OptionTab.Video, "Video"), new(OptionTab.Audio, "Sadece ses"), new(OptionTab.Subs, "Altyazı"), new(OptionTab.Advanced, "Gelişmiş")];
+    public IReadOnlyList<Choice> ModeChoices { get; } = [new(DownloadMode.Video, "Video"), new(DownloadMode.Audio, "Sadece ses")];
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(PlaylistUrl))] private string _url = "";
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(PlaylistUrl), nameof(IsQuery))] private string _url = "";
+
+    /// <summary>Kutudaki metin bağlantı değil: Enter YouTube'da arar (kutu hem bağlantı hem arama kabul eder).</summary>
+    public bool IsQuery => Url.Trim() is { Length: > 0 } t && YouTubeUrl.Classify(t) is null && !LooksLikeUrl(t);
+
+    private static bool LooksLikeUrl(string t) =>
+        t.Contains("://", StringComparison.Ordinal) || t.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ||
+        (!t.Contains(' ') && t.Contains('/') && t.Contains('.'));
 
     /// <summary>İzleme bağlantısı bir playlistin içindeyse (watch?v=…&amp;list=…) o listenin adresi.</summary>
     public string? PlaylistUrl => YouTubeUrl.Classify(Url) == LinkKind.Video && YouTubeUrl.PlaylistId(Url) is { } id
@@ -83,8 +86,10 @@ public sealed partial class DownloadViewModel : ObservableObject
     public bool HasInfo => Info is not null;
     public bool ShowEmpty => Info is null && !IsLoading;
 
-    [ObservableProperty] private OptionTab _tab;
     [ObservableProperty] private DownloadMode _mode;
+
+    /// <summary>"Diğer seçenekler" açık mı: altyazı, klip, SponsorBlock, kodek… varsayılan olarak gizli.</summary>
+    [ObservableProperty] private bool _showMore;
 
     // Video
     public ObservableCollection<QualityCard> Qualities { get; } = [];
@@ -107,6 +112,9 @@ public sealed partial class DownloadViewModel : ObservableObject
     [ObservableProperty] private bool _clipEnabled;
     [ObservableProperty] private string _clipStart = "";
     [ObservableProperty] private string _clipEnd = "";
+
+    /// <summary>Kare hassasiyetinde kesim: videoyu yeniden kodlar. Kapalıyken anahtar karede kopyalayarak keser.</summary>
+    [ObservableProperty] private bool _clipPrecise;
     [ObservableProperty] private Chapter? _selectedChapter;
     [ObservableProperty] private bool _splitChapters;
     public ObservableCollection<Toggle> SponsorCats { get; } = [];
@@ -118,7 +126,6 @@ public sealed partial class DownloadViewModel : ObservableObject
 
     // Hesaplanan özet
     public ObservableCollection<StreamRow> StreamRows { get; } = [];
-    [ObservableProperty] private string _resultSummary = "";
     [ObservableProperty] private string _estimate = "";
     [ObservableProperty] private string _filePreview = "";
     [ObservableProperty] private string _clipText = "";
@@ -131,6 +138,13 @@ public sealed partial class DownloadViewModel : ObservableObject
     [ObservableProperty] private string _metaUpload = "—";
     [ObservableProperty] private string _metaViews = "—";
 
+    /// <summary>Dönüştürme satırı: akışlar kopyalanıyor mu, yoksa neyin yeniden kodlandığı.</summary>
+    [ObservableProperty] private bool _isLossless = true;
+    [ObservableProperty] private string _conversionText = "";
+
+    /// <summary>Kapalı "Diğer seçenekler" başlığında açık olanların özeti.</summary>
+    [ObservableProperty] private string _moreSummary = "";
+
     public bool UseArchive
     {
         get => _host.Settings.UseArchive;
@@ -139,12 +153,6 @@ public sealed partial class DownloadViewModel : ObservableObject
 
     public string OutputDir => _host.Settings.OutputDir;
     public string SponsorHint => $"{_host.Settings.SponsorCategories.Count} kategori kesilir";
-
-    partial void OnTabChanged(OptionTab value)
-    {
-        if (value is OptionTab.Video) Mode = DownloadMode.Video;
-        else if (value is OptionTab.Audio) Mode = DownloadMode.Audio;
-    }
 
     partial void OnModeChanged(DownloadMode value) => Recalculate();
     partial void OnSelectedQualityChanged(QualityCard? value) => Recalculate();
@@ -155,6 +163,10 @@ public sealed partial class DownloadViewModel : ObservableObject
     partial void OnClipEnabledChanged(bool value) => Recalculate();
     partial void OnClipStartChanged(string value) => Recalculate();
     partial void OnClipEndChanged(string value) => Recalculate();
+    partial void OnClipPreciseChanged(bool value) => Recalculate();
+    partial void OnEmbedThumbnailChanged(bool value) => Recalculate();
+    partial void OnSponsorBlockChanged(bool value) => Recalculate();
+    partial void OnSplitChaptersChanged(bool value) => Recalculate();
     partial void OnContainerChanged(ContainerFormat value) => RebuildQualities();
     partial void OnCodecChanged(CodecPreference value) => RebuildQualities();
     partial void OnMaxFps30Changed(bool value) => RebuildQualities();
@@ -183,6 +195,15 @@ public sealed partial class DownloadViewModel : ObservableObject
         var url = Url.Trim();
         if (url.Length == 0) return;
         var kind = YouTubeUrl.Classify(url);
+        if (kind is null && IsQuery)
+        {
+            Error = null;
+            Url = "";
+            _main.Search.Query = url;
+            _main.Go(Page.Search);
+            await _main.Search.SearchCommand.ExecuteAsync(null);
+            return;
+        }
         if (kind is null)
         {
             Error = "Bu bir YouTube video, Shorts, playlist, kanal ya da canlı yayın bağlantısı değil.";
@@ -201,6 +222,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         Error = null;
         Info = null;
         ClipEnabled = false;
+        ClipPrecise = false;
         try
         {
             var r = await _host.YtDlp.ProbeAsync(url, ct: cts.Token);
@@ -264,14 +286,19 @@ public sealed partial class DownloadViewModel : ObservableObject
         }
 
         AudioCards.Clear();
-        foreach (var f in Enum.GetValues<AudioFormat>())
+        foreach (var f in Choices.AudioOrder)
         {
             var (detail, kbps) = AudioMeta[f];
-            long? size = kbps is { } k && v.Duration is { } dur ? (long)(k * 1000 / 8 * dur) : v.Audio?.Size;
-            if (f == AudioFormat.Opus && v.Audio is { } au) detail = $"{au.Codec} · {Fmt.Kbps(au.Abr)}";
-            AudioCards.Add(new AudioCard(f, f.ToString().ToUpperInvariant(), detail, "≈ " + Fmt.Bytes(size), size));
+            var src = AudioFor(f);
+            long? size = kbps is { } k && v.Duration is { } dur ? (long)(k * 1000 / 8 * dur) : src?.Size;
+            if (kbps is null && src is not null)
+                detail = Conversion.Reencodes(new DownloadOptions { Mode = DownloadMode.Audio, AudioFormat = f }, src.Codec).Count > 0
+                    ? $"{AudioName(src.Codec)} kaynaktan dönüştürülür"
+                    : $"{AudioName(src.Codec)} {Fmt.Kbps(src.Abr)} · dönüştürmesiz";
+            AudioCards.Add(new AudioCard(f, f.Label(), detail, "≈ " + Fmt.Bytes(size), size));
         }
-        SelectedAudio = AudioCards.FirstOrDefault(a => a.Format == _host.Settings.Defaults.AudioFormat) ?? AudioCards.First();
+        var wantAudio = _host.Settings.Defaults.AudioFormat == AudioFormat.Opus ? AudioFormat.Original : _host.Settings.Defaults.AudioFormat;
+        SelectedAudio = AudioCards.FirstOrDefault(a => a.Format == wantAudio) ?? AudioCards.First();
 
         RebuildQualities();
     }
@@ -283,22 +310,24 @@ public sealed partial class DownloadViewModel : ObservableObject
         var keepBest = SelectedQuality is { Height: null };
         Qualities.Clear();
         // Standart dışı yükseklikler de (ör. geniş 4K → 1974p) listelenir; -S res: en küçük boyuta göre sıralar
+        var audio = Container == ContainerFormat.Mp4 ? Info.AudioAac ?? Info.Audio : Info.Audio;
         foreach (var q in Info.Qualities)
         {
             var s = ProbeParser.PickStream(q, Codec, Container, MaxFps30);
-            long? total = s?.Size is { } sz ? sz + (Info.Audio?.Size ?? 0) : q.Size;
-            var label = q.Height switch { >= 4320 => "8K", >= 2160 => "4K", >= 1440 => "2K", >= 1080 => "Full HD", >= 720 => "HD", _ => null };
+            long? total = s?.Size is { } sz ? sz + (audio?.Size ?? 0) : q.Size;
+            var label = q.Height switch { >= 4320 => "8K", >= 2160 => "4K", >= 1440 => "2K", _ => null };
             var tag = string.Join(" ", new[] { label, q.Hdr ? "HDR" : null, q.MaxFps is > 30 ? $"{q.MaxFps.Value:0}fps" : null }.Where(x => x is not null));
-            var codec = s is null ? "—" : $"{CodecName(s)} · {Fmt.Kbps(s.Tbr)}";
-            Qualities.Add(new QualityCard(q.Height, $"{q.Height}p", tag, codec, "≈ " + Fmt.Bytes(total), total, s));
+            var detail = string.Join(" · ", new[] { "≈ " + Fmt.Bytes(total), s is null ? null : CodecName(s) }.Where(x => x is not null));
+            Qualities.Add(new QualityCard(q.Height, $"{q.Height}p", tag, detail, total, s));
         }
+        // "En iyi" başta: yeni bir kalite çıkınca (ör. 8K) da en yükseği alır
         var top = Qualities.FirstOrDefault();
-        Qualities.Add(new QualityCard(null, "En iyi", "otomatik", "en yüksek mevcut", top?.SizeText ?? "", top?.Size, top?.Stream));
+        Qualities.Insert(0, new QualityCard(null, "En iyi", top?.Title ?? "", top?.Detail ?? "", top?.Size, top?.Stream));
 
-        SelectedQuality = keepBest ? Qualities.Last()
+        SelectedQuality = keepBest ? Qualities.FirstOrDefault()
             : Qualities.FirstOrDefault(q => q.Height == wantHeight)
               ?? Qualities.FirstOrDefault(q => q.Height <= wantHeight)
-              ?? Qualities.Last();
+              ?? Qualities.FirstOrDefault();
         Recalculate();
     }
 
@@ -310,12 +339,20 @@ public sealed partial class DownloadViewModel : ObservableObject
         _ => s.VCodec.Split('.')[0],
     };
 
+    private static string AudioName(string codec) => codec switch { "opus" => "Opus", "mp4a" => "AAC", _ => codec };
+
+    /// <summary>Seçime göre kopyalanacak ses akışı: MP4/M4A'da AAC, aksi hâlde en iyisi (genelde Opus).</summary>
+    private AudioInfo? AudioFor(AudioFormat f) => f == AudioFormat.M4a ? Info?.AudioAac ?? Info?.Audio : Info?.Audio;
+
+    private AudioInfo? CurrentAudio(DownloadOptions o) => o.Mode == DownloadMode.Audio ? AudioFor(o.AudioFormat)
+        : o.Container == ContainerFormat.Mp4 ? Info?.AudioAac ?? Info?.Audio : Info?.Audio;
+
     private Clip? CurrentClip()
     {
         if (!ClipEnabled) return null;
         var a = TimeText.ToSeconds(ClipStart);
         var b = TimeText.ToSeconds(ClipEnd);
-        return a is not null && b is not null && b > a ? new Clip(ClipStart.Trim(), ClipEnd.Trim()) : null;
+        return a is not null && b is not null && b > a ? new Clip(ClipStart.Trim(), ClipEnd.Trim(), ClipPrecise) : null;
     }
 
     public DownloadOptions BuildOptions() => _host.Settings.Defaults with
@@ -353,25 +390,44 @@ public sealed partial class DownloadViewModel : ObservableObject
         ClipWidth = clip is not null ? ratio : 0;
         ClipRight = Math.Max(0, 1 - ClipLeft - ClipWidth);
 
+        var video = o.Mode == DownloadMode.Video ? SelectedQuality?.Stream : null;
+        var audio = CurrentAudio(o);
+        var ext = Conversion.PredictExt(o, video?.VCodec, audio?.Codec);
+
         StreamRows.Clear();
-        if (o.Mode == DownloadMode.Video && SelectedQuality?.Stream is { } s)
+        if (video is { } s)
         {
-            var h = SelectedQuality.Height ?? v.Qualities.FirstOrDefault()?.Height;
+            var h = SelectedQuality!.Height ?? v.Qualities.FirstOrDefault()?.Height;
             var res = s.Width is { } w ? $"{w}×{h}" : $"{h}p";
             StreamRows.Add(new StreamRow("Video", s.Id, $"{res}{(s.Fps is { } f ? $" · {f:0}fps" : "")} · {s.VCodec.Split('.')[0]}{(s.Hdr ? " · HDR" : "")}",
                 Fmt.Kbps(s.Tbr), Fmt.Bytes(s.Size)));
         }
-        if (v.Audio is { } a)
+        if (audio is { } a)
             StreamRows.Add(new StreamRow("Ses", a.Id,
-                $"{a.Codec}{(a.Asr is { } asr ? $" · {asr / 1000:0.#} kHz" : "")}{(o.Mode == DownloadMode.Audio ? $" → {o.AudioFormat.Ext().ToUpperInvariant()}" : "")}",
+                $"{a.Codec}{(a.Asr is { } asr ? $" · {asr / 1000:0.#} kHz" : "")} → .{ext}",
                 Fmt.Kbps(a.Abr), Fmt.Bytes(a.Size)));
 
-        var ext = o.Mode == DownloadMode.Audio ? o.AudioFormat.Ext() : o.Container.Ext();
-        var parts = new List<string> { ext.ToUpperInvariant() };
-        if (o.Subtitles && o.SubLangs is { Count: > 0 } langs) parts.Add("altyazı " + string.Join('+', langs).ToUpperInvariant());
-        if (o.Chapters && v.Chapters.Count > 0) parts.Add($"{v.Chapters.Count} bölüm");
-        if (clip is not null) parts.Add($"klip {TimeText.Format(clipSecs)}");
-        ResultSummary = string.Join(" · ", parts);
+        var reencodes = Conversion.Reencodes(o, audio?.Codec);
+        IsLossless = reencodes.Count == 0;
+        ConversionText = !IsLossless ? "Yeniden kodlanır: " + string.Join(", ", reencodes)
+            : o.Mode == DownloadMode.Video
+                ? video is not null && audio is not null
+                    ? $"Dönüştürme yok · {CodecName(video)} + {AudioName(audio.Codec)} akışları olduğu gibi .{ext} dosyasına kopyalanır"
+                    : "Dönüştürme yok · akışlar olduğu gibi kopyalanır"
+                : audio is not null ? $"Dönüştürme yok · {AudioName(audio.Codec)} akışı olduğu gibi .{ext} olarak kaydedilir"
+                : $"Dönüştürme yok · .{ext} olarak kaydedilir";
+
+        var more = new List<string>();
+        if (o.Mode == DownloadMode.Video && o.Codec != CodecPreference.Auto) more.Add(Choices.Codecs.First(c => Equals(c.Value, o.Codec)).Label);
+        if (o.Mode == DownloadMode.Video && o.MaxFps30) more.Add("≤ 30 fps");
+        if (o.Subtitles && o.SubLangs is { Count: > 0 } langs && !(o.Mode == DownloadMode.Audio && o.MusicMode))
+            more.Add("altyazı " + string.Join('+', langs).ToUpperInvariant());
+        if (clip is not null) more.Add($"klip {TimeText.Format(clipSecs)}");
+        if (o.SponsorBlock) more.Add("SponsorBlock");
+        if (o.Chapters && v.Chapters.Count > 0) more.Add("bölüm işaretleri");
+        if (o.SplitChapters) more.Add("bölümlere ayır");
+        if (o.EmbedThumbnail) more.Add("kapak & etiket");
+        MoreSummary = more.Count > 0 ? string.Join(" · ", more) : "Altyazı, klip, SponsorBlock, kodek";
 
         long? size = o.Mode == DownloadMode.Audio ? SelectedAudio?.Size : SelectedQuality?.Size;
         Estimate = size is { } sz ? Fmt.Bytes(sz * ratio) : "—";
@@ -417,10 +473,11 @@ public sealed partial class DownloadViewModel : ObservableObject
         Codec = o.Codec;
         MaxFps30 = o.MaxFps30;
         MusicMode = o.MusicMode;
-        Tab = o.Mode == DownloadMode.Audio ? OptionTab.Audio : OptionTab.Video;
-        SelectedAudio = AudioCards.FirstOrDefault(a => a.Format == o.AudioFormat) ?? SelectedAudio;
-        SelectedQuality = o.Height is not { } h ? Qualities.LastOrDefault()
-            : Qualities.FirstOrDefault(q => q.Height == h) ?? Qualities.FirstOrDefault(q => q.Height < h) ?? Qualities.LastOrDefault();
+        Mode = o.Mode;
+        var audio = o.AudioFormat == AudioFormat.Opus ? AudioFormat.Original : o.AudioFormat;
+        SelectedAudio = AudioCards.FirstOrDefault(a => a.Format == audio) ?? SelectedAudio;
+        SelectedQuality = o.Height is not { } h ? Qualities.FirstOrDefault()
+            : Qualities.FirstOrDefault(q => q.Height == h) ?? Qualities.FirstOrDefault(q => q.Height < h) ?? Qualities.FirstOrDefault();
     }
 
     [RelayCommand]

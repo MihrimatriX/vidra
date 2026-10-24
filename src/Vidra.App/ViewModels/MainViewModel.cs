@@ -35,7 +35,6 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _cookieLabel = "";
     [ObservableProperty] private bool _cookieActive;
     [ObservableProperty] private string _diskLabel = "";
-    [ObservableProperty] private double _diskUsedFraction;
     [ObservableProperty] private int _activeCount;
     [ObservableProperty] private string _speedLabel = "";
 
@@ -152,7 +151,6 @@ public sealed partial class MainViewModel : ObservableObject
             if (!string.IsNullOrEmpty(root))
             {
                 var d = new DriveInfo(root);
-                DiskUsedFraction = 1 - (double)d.AvailableFreeSpace / d.TotalSize;
                 DiskLabel = $"{d.Name.TrimEnd('\\')} · {Fmt.Bytes(d.AvailableFreeSpace)} boş";
             }
         }
