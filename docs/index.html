@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vidra — Windows için video ve müzik indirici</title>
+<meta name="description" content="Vidra: yt-dlp tabanlı, sade ve hızlı Windows video, playlist, kanal ve müzik indirici. Ücretsiz.">
+<link rel="icon" href="icon.png">
+<meta property="og:title" content="Vidra — video ve müzik indirici">
+<meta property="og:description" content="Video, playlist, kanal ve müzik indirmek için sade bir Windows uygulaması.">
+<meta property="og:image" content="https://mihrimatrix.github.io/vidra/shot-light.png">
+<style>
+  :root {
+    --bg: #f5f5f7; --surface: #ffffff; --line: #e6e6ea; --text: #15161a; --text2: #5b5e66; --muted: #8a8d95;
+    --accent: #f23d52; --accent2: #ff6676; --accent-soft: #fdecee; --accent-ink: #ffffff;
+    --shadow: 0 1px 2px rgba(16,17,21,.04), 0 12px 40px rgba(16,17,21,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101115; --surface: #18191e; --line: #26272e; --text: #f2f2f4; --text2: #a5a8b0; --muted: #767983;
+      --accent: #ff4d61; --accent2: #ff7584; --accent-soft: #2a1519;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 40px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.6 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; font-size: 18px; }
+  .brand img { width: 32px; height: 32px; }
+  .gh { font-size: 14px; color: var(--text2); text-decoration: none; padding: 7px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .gh:hover { color: var(--text); }
+
+  .hero { text-align: center; padding: 48px 0 36px; }
+  .hero h1 {
+    font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    font-size: clamp(32px, 5.5vw, 52px); line-height: 1.1; letter-spacing: -.02em; margin: 0 0 14px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero p { font-size: 17px; color: var(--text2); max-width: 600px; margin: 0 auto 28px; }
+
+  .cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px; text-decoration: none; font-weight: 600; font-size: 15px;
+    padding: 12px 20px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn.primary { background: linear-gradient(180deg, var(--accent2), var(--accent)); border-color: transparent; color: var(--accent-ink); }
+  .btn small { font-weight: 400; opacity: .8; font-size: 13px; }
+  .btn svg { width: 18px; height: 18px; }
+  .meta { margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+  .shot { margin: 44px auto 0; max-width: 980px; }
+  .shot img { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid var(--line); box-shadow: var(--shadow); }
+
+  section { padding: 56px 0 8px; }
+  h2 { font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; font-size: 26px; letter-spacing: -.01em; margin: 0 0 20px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .card .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; margin-bottom: 12px; }
+  .card .ic svg { width: 18px; height: 18px; }
+  .card h3 { font-size: 15px; margin: 0 0 4px; }
+  .card p { margin: 0; color: var(--text2); font-size: 14px; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+  .split img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); box-shadow: var(--shadow); }
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+  ol.steps li { counter-increment: s; position: relative; padding: 0 0 18px 44px; color: var(--text2); }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700; display: grid; place-items: center; font-size: 14px;
+  }
+  ol.steps b { color: var(--text); display: block; }
+  .note { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px; font-size: 14px; color: var(--text2); }
+
+  footer { padding: 48px 0 40px; color: var(--muted); font-size: 13px; text-align: center; }
+  footer a { color: var(--text2); }
+
+  @media (max-width: 760px) {
+    .split { grid-template-columns: 1fr; }
+    .hero { padding-top: 28px; }
+    .btn { width: 100%; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="./"><img src="icon.png" alt="">Vidra</a>
+    <a class="gh" href="https://github.com/MihrimatriX/vidra">GitHub</a>
+  </header>
+
+  <div class="hero">
+    <h1>Video ve müzik indir.<br><span>Sade, hızlı, Windows için.</span></h1>
+    <p>Bağlantıyı yapıştır, kaliteyi seç, indir. Tek videodan koca kanallara, playlistlerden MP3 arşivine kadar; yt-dlp'nin gücü, temiz bir arayüzde.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/MihrimatriX/vidra/releases/latest/download/Vidra-Setup.exe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>
+        İndir <small>Kurulum · 52 MB</small>
+      </a>
+      <a class="btn" href="https://github.com/MihrimatriX/vidra/releases/latest/download/Vidra-Portable.exe">
+        Taşınabilir sürüm <small>Tek exe · 176 MB</small>
+      </a>
+    </div>
+    <div class="meta">Windows 10 / 11 (x64) · Ücretsiz · <a href="https://github.com/MihrimatriX/vidra/releases">Sürüm notları</a></div>
+
+    <div class="shot">
+      <picture>
+        <source srcset="shot-dark.png" media="(prefers-color-scheme: dark)">
+        <img src="shot-light.png" width="1220" height="780" alt="Vidra ana ekranı: bağlantı kutusu ve Getir düğmesi">
+      </picture>
+    </div>
+  </div>
+
+  <section>
+    <h2>Neler yapabilir?</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/></svg></div>
+        <h3>Tek video, Shorts, canlı yayın</h3>
+        <p>4K ve HDR'ye kadar kalite, kodek seçimi, altyazı ve istediğin aralığı kesip indirme.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 12h12M4 18h7M16 15v6l5-3z"/></svg></div>
+        <h3>Playlist ve kanal</h3>
+        <p>Listeyi aç, istediğin videoları seç, tek tıkla indir. Daha önce indirdiklerin otomatik atlanır.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg></div>
+        <h3>Üyelere özel içerik</h3>
+        <p>Üye olduğun kanalların üyelere özel videoları ve playlistleri de listelenir.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></div>
+        <h3>Müzik modu</h3>
+        <p>MP3 / FLAC; kare kapak, ses seviyesi eşitleme, sanatçı-albüm-parça etiketleri.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></div>
+        <h3>Hesabından aç</h3>
+        <p>Abonelikler, Daha sonra izle, Beğenilenler ve playlistlerin. Şifren hiçbir zaman sorulmaz.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h3>Kuyruk ve geçmiş</h3>
+        <p>Aynı anda birden çok indirme, duraklat/sürdür, bitince bilgisayarı uyut, istatistikler.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="split">
+      <div>
+        <h2>Kurulum bir dakika</h2>
+        <ol class="steps">
+          <li><b>Kurulumu indir ve çalıştır</b>Yönetici izni istemez; Başlat menüsüne ve masaüstüne kısayol ekler.</li>
+          <li><b>İlk açılışta bileşenler iner</b>yt-dlp, ffmpeg ve Deno (~150 MB) bir kez indirilir; yt-dlp'yi sonra Ayarlar'dan tek tıkla güncelleyebilirsin.</li>
+          <li><b>Bağlantıyı yapıştır</b>Panoda YouTube bağlantısı görürse Vidra kendisi sorar.</li>
+        </ol>
+        <div class="note">Uygulama imzalı olmadığı için Windows ilk çalıştırmada "Windows kişisel bilgisayarınızı korudu" diyebilir: <b>Ek bilgi → Yine de çalıştır</b>.</div>
+      </div>
+      <img src="shot-playlist.png" width="1220" height="780" loading="lazy" alt="Playlist ve kanal ekranı: bağlantı kutusu ve hesap akışları">
+    </div>
+  </section>
+
+  <footer>
+    Vidra, <a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a> ve <a href="https://ffmpeg.org">ffmpeg</a> üzerine kuruludur.
+    Yalnızca indirme hakkına sahip olduğun içerikleri indir.<br>
+    <a href="https://github.com/MihrimatriX/vidra">Kaynak kodu</a> · <a href="https://github.com/MihrimatriX/vidra/issues">Sorun bildir</a>
+  </footer>
+</div>
+</body>
+</html>
