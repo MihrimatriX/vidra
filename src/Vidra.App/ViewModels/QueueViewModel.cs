@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -29,8 +30,10 @@ public sealed partial class QueueViewModel : ObservableObject
         _main = main;
         HistoryView = CollectionViewSource.GetDefaultView(host.Queue.History);
         HistoryView.Filter = o => o is HistoryEntry h && MatchesHistory(h);
-        host.Queue.Jobs.CollectionChanged += (_, _) => RefreshCounts();
-        host.Queue.History.CollectionChanged += (_, _) => RefreshCounts();
+        // Toplu değişikliklerde (kuyruğu boşalt, geçmişi geri al) her öğe için değil, bir kez say
+        var refresh = Ui.Coalesce(RefreshCounts);
+        host.Queue.Jobs.CollectionChanged += (_, _) => refresh();
+        host.Queue.History.CollectionChanged += (_, _) => refresh();
         host.Queue.Drained += (_, _) => Application.Current?.Dispatcher.BeginInvoke(OnDrained);
         // Zamanlama kapanıştan sonra da geçerli: saat gelene kadar kuyruk başlamasın
         host.Queue.Held = host.Settings.ScheduledStart is not null;
@@ -182,10 +185,100 @@ public sealed partial class QueueViewModel : ObservableObject
     [RelayCommand] private void Cancel(object? p) { if (p is DownloadJob j) _host.Queue.Cancel(j); }
     [RelayCommand] private void Retry(object? p) { if (p is DownloadJob j) _host.Queue.Retry(j); }
     [RelayCommand] private void MoveToFront(object? p) { if (p is DownloadJob j) _host.Queue.MoveToFront(j); }
+    [RelayCommand] private void MoveToEnd(object? p) { if (p is DownloadJob j) _host.Queue.MoveToEnd(j); }
     [RelayCommand] private void PauseAll() => _host.Queue.PauseAll();
     [RelayCommand] private void ResumeAll() => _host.Queue.ResumeAll();
-    [RelayCommand] private void ClearHistory() => _host.Queue.ClearHistory();
-    [RelayCommand] private void RemoveHistory(object? p) { if (p is HistoryEntry h) _host.Queue.RemoveHistory(h); }
+
+    [RelayCommand]
+    private void RetryFailed()
+    {
+        var n = _host.Queue.RetryFailed();
+        if (n > 0) _main.ShowToast($"{n} iş yeniden sıraya alındı");
+    }
+
+    /// <summary>Kuyruğu boşaltır; "Geri al" iptal kayıtlarını geçmişten silip işleri eski durumlarıyla geri koyar (.part'tan devam eder).</summary>
+    [RelayCommand]
+    private void CancelAll()
+    {
+        var before = _host.Queue.Jobs.ToDictionary(j => j.Id, j => j.Status);
+        var jobs = _host.Queue.CancelAll();
+        if (jobs.Count == 0) return;
+        _main.ShowToast($"{jobs.Count} iş iptal edildi", "Geri al", () =>
+            _ = _host.Queue.RestoreCanceledAsync(jobs, j => before.GetValueOrDefault(j.Id) is JobStatus.Paused or JobStatus.Error));
+    }
+
+    [RelayCommand]
+    private void ClearHistory()
+    {
+        var all = _host.Queue.History.ToList();
+        if (all.Count == 0) return;
+        _host.Queue.ClearHistory();
+        _main.ShowToast($"Geçmiş temizlendi ({all.Count} kayıt)", "Geri al", () => _host.Queue.RestoreHistory(all));
+    }
+
+    [RelayCommand]
+    private void RemoveHistory(object? p)
+    {
+        if (p is not HistoryEntry h) return;
+        _host.Queue.RemoveHistory(h);
+        _main.ShowToast("Geçmişten kaldırıldı", "Geri al", () => _host.Queue.RestoreHistory([h]));
+    }
+
+    [RelayCommand]
+    private void CopyLink(object? p)
+    {
+        var url = p switch { DownloadJob j => j.Url, HistoryEntry h => h.Url, _ => null };
+        if (url is null) return;
+        CopyText(url);
+        _main.ShowToast("Bağlantı kopyalandı");
+    }
+
+    [RelayCommand]
+    private void OpenInBrowser(object? p)
+    {
+        var url = p switch { DownloadJob j => j.Url, HistoryEntry h => h.Url, _ => null };
+        _main.OpenInBrowserCommand.Execute(url);
+    }
+
+    /// <summary>Geçmişteki videoyu İndir ekranında yeniden aç: farklı kalite ya da biçimle indirmek için.</summary>
+    [RelayCommand] private Task Reopen(object? p) => p is HistoryEntry h ? _main.OpenLinkAsync(h.Url) : Task.CompletedTask;
+
+    /// <summary>Çift tıklama: dosya duruyorsa oynat, yoksa klasörü aç.</summary>
+    [RelayCommand]
+    private void OpenOrReveal(object? p)
+    {
+        if (p is HistoryEntry { FilePath: { } path } && File.Exists(path)) Open(p);
+        else Reveal(p);
+    }
+
+    /// <summary>
+    /// Dosyayı geri dönüşüm kutusuna taşır; geçmiş kaydı kalır. Geri dönüşüm kutusu olmayan sürücülerde (ağ, bazı USB)
+    /// Windows kalıcı silme onayı sorar: sessiz seçenek orada sormadan kalıcı silerdi.
+    /// </summary>
+    [RelayCommand]
+    private void DeleteFile(object? p)
+    {
+        if (p is not HistoryEntry { FilePath: { } path } || !File.Exists(path)) return;
+        try
+        {
+            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.AllDialogs,
+                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            if (File.Exists(path)) return;
+            _main.ShowToast(IsFixedDrive(path) ? "Dosya geri dönüşüm kutusuna taşındı" : "Dosya silindi");
+            _main.Library.Refresh();
+        }
+        catch (OperationCanceledException) { } // kullanıcı Windows'un onay penceresinde vazgeçti
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _main.ShowToast($"Dosya silinemedi: {e.Message}");
+        }
+    }
+
+    private static bool IsFixedDrive(string path)
+    {
+        try { return new DriveInfo(Path.GetPathRoot(Path.GetFullPath(path))!).DriveType == DriveType.Fixed; }
+        catch (ArgumentException) { return false; } // UNC yolu: sürücü harfi yok
+    }
     [RelayCommand] private void IncConcurrency() => Concurrency++;
     [RelayCommand] private void DecConcurrency() => Concurrency--;
     [RelayCommand] private void OpenAccount() => _main.Go(Page.Account);
@@ -197,6 +290,7 @@ public sealed partial class QueueViewModel : ObservableObject
         if (j.LastArgs is null) return;
         var cookie = _host.Settings.Cookies switch { AppLoginCookies a => a.Path, FileCookies f => f.Path, ExtensionCookies x => x.Path, _ => null };
         CopyText(YtDlpArgs.ToCommandLine("yt-dlp", j.LastArgs, cookie));
+        _main.ShowToast("yt-dlp komutu kopyalandı");
     }
 
     [RelayCommand]
@@ -206,6 +300,7 @@ public sealed partial class QueueViewModel : ObservableObject
         var text = j.Log.Text;
         if (text.Length == 0) return;
         CopyText(text);
+        _main.ShowToast("Günlük kopyalandı");
     }
 
     [RelayCommand]
@@ -213,6 +308,7 @@ public sealed partial class QueueViewModel : ObservableObject
     {
         if (p is not HistoryEntry h) return;
         if (h.FilePath is { } path && File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        else _main.ShowToast("Dosya bulunamadı: taşınmış ya da silinmiş olabilir", "Tekrar indir", () => Redownload(h));
     }
 
     [RelayCommand]
@@ -226,8 +322,9 @@ public sealed partial class QueueViewModel : ObservableObject
     [RelayCommand]
     private void Redownload(object? p)
     {
-        if (p is HistoryEntry h)
-            _host.Queue.Enqueue([new NewJob(h.Url, h.Title, h.Options, h.Channel, h.Thumbnail, h.Duration, Source: h.Source)]);
+        if (p is not HistoryEntry h) return;
+        _host.Queue.Enqueue([new NewJob(h.Url, h.Title, h.Options, h.Channel, h.Thumbnail, h.Duration, Source: h.Source)]);
+        _main.ShowToast("Aynı ayarlarla kuyruğa eklendi");
     }
 
     /// <summary>Başka bir uygulama panoyu açık tutuyorsa SetText COMException atar: birkaç kez dene, olmazsa sessizce geç.</summary>

@@ -46,6 +46,17 @@ public static class ThemeService
         _ = DwmSetWindowAttribute(hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, ref round, sizeof(int));
     }
 
+    /// <summary>Görev çubuğu açık temada mı (küçük resim düğmesi ikonlarının rengi için; uygulama temasından ayrı bir ayar).</summary>
+    public static bool TaskbarIsLight()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            return key?.GetValue("SystemUsesLightTheme") is int v && v == 1;
+        }
+        catch { return false; }
+    }
+
     public static bool SystemPrefersDark()
     {
         try

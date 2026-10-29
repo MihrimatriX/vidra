@@ -1,0 +1,58 @@
+# Ekran görüntülerini gerçek Windows'ta üretir: Debug derlemesi örnek verilerle ekranları gezer
+# (src/Vidra.App/Services/ScreenshotTour.cs) ve PNG'leri docs/screenshots altına işler.
+name: Ekran görüntüleri
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['feature/**']
+    paths: ['src/**', '.github/workflows/screenshots.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shots:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Derle (Debug, tur dahil)
+        run: dotnet build src/Vidra.App -c Debug -o build
+
+      - name: Turu çalıştır
+        shell: pwsh
+        run: |
+          $out = Join-Path $PWD 'docs/screenshots'
+          if (Test-Path $out) { Get-ChildItem $out -Filter *.png | Remove-Item }
+          $p = Start-Process -FilePath 'build/Vidra.exe' -ArgumentList '--screenshot-tour', "`"$out`"" -PassThru
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); Write-Host 'Tur zaman aşımına uğradı' }
+          if (Test-Path "$out/tour.log") { Get-Content "$out/tour.log" }
+          Get-ChildItem $out -Filter *.png | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: docs/screenshots
+
+      - name: Görüntüleri dala işle
+        shell: pwsh
+        run: |
+          Remove-Item docs/screenshots/tour.log -ErrorAction SilentlyContinue
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/screenshots
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { Write-Host 'Değişiklik yok'; exit 0 }
+          git commit -m 'Ekran görüntüleri (otomatik, ScreenshotTour)'
+          git push origin HEAD:${{ github.ref_name }}

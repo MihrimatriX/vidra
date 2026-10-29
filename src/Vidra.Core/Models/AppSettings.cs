@@ -69,8 +69,22 @@ public sealed class AppSettings
     /// <summary>Eklenti çerez gönderince oturumsuz Vidra kendiliğinden eklenti oturumuna geçsin. Eklenti oturumundan çıkış kapatır.</summary>
     public bool ExtensionSync { get; set; } = true;
 
+    /// <summary>İndirme sürerken (ve zamanlanmış başlangıç beklenirken) bilgisayar uykuya geçmesin.</summary>
+    public bool KeepAwake { get; set; } = true;
+
+    /// <summary>Açılışta GitHub'da Vidra'nın yeni sürümünü denetle.</summary>
+    public bool CheckAppUpdates { get; set; } = true;
+
+    /// <summary>İndirmelere eklenecek ek yt-dlp argümanları (ileri düzey). Vidra'nın yönettiği bayraklar reddedilir: bkz. ExtraArgs.</summary>
+    public string ExtraArgs { get; set; } = "";
+
+    /// <summary>Son pencere konumu ve boyutu (DIP). Kayıtlı ekran artık yoksa yok sayılır.</summary>
+    public WindowBounds? Window { get; set; }
+
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 }
+
+public sealed record WindowBounds(double Left, double Top, double Width, double Height, bool Maximized);
 
 /// <summary>Kayıtlı hesap. Dosyaları AppPaths.AccountCookiesFile/AccountProfileDir(Id) altında.</summary>
 public sealed record SavedAccount(string Id, string Name, DateTimeOffset ExportedAt, DateTimeOffset? ExpiresAt);

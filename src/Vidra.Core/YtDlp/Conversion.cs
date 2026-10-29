@@ -33,7 +33,7 @@ public static class Conversion
             r.Add($"ses {o.AudioFormat.Label()} biçimine dönüştürülür");
             if (o.MusicMode && o.AudioFormat is AudioFormat.Mp3 or AudioFormat.Flac or AudioFormat.Wav) r.Add("ses yüksekliği eşitlenir");
         }
-        if (o.Clip is { Precise: true } c && YtDlpArgs.ClipArgs(c).Count > 0)
+        if (YtDlpArgs.AllClips(o).Any(c => c.Precise))
             r.Add(o.Mode == DownloadMode.Audio ? "klip kesin kesim için yeniden kodlanır" : "klip kesin kesim için video yeniden kodlanır");
         return r;
     }

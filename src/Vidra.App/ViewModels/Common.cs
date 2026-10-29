@@ -102,6 +102,30 @@ public sealed partial class CardGrid : ObservableObject
     }
 }
 
+public static class Ui
+{
+    /// <summary>
+    /// Aynı arayüz turunda gelen çağrıları tek çağrıya indirir (ör. koleksiyona art arda 1000 ekleme → bir yenileme).
+    /// Uygulama dışında (testler) doğrudan çağırır.
+    /// </summary>
+    public static Action Coalesce(Action action)
+    {
+        var pending = false;
+        return () =>
+        {
+            var d = System.Windows.Application.Current?.Dispatcher;
+            if (d is null) { action(); return; }
+            if (pending) return;
+            pending = true;
+            d.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () =>
+            {
+                pending = false;
+                action();
+            });
+        };
+    }
+}
+
 /// <summary>RadioButton ↔ enum için iki yönlü dönüştürücü.</summary>
 public sealed class EnumBoolConverter : IValueConverter
 {

@@ -20,7 +20,9 @@ public sealed partial class StatsViewModel : ObservableObject
     public StatsViewModel(AppHost host)
     {
         _host = host;
-        host.Queue.History.CollectionChanged += (_, _) => Refresh();
+        // Geçmişi geri almak yüzlerce ekleme üretir: her biri için tüm istatistiği yeniden hesaplama
+        var refresh = Ui.Coalesce(Refresh);
+        host.Queue.History.CollectionChanged += (_, _) => refresh();
         Refresh();
     }
 
