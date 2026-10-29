@@ -161,6 +161,14 @@
 
         <!-- Alt durum: kutusuz, tek satırlar -->
         <StackPanel DockPanel.Dock="Bottom" Margin="10,0,2,0" TextElement.FontSize="12" TextElement.Foreground="{DynamicResource Muted}">
+          <!-- Gizli mod göstergesi: tıklayınca kapanır -->
+          <Border Background="{DynamicResource Invert}" CornerRadius="8" HorizontalAlignment="Left" Margin="-2,0,8,10"
+                  Visibility="{Binding Incognito, Converter={StaticResource Vis}}">
+            <Button Style="{StaticResource ToastBtn}" Foreground="{DynamicResource InvertInk}" FontSize="12" MinHeight="26" Padding="8,0"
+                    Command="{Binding ToggleIncognitoCommand}" ToolTip="Gizli mod açık: yeni indirmeler geçmişe ve arşive yazılmaz. Kapatmak için tıkla.">
+              <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Lock}" Size="13" Margin="0,0,6,0" /><TextBlock Text="Gizli mod" /></StackPanel>
+            </Button>
+          </Border>
           <DockPanel Margin="0,0,8,6" Visibility="{Binding SpeedLabel, Converter={StaticResource Vis}}">
             <TextBlock Text="{Binding SpeedLabel}" DockPanel.Dock="Right" Style="{StaticResource Mono}" Foreground="{DynamicResource Text}" />
             <TextBlock Text="İndiriliyor" />
@@ -189,7 +197,13 @@
                     Command="{Binding ToggleThemeCommand}" ToolTip="Açık / koyu tema" AutomationProperties.Name="Temayı değiştir">
               <c:Icon Data="{StaticResource I.Sun}" Size="16" />
             </Button>
-            <TextBlock Text="{Binding Version}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <Grid HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
+              <TextBlock Text="{Binding Version}" FontSize="11" VerticalAlignment="Center" Visibility="{Binding Update, Converter={StaticResource Vis}, ConverterParameter=!}" />
+              <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" FontSize="11.5" Command="{Binding OpenUpdateCommand}"
+                      Visibility="{Binding Update, Converter={StaticResource Vis}}" ToolTip="Yeni sürümün sayfasını aç">
+                <TextBlock><Run Text="{Binding Update.Tag, Mode=OneWay}" /><Run Text=" çıktı" /></TextBlock>
+              </Button>
+            </Grid>
           </DockPanel>
         </StackPanel>
       </DockPanel>

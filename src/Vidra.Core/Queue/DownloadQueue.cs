@@ -69,7 +69,10 @@ public sealed partial class DownloadQueue : ObservableObject
             Jobs.Add(CreateJob(n with { Source = n.Source ?? "Önceki oturum" }, startNow: false));
     }
 
-    private static DownloadJob CreateJob(NewJob n, bool startNow) => new()
+    /// <summary>Gizli mod: bundan sonra kuyruğa giren işler geçmişe ve indirme arşivine yazılmaz.</summary>
+    public bool Incognito { get; set; }
+
+    private DownloadJob CreateJob(NewJob n, bool startNow) => new()
     {
         Url = n.Url,
         VideoId = YouTubeUrl.VideoId(n.Url),
@@ -77,7 +80,7 @@ public sealed partial class DownloadQueue : ObservableObject
         Channel = n.Channel,
         Thumbnail = n.Thumbnail,
         Duration = n.Duration,
-        Options = n.Options,
+        Options = Incognito && !n.Options.Incognito ? n.Options with { Incognito = true } : n.Options,
         OutputTemplate = n.OutputTemplate,
         Source = n.Source,
         Status = startNow ? JobStatus.Queued : JobStatus.Paused,
@@ -302,7 +305,7 @@ public sealed partial class DownloadQueue : ObservableObject
         job.ErrorMessage = null;
         job.Warning = null;
         job.StartedAt ??= DateTimeOffset.Now;
-        job.ResetProgress("Bilgi alınıyor");
+        job.ResetProgress(job.Options.WaitForLive ? "Yayının başlaması bekleniyor" : "Bilgi alınıyor");
 
         string? lastFormat = null;
         ErrorLine? lastError = null;
@@ -345,6 +348,11 @@ public sealed partial class DownloadQueue : ObservableObject
                 case DoneLine done:
                     gotFile = true;
                     job.FilePath = done.FilePath;
+                    break;
+                // Toplu yapıştırılan işlerde başlık bağlantının kendisidir: yt-dlp'nin bildirdiğiyle değiştir
+                case MetaLine meta when meta.Title.Length > 0 && (job.Title == job.Url || job.Title.Length == 0):
+                    job.Title = meta.Title;
+                    job.Channel ??= meta.Channel;
                     break;
                 case ErrorLine e:
                     lastError = e;
@@ -446,6 +454,13 @@ public sealed partial class DownloadQueue : ObservableObject
     private void Finish(DownloadJob job)
     {
         job.FinishedAt = DateTimeOffset.Now;
+        // Gizli iş iz bırakmaz: kuyruktan düşer, geçmişe yazılmaz
+        if (job.Options.Incognito)
+        {
+            _dispatch(() => Jobs.Remove(job));
+            JobFinished?.Invoke(this, job);
+            return;
+        }
         var entry = HistoryEntry.From(job);
         _dispatch(() =>
         {

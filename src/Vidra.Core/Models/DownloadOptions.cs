@@ -59,6 +59,21 @@ public sealed record DownloadOptions
     public bool SplitChapters { get; init; }
     public Clip? Clip { get; init; }
 
+    /// <summary>Clip'e ek kesim aralıkları (çoklu kesim); her aralık ayrı dosya olur. Bkz. YtDlpArgs.AllClips.</summary>
+    public IReadOnlyList<Clip>? Clips { get; init; }
+
+    /// <summary>Ses dili (dublaj) kodu, ör. "tr" ya da "en-US"; null = YouTube'un varsayılanı (genelde orijinal).</summary>
+    public string? AudioLanguage { get; init; }
+
+    /// <summary>Henüz başlamamış canlı yayın/prömiyer: başlayana kadar bekle, sonra indir (--wait-for-video).</summary>
+    public bool WaitForLive { get; init; }
+
+    /// <summary>Süren canlı yayını şu andan değil baştan kaydet (--live-from-start).</summary>
+    public bool LiveFromStart { get; init; }
+
+    /// <summary>Gizli: geçmişe ve indirme arşivine yazılmaz.</summary>
+    public bool Incognito { get; init; }
+
     /// <summary>Ses modunda: kare kapak, ses yüksekliği eşitleme, temiz sanatçı adı (bkz. YtDlpArgs.MusicArgs).</summary>
     public bool MusicMode { get; init; }
 
@@ -76,7 +91,7 @@ public sealed record DownloadOptions
         if (Mode == DownloadMode.Audio) return $"Ses · {AudioFormat.Label()}{(MusicMode ? " · müzik" : "")}";
         var q = Height is { } h ? $"{h}p" : "En iyi";
         var codec = Codec == CodecPreference.Auto ? "" : $" · {Codec.ToString().ToUpperInvariant()}";
-        var clip = Clip is null ? "" : " · klip";
+        var clip = Clip is null && Clips is not { Count: > 0 } ? "" : " · klip";
         return $"{q} · {Container.Label()}{codec}{clip}";
     }
 }

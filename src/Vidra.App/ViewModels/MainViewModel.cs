@@ -53,6 +53,12 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private QueueProgress _progress = QueueProgress.From([]);
 
     [ObservableProperty] private ToastMessage? _toast;
+
+    /// <summary>Gizli mod (yalnızca bu oturum): yeni indirmeler geçmişe ve arşive yazılmaz.</summary>
+    [ObservableProperty] private bool _incognito;
+
+    /// <summary>GitHub'da daha yeni Vidra sürümü varsa; kenar çubuğunda bağlantı olarak görünür.</summary>
+    [ObservableProperty] private AppRelease? _update;
     private readonly DispatcherTimer _toastTimer = new();
     private bool _toastHeld;
     private string _trayTip = "";
@@ -95,7 +101,38 @@ public sealed partial class MainViewModel : ObservableObject
         };
         _timer.Start();
         RefreshStatus();
+        if (host.Settings.CheckAppUpdates) _ = CheckUpdatesLaterAsync();
     }
+
+    private async Task CheckUpdatesLaterAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(8)); // açılışı yavaşlatmasın
+        await CheckUpdatesAsync(manual: false);
+    }
+
+    /// <summary>GitHub'daki son sürümü denetler; elle istenince "güncel" ya da "denetlenemedi" de der.</summary>
+    public async Task CheckUpdatesAsync(bool manual)
+    {
+        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var r = await AppUpdate.CheckAsync(_host.Http, cts.Token);
+        var current = typeof(MainViewModel).Assembly.GetName().Version ?? new System.Version(0, 0, 0);
+        if (r is not null && AppUpdate.IsNewer(r, current))
+        {
+            Update = r;
+            ShowToast($"Vidra {r.Tag} çıktı", "Sürüm notları", () => OpenInBrowser(r.Url));
+        }
+        else if (manual) ShowToast(r is null ? "Güncelleme denetlenemedi: GitHub'a ulaşılamadı" : $"Vidra güncel ({Version})");
+    }
+
+    [RelayCommand] private void OpenUpdate() { if (Update is { } r) OpenInBrowser(r.Url); }
+
+    partial void OnIncognitoChanged(bool value)
+    {
+        _host.Queue.Incognito = value;
+        ShowToast(value ? "Gizli mod açık: yeni indirmeler geçmişe ve arşive yazılmaz" : "Gizli mod kapandı");
+    }
+
+    [RelayCommand] private void ToggleIncognito() => Incognito = !Incognito;
 
     partial void OnPageChanged(Page value)
     {
@@ -257,6 +294,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var p = QueueProgress.From(_host.Queue.Jobs);
         if (p != Progress) Progress = p;
+        // İndirirken ya da zamanlanmış başlangıç beklenirken sistem uykuya geçmesin (ekran yine kapanabilir)
+        PowerService.KeepAwake(_host.Settings.KeepAwake && (p.Running > 0 || (QueueVm.IsScheduled && p.Paused + p.Queued > 0)));
         var tip = p.IsEmpty ? "Vidra" : $"Vidra · {p.Describe()}" + (p.Speed > 0 ? $" · {Fmt.Speed(p.Speed)}" : "");
         if (tip == _trayTip) return;
         _trayTip = tip;
