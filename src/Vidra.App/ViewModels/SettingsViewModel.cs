@@ -196,6 +196,15 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string RateLimit { get => S.RateLimit ?? ""; set => Set(s => s.RateLimit = string.IsNullOrEmpty(value) ? null : value); }
     public string Proxy { get => S.Proxy; set => Set(s => s.Proxy = value); }
 
+    /// <summary>İleri düzey: her indirmeye eklenen yt-dlp argümanları. Hatalıysa hiç kullanılmaz ve sebebi yazar.</summary>
+    public string ExtraArgs
+    {
+        get => S.ExtraArgs;
+        set { Set(s => s.ExtraArgs = value ?? ""); OnPropertyChanged(nameof(ExtraArgsError)); }
+    }
+
+    public string? ExtraArgsError => Vidra.Core.YtDlp.ExtraArgs.Parse(S.ExtraArgs).Error;
+
     // ---- Davranış & görünüm
     public ThemeMode Theme
     {
@@ -211,6 +220,8 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public bool Notifications { get => S.Notifications; set => Set(s => s.Notifications = value); }
     public bool MinimizeToTray { get => S.MinimizeToTray; set => Set(s => s.MinimizeToTray = value); }
+    public bool KeepAwake { get => S.KeepAwake; set => Set(s => s.KeepAwake = value); }
+    public bool CheckAppUpdates { get => S.CheckAppUpdates; set => Set(s => s.CheckAppUpdates = value); }
 
     // ---- Bileşenler
     public UpdateChannel UpdateChannel { get => S.UpdateChannel; set => Set(s => s.UpdateChannel = value); }

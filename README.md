@@ -27,6 +27,25 @@
 - **Sürükle-bırak:** tarayıcıdan bağlantıyı, masaüstündeki `.url` kısayolunu ya da bağlantı listesi `.txt` dosyasını pencereye bırak; kütüphanedeki kartı da dışarı (klasöre, uygulamaya) sürükleyebilirsin
 - **Geri alınabilir işlemler:** geçmişten kaldırma, geçmişi temizleme, sepeti boşaltma, kuyruğu boşaltma alttaki bildirimden **Geri al** ile döner; silinen dosyalar geri dönüşüm kutusuna gider
 - **Sağ tık menüleri:** kuyruktaki iş, geçmiş satırı ve kütüphane kartında; görev çubuğunda toplam ilerleme ve duraklat/sürdür düğmeleri
+- **Dublaj / ses dili:** çok dilli videolarda istediğin ses izi (YouTube'un otomatik dublajı dahil); yoksa orijinal ses iner
+- **En çok izlenen kısım:** YouTube'un "en çok tekrar oynatılan" grafiği klip ekranında; en çok izlenen 30 sn, 1 dk ya da en iyi 3 an tek tıkla klip olur; birden çok aralık, her biri ayrı dosya
+- **Canlı yayın ve prömiyer:** başlamamış yayın için "Başlayınca indir", süren yayında "Baştan kaydet"
+- **Gizli mod:** geçmişe ve indirme arşivine iz bırakmadan indir (komut paleti ya da kenar çubuğu)
+- **Uyumayı engelle:** indirme sürerken ve zamanlanmış başlangıç beklenirken bilgisayar uykuya geçmez
+- **Ek yt-dlp argümanları** (ileri düzey) ve **güncelleme denetimi** (yeni Vidra sürümü çıkınca haber verir)
+
+<table>
+<tr>
+<td><img src="docs/screenshots/dark-04-komut-paleti.png" alt="Komut paleti"><br><sub>Komut paleti (Ctrl+K)</sub></td>
+<td><img src="docs/screenshots/dark-02-klip-heatmap.png" alt="Klip ve en çok izlenen grafiği"><br><sub>En çok izlenen kısım ve çoklu kesim</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/dark-06-kuyruk.png" alt="Kuyruk"><br><sub>Kuyruk: toplam ilerleme, toplu işlemler</sub></td>
+<td><img src="docs/screenshots/light-10-kutuphane.png" alt="Kütüphane"><br><sub>Kütüphane: sıralama, sürükle-bırak</sub></td>
+</tr>
+</table>
+
+Tüm ekran görüntüleri (açık/koyu): [`docs/screenshots/`](docs/screenshots/)
 
 Windows 10 1809+ / 11 (x64). Kurulum yönetici izni istemez; yt-dlp, ffmpeg ve Deno ilk açılışta otomatik indirilir.
 Uygulama imzalı olmadığı için SmartScreen uyarısında **Ek bilgi → Yine de çalıştır** demen gerekebilir.
@@ -41,7 +60,7 @@ arayüz `Vidra.App` (WPF) içinde. yt-dlp, ffmpeg/ffprobe ve Deno ilk açılış
 
 ```powershell
 dotnet run --project src/Vidra.App            # geliştirme
-dotnet test                                    # 134 birim testi (Core)
+dotnet test                                    # 171 birim testi (Core)
 dotnet publish src/Vidra.App -c Release -r win-x64 -o publish   # tek, bağımsız Vidra.exe (~175 MB)
 
 # Küçük sürüm (.NET 9 Desktop Runtime kurulu makineler için, ~3 MB):
@@ -57,11 +76,15 @@ ekler, Ayarlar › Uygulamalar'dan kaldırılabilir. Kaldırınca ayarlar ve ge�
 
 Geliştirme gereksinimleri: Windows 10 1809+ / 11, .NET 9 SDK, Microsoft Edge WebView2 Runtime (Windows 11'de hazır gelir).
 
+**Ekran görüntüleri:** Debug derlemesinde `Vidra.exe --screenshot-tour <klasör>` örnek verilerle (Blender açık filmleri) ekranları
+açık/koyu temada PNG'ye çizer (`Services/ScreenshotTour.cs`, yalnızca Debug). `.github/workflows/screenshots.yml` bunu
+`feature/**` dallarında Windows'ta çalıştırıp `docs/screenshots/` altına işler.
+
 ## Ekranlar
 
 | Ekran | Neler var |
 |---|---|
-| **İndir** | Tek kutu: bağlantı yapıştır ya da yaz ve ara (birden çok link → hepsi kuyruğa); boşken **son indirilenler** (oynat ya da farklı kalitede yeniden aç). Video / Sadece ses; kalite kartları (boyut, kodek); biçim **Orijinal**/MP4/MKV/WebM; ses Orijinal/MP3/M4A/FLAC/WAV; **dönüştürme satırı** (kopyalanıyor mu, neyin yeniden kodlandığı). "Diğer seçenekler" altında: kodek (H.264/VP9/AV1), ≤30 fps, altyazı dilleri, **klip kesme** (anahtar karede kopyalayarak ya da kesin kesim), SponsorBlock, bölümler, hazır ayarlar, akış tablosu. |
+| **İndir** | Tek kutu: bağlantı yapıştır ya da yaz ve ara (birden çok link → hepsi kuyruğa); boşken **son indirilenler** (oynat ya da farklı kalitede yeniden aç); çok dilli videolarda **ses dili**; canlı yayında **baştan kaydet**, başlamamış yayında **başlayınca indir**. Video / Sadece ses; kalite kartları (boyut, kodek); biçim **Orijinal**/MP4/MKV/WebM; ses Orijinal/MP3/M4A/FLAC/WAV; **dönüştürme satırı** (kopyalanıyor mu, neyin yeniden kodlandığı). "Diğer seçenekler" altında: kodek (H.264/VP9/AV1), ≤30 fps, altyazı dilleri, **klip kesme** (anahtar karede kopyalayarak ya da kesin kesim; **birden çok aralık**, **"en çok tekrar oynatılan" grafiği** ve en çok izlenen kısmı öneren düğmeler), SponsorBlock, bölümler, hazır ayarlar, akış tablosu. |
 | **Ara** | YouTube'da arama; sonuçtan tek tıkla analiz, kuyruğa ya da sepete ekleme; YouTube'da aç, kanala git. |
 | **Playlist & kanal** | Videolar/Shorts/Canlı/Playlistler/**Üyeler** sekmeleri (sekmeli bağlantı doğrudan o sekmeyi açar); **kart ızgarası** ya da satır listesi (ikisi de sanallaştırılmış, binlerce video); aralık, tarih, süre, arama, "indirilmemiş/üye" filtreleri; süre ve boyut tahmini; **Takip et** (yeni videolar otomatik iner); "Playlistlerim" gibi alt listeleri açma ya da **birden çok listeyi seçip tek seferde indirme**; **Sepete ekle**; görünen listeyi **CSV**'ye aktarma. |
 | **Sepet** | Farklı playlist, kanal ve aramalardan toplanan videolar (diskte saklanır); video/ses, kalite ve ses biçimi bir kez seçilir, hepsi birlikte kuyruğa girer. |
@@ -69,7 +92,7 @@ Geliştirme gereksinimleri: Windows 10 1809+ / 11, .NET 9 SDK, Microsoft Edge We
 | **Kütüphane** | Diskte hâlâ duran indirmeler kart olarak; arama, video/ses filtresi, **sıralama** (yeni/eski/boyut/ad/kanal), çift tıkla oynat, klasörde göster, YouTube'da aç, geri dönüşüm kutusuna taşı; kartı sürükleyip dosyayı başka yere bırak. |
 | **İstatistik** | Toplam indirme, boyut ve süre; video/ses dağılımı; bu hafta; son 14 günün grafiği; en çok indirilen kanallar. |
 | **Hesabım** | **Tarayıcı eklentisi** (kurulum ve eşitleme durumu); **birden çok hesap** (ekle, adlandır, geç, kaldır); **uygulama içi YouTube girişi** (WebView2), oturum testi, çıkış; hesap akışları: Abonelikler, Daha sonra izle, Beğenilenler, Geçmiş, Playlistlerim; takip edilen listeler ve kontrol aralığı; nazik mod. |
-| **Ayarlar** | Çerez kaynağı (Vidra hesabı / Firefox / Chrome / Edge / Brave / cookies.txt), tarayıcı profili; klasör ve dosya adı şablonları (önizlemeli); format varsayılanları; -N/-R/hız sınırı/proxy; tema (açık/koyu/sistem), pano izleme, bildirimler, tepsi; bileşen sürümleri, yt-dlp güncellemesi (kararlı/nightly), yeniden indirme. |
+| **Ayarlar** | Çerez kaynağı (Vidra hesabı / Firefox / Chrome / Edge / Brave / cookies.txt), tarayıcı profili; klasör ve dosya adı şablonları (önizlemeli); format varsayılanları; -N/-R/hız sınırı/proxy, **ek yt-dlp argümanları** (Vidra'nın yönettiği bayraklar reddedilir); tema (açık/koyu/sistem), pano izleme, bildirimler, tepsi, **uyumayı engelle**, **güncelleme denetimi**; bileşen sürümleri, yt-dlp güncellemesi (kararlı/nightly), yeniden indirme. |
 
 Ayrıca: sistem tepsisi + baloncuk bildirimleri (tepsi ipucunda canlı kuyruk durumu), pano izleme (yoklamasız, `AddClipboardFormatListener`), tek örnek (ikinci açılış bağlantıyı mevcut pencereye iletir: `Vidra.exe <url>`), koyu başlık çubuğu, pencere konumu ve boyutu hatırlanır.
 
@@ -88,7 +111,7 @@ Ayrıca: sistem tepsisi + baloncuk bildirimleri (tepsi ipucunda canlı kuyruk du
 ```
 src/Vidra.Core/                      (net9.0 — Windows'a bağımlı değil, Linux'ta test edilir)
   Models/        DownloadOptions (değişmez record), AppSettings, CookieSource (JSON polimorfik), DownloadJob (gözlemlenebilir), HistoryEntry
-  YtDlp/         YtDlpArgs (saf: ayar → argüman listesi), OutputParser, ProbeParser (-J → model), YtDlpService, YouTubeUrl, Templates
+  YtDlp/         YtDlpArgs (saf: ayar → argüman listesi), ExtraArgs (ek argüman doğrulama), OutputParser, ProbeParser (-J → model), YtDlpService, YouTubeUrl, Templates
   Process/       IProcessRunner + ProcessRunner (ArgumentList, UTF-8, süreç ağacını öldürme)
   Queue/         DownloadQueue (eşzamanlılık, duraklat = öldür + .part'tan devam, geçmiş, bekleyen işler), QueueProgress (toplam ilerleme)
   Follow/        FollowService (takip edilen listeleri aralıkla kontrol, arşivle karşılaştır)
@@ -96,6 +119,8 @@ src/Vidra.Core/                      (net9.0 — Windows'a bağımlı değil, Li
   Browser/       BrowserBridge (eklentiyle native messaging: çerçeveleme, çerez listesi → cookies.txt)
   Export.cs      Playlist → CSV (formül enjeksiyonuna karşı), WebVTT → düz metin döküm
   Fuzzy.cs       Komut paleti için Türkçe harf duyarsız bulanık eşleştirme
+  Heatmap.cs     "En çok tekrar oynatılan" grafiğinden en iyi, çakışmayan klip pencereleri
+  AppUpdate.cs   GitHub releases/latest → yeni sürüm var mı
   Tools/         ToolManager (bileşenleri indir/güncelle/sürüm oku)
   Storage/       AppPaths, JsonStore (atomik yazma), SettingsStore (debounce), ArchiveStore
 src/Vidra.App/                       (net9.0-windows — WPF)

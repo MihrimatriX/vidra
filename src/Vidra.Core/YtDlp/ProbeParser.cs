@@ -21,11 +21,17 @@ public static partial class ProbeParser
     {
         var formats = Get(r, "formats", out var f) && f.ValueKind == JsonValueKind.Array ? f.EnumerateArray().ToList() : [];
 
-        // -drc: dinamik aralık sıkıştırılmış kopyalar; orijinali tercih et
+        // -drc: dinamik aralık sıkıştırılmış kopyalar; orijinali tercih et.
+        // Çok dilli videolarda (dublaj) varsayılan iz önde: yt-dlp de "ba"yı language_preference'a göre seçer.
         var audios = formats
             .Where(x => Str(x, "vcodec") == "none" && Str(x, "acodec") is { } ac && ac != "none" && !(Str(x, "format_id") ?? "").EndsWith("-drc"))
-            .OrderByDescending(x => Dbl(x, "tbr") ?? 0)
-            .Select(x => new AudioInfo(Str(x, "format_id")!, Str(x, "acodec")!.Split('.')[0], Dbl(x, "abr") ?? Dbl(x, "tbr"), Dbl(x, "asr"), Size(x)))
+            .Select(x => new AudioInfo(Str(x, "format_id")!, Str(x, "acodec")!.Split('.')[0], Dbl(x, "abr") ?? Dbl(x, "tbr"), Dbl(x, "asr"), Size(x),
+                Str(x, "language"),
+                // yt-dlp: 10 = sayfanın asıl dili, -1 = bilinmiyor, -10 = diğer
+                (Int(x, "language_preference") ?? -1) >= -1,
+                (Str(x, "format_note") ?? "").Contains("dubbed", StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(a => a.IsDefault)
+            .ThenByDescending(a => a.Abr ?? 0)
             .ToList();
         var audio = audios.FirstOrDefault();
 
@@ -77,6 +83,12 @@ public static partial class ProbeParser
             }
         }
 
+        var heatmap = new List<HeatPoint>();
+        if (Get(r, "heatmap", out var hm) && hm.ValueKind == JsonValueKind.Array)
+            foreach (var p in hm.EnumerateArray())
+                if (Dbl(p, "start_time") is { } s && Dbl(p, "end_time") is { } e && e > s)
+                    heatmap.Add(new HeatPoint(s, e, Math.Clamp(Dbl(p, "value") ?? 0, 0, 1)));
+
         var id = Str(r, "id") ?? "";
         return new VideoInfo
         {
@@ -95,6 +107,9 @@ public static partial class ProbeParser
             Qualities = qualities,
             Audio = audio,
             AudioAac = audios.FirstOrDefault(x => x.Codec == "mp4a"),
+            Audios = audios,
+            AudioLanguages = AudioLanguages(audios),
+            Heatmap = heatmap,
             Subtitles = subs,
             AutoTranslateCount = autoCount,
         };
@@ -145,6 +160,28 @@ public static partial class ProbeParser
             Url = Str(r, "webpage_url") ?? "",
             Entries = entries,
         };
+    }
+
+    /// <summary>Birden çok dilde ses izi varsa seçenekler: orijinal önce, sonra ada göre. Tek dilde boş.</summary>
+    public static IReadOnlyList<AudioLanguage> AudioLanguages(IReadOnlyList<AudioInfo> audios)
+    {
+        var langs = audios.Where(a => !string.IsNullOrEmpty(a.Language))
+            .GroupBy(a => a.Language!, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new AudioLanguage(g.Key, LanguageName(g.Key), g.Any(a => a.IsDefault), g.Any(a => a.AutoDub)))
+            .ToList();
+        if (langs.Count < 2) return [];
+        return langs.OrderByDescending(l => l.Original).ThenBy(l => l.Name, StringComparer.Create(Fmt.Tr, true)).ToList();
+    }
+
+    /// <summary>"es-US" → "Español (Estados Unidos)": dilin kendi adı (herkes kendi dilini tanır); bilinmiyorsa kod.</summary>
+    public static string LanguageName(string code)
+    {
+        try
+        {
+            var n = System.Globalization.CultureInfo.GetCultureInfo(code).NativeName;
+            return n.Length > 0 && !n.StartsWith("Unknown", StringComparison.OrdinalIgnoreCase) ? char.ToUpper(n[0], Fmt.Tr) + n[1..] : code;
+        }
+        catch (System.Globalization.CultureNotFoundException) { return code; }
     }
 
     /// <summary>Seçilen kodek/fps tercihine göre yt-dlp'nin o çözünürlükte seçeceği akışı tahmin eder.</summary>

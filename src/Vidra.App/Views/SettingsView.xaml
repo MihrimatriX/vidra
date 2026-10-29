@@ -169,6 +169,14 @@
             </HeaderedContentControl>
             <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap"
                        Text="-N, tek videonun parçalarını paralel indirir; YouTube çok yüksek değerlerde yavaşlatabilir, 4 iyi bir başlangıç." />
+            <HeaderedContentControl Style="{StaticResource Field}" Header="Ek yt-dlp argümanları (ileri düzey)" Margin="0,16,0,6">
+              <TextBox Style="{StaticResource InputMono}" Text="{Binding ExtraArgs, UpdateSourceTrigger=LostFocus}" Tag="--limit-rate 5M --embed-chapters"
+                       AutomationProperties.Name="Ek yt-dlp argümanları" />
+            </HeaderedContentControl>
+            <TextBlock Style="{StaticResource Small}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" Margin="0,0,0,4"
+                       Text="{Binding ExtraArgsError}" Visibility="{Binding ExtraArgsError, Converter={StaticResource Vis}}" />
+            <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap"
+                       Text="Her indirmenin sonuna eklenir; aynı bayrak iki kez verilirse yt-dlp sonrakini kullanır. Çıktı yolu, ilerleme ve playlist bayrakları Vidra'da kalır." />
           </StackPanel>
         </Border>
 
@@ -184,6 +192,8 @@
               <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding WatchClipboard}" Content="Pano izleme" Tag="Kopyalanan YouTube bağlantısını yakala" />
               <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding Notifications}" Content="Bildirimler" Tag="İndirme bitince ya da yeni takip videosu gelince" />
               <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding MinimizeToTray}" Content="Sistem tepsisi" Tag="Kapatınca arka planda devam et" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding KeepAwake}" Content="Uyumayı engelle" Tag="İndirme sürerken ve zamanlanmış başlangıç beklenirken" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding CheckAppUpdates}" Content="Güncelleme denetimi" Tag="Açılışta yeni Vidra sürümü var mı bak" />
             </c:UniformWrapPanel>
           </StackPanel>
         </Border>
