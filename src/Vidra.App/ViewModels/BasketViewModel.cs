@@ -60,11 +60,29 @@ public sealed partial class BasketViewModel : ObservableObject
     [RelayCommand]
     private void Remove(BasketItem? i)
     {
-        if (i is not null && Items.Remove(i)) Save();
+        if (i is null) return;
+        var at = Items.IndexOf(i);
+        if (at < 0) return;
+        Items.RemoveAt(at);
+        Save();
+        _main.ShowToast("Sepetten çıkarıldı", "Geri al", () =>
+        {
+            if (Items.Contains(i)) return;
+            Items.Insert(Math.Min(at, Items.Count), i);
+            Save();
+        });
     }
 
     [RelayCommand]
     private void Clear()
+    {
+        var all = Items.ToList();
+        if (all.Count == 0) return;
+        ClearItems();
+        _main.ShowToast($"Sepet boşaltıldı ({all.Count} video)", "Geri al", () => Add(all));
+    }
+
+    private void ClearItems()
     {
         Items.Clear();
         Save();
@@ -79,8 +97,10 @@ public sealed partial class BasketViewModel : ObservableObject
             ? new NewJob(i.Url, i.Title, o with { Playlist = new PlaylistRef(list, i.PlaylistIndex) }, i.Channel, i.Thumbnail, i.Duration,
                 Templates.ResolvePlaylist(_host.Settings.PlaylistTemplate, list, i.PlaylistIndex), i.Source)
             : new NewJob(i.Url, i.Title, o, i.Channel, i.Thumbnail, i.Duration, Source: i.Source)).ToList());
-        Clear();
+        var n = Items.Count;
+        ClearItems();
         _main.Go(Page.Queue);
+        _main.ShowToast($"{n} video kuyruğa eklendi");
     }
 
     private void Save() => _ = JsonStore.WriteAsync(_host.Paths.BasketFile, Items.ToList());

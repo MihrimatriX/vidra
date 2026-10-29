@@ -909,4 +909,90 @@
       </Setter.Value>
     </Setter>
   </Style>
+  <!-- ============ Sağ tık menüsü ============ -->
+  <Style TargetType="ContextMenu">
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="HasDropShadow" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ContextMenu">
+          <!-- Margin: gölgeye yer (menü açılır penceresi saydamdır) -->
+          <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line2}" BorderThickness="1" CornerRadius="10"
+                  Padding="4" Margin="0,0,12,12" MinWidth="210">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.18" Color="#14171C" />
+            </Border.Effect>
+            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <!-- Alt menüsüz, düz menü öğesi: Icon solda, InputGestureText sağda soluk -->
+  <Style TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="MenuItem">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="7" Padding="10,0" MinHeight="32">
+            <DockPanel>
+              <ContentPresenter DockPanel.Dock="Left" ContentSource="Icon" Width="16" Height="16" Margin="0,0,10,0" VerticalAlignment="Center"
+                                TextElement.Foreground="{DynamicResource Text2}" />
+              <TextBlock DockPanel.Dock="Right" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource Muted}" FontSize="12"
+                         Margin="24,0,0,0" VerticalAlignment="Center" />
+              <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" />
+            </DockPanel>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Raised}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="MenuDanger" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+    <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+  </Style>
+  <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Separator">
+          <Border Height="1" Background="{DynamicResource Line}" Margin="8,4" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Ters zeminli bildirimdeki düğme ("Geri al", kapat) -->
+  <Style x:Key="ToastBtn" TargetType="Button">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
+    <Setter Property="Foreground" Value="{DynamicResource InvertAccent}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}" MinHeight="{TemplateBinding MinHeight}">
+            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource InvertHover}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
 </ResourceDictionary>

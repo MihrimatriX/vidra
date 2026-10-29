@@ -28,6 +28,9 @@
   <SolidColorBrush x:Key="ThumbBg" Color="#25262C" />
   <SolidColorBrush x:Key="Invert" Color="#ECEDF0" />
   <SolidColorBrush x:Key="InvertInk" Color="#121317" />
+  <!-- Ters zeminli bildirimde eylem metni ve düğme üzeri -->
+  <SolidColorBrush x:Key="InvertAccent" Color="#C8102E" />
+  <SolidColorBrush x:Key="InvertHover" Color="#D6D8DD" />
   <SolidColorBrush x:Key="Danger" Color="#F87171" />
   <Color x:Key="ShadowColor">#000000</Color>
   <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="ShadowOpacity">0</sys:Double>

@@ -92,6 +92,25 @@ public static partial class YouTubeUrl
             .Distinct()
             .ToList();
 
+    [GeneratedRegex(@"(?:https?://)?(?:(?:www|m|music)\.)?(?:youtube\.com|youtu\.be)/[^\s""'<>]+", RegexOptions.IgnoreCase)]
+    private static partial Regex LinkInText();
+
+    /// <summary>
+    /// Serbest metindeki her türden YouTube bağlantısı (sürükle-bırak, .url/.txt dosyaları): "URL=…" gibi önekler,
+    /// parantez/nokta gibi sondaki noktalama ve eksik şema tolere edilir. Sıra korunur, tekrarlar atılır.
+    /// </summary>
+    public static IReadOnlyList<string> ExtractLinks(string text)
+    {
+        var list = new List<string>();
+        foreach (Match m in LinkInText().Matches(text))
+        {
+            var s = m.Value.TrimEnd(')', ']', '>', '.', ',', ';', '!', '?');
+            if (!s.StartsWith("http", StringComparison.OrdinalIgnoreCase)) s = "https://" + s;
+            if (Classify(s) is not null && !list.Contains(s)) list.Add(s);
+        }
+        return list;
+    }
+
     private static string? QueryValue(Uri u, string key)
     {
         foreach (var pair in u.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))

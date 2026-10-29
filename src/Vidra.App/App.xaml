@@ -23,6 +23,7 @@
       <local:EqualsVisConverter x:Key="EqVis" />
       <local:StarConverter x:Key="Star" />
       <local:DescribeConverter x:Key="Desc" />
+      <local:IconKeyConverter x:Key="IconKey" />
       <vm:EnumBoolConverter x:Key="EnumBool" />
     </ResourceDictionary>
   </Application.Resources>

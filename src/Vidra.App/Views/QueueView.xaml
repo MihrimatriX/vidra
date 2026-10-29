@@ -48,6 +48,36 @@
         </DataTrigger>
       </Style.Triggers>
     </Style>
+    <!-- Sağ tık menüsü öğeleri: işin durumuna göre görünür -->
+    <Style x:Key="MiPause" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+      <Setter Property="Visibility" Value="Collapsed" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Status}" Value="Running"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+        <DataTrigger Binding="{Binding Status}" Value="Queued"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="MiResume" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+      <Setter Property="Visibility" Value="Collapsed" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Status}" Value="Paused"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="MiRetry" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+      <Setter Property="Visibility" Value="Collapsed" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <!-- Geçmiş satırı: üzerine gelince belirginleşir; çift tıkla oynat -->
+    <Style x:Key="HistoryRow" TargetType="Border">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Raised}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+      <Setter Property="Padding" Value="12,6" />
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Surface2}" /></Trigger>
+      </Style.Triggers>
+    </Style>
   </UserControl.Resources>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -89,10 +119,16 @@
         <Border><TextBlock><Run Text="{Binding PausedCount, Mode=OneWay}" FontWeight="SemiBold" /> duraklatıldı</TextBlock></Border>
         <Border Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}" TextElement.Foreground="{DynamicResource Warn}"
                 Visibility="{Binding ErrorCount, Converter={StaticResource Vis}}">
-          <TextBlock><Run Text="{Binding ErrorCount, Mode=OneWay}" FontWeight="SemiBold" /> dikkat gerekiyor</TextBlock>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock VerticalAlignment="Center"><Run Text="{Binding ErrorCount, Mode=OneWay}" FontWeight="SemiBold" /> dikkat gerekiyor</TextBlock>
+            <Button Style="{StaticResource BtnSm}" MinHeight="22" Padding="8,0" Margin="10,-2,-4,-2" Content="Hepsini tekrar dene"
+                    Command="{Binding RetryFailedCommand}" ToolTip="Hata almış işlerin hepsini yeniden sıraya koy" />
+          </StackPanel>
         </Border>
         <Border Visibility="{Binding RunningCount, Converter={StaticResource Vis}}">
-          <StackPanel Orientation="Horizontal">
+          <StackPanel Orientation="Horizontal" ToolTip="Kuyruğun toplam ilerlemesi ve hızı">
+            <TextBlock Text="{Binding DataContext.Progress.Percent, RelativeSource={RelativeSource AncestorType=Window}, StringFormat={}%{0}}" FontWeight="SemiBold"
+                       VerticalAlignment="Center" Margin="0,0,8,0" />
             <TextBlock Text="{Binding Queue.TotalSpeed, Converter={StaticResource Bytes}, ConverterParameter=speed}" FontWeight="SemiBold" VerticalAlignment="Center" />
             <Viewbox Stretch="Fill" Width="60" Height="14" Margin="8,0,0,0">
               <Canvas Width="120" Height="22">
@@ -121,6 +157,10 @@
         </Border>
         <TextBlock Text="{Binding ScheduleError}" Foreground="{DynamicResource Warn}" VerticalAlignment="Center" Margin="4,0,0,6"
                    Visibility="{Binding ScheduleError, Converter={StaticResource Vis}}" />
+        <Button Style="{StaticResource BtnSm}" Margin="0,0,6,6" VerticalAlignment="Top" Command="{Binding CancelAllCommand}"
+                Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}}" ToolTip="Kuyruktaki her işi iptal et (bildirimden geri alınabilir)">
+          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.X}" Size="13" Margin="0,0,6,0" /><TextBlock Text="Kuyruğu boşalt" /></StackPanel>
+        </Button>
       </WrapPanel>
 
       <Grid Margin="0,0,0,24">
@@ -133,15 +173,58 @@
         <!-- İşler -->
         <StackPanel>
           <Border Style="{StaticResource Tile}" BorderBrush="{DynamicResource Line2}" Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}, ConverterParameter=!}">
-            <TextBlock Style="{StaticResource Body2}" Text="Kuyruk boş. İndir ekranından ya da bir playlist'ten video ekleyebilirsin." />
+            <TextBlock Style="{StaticResource Body2}" Text="Kuyruk boş. İndir ekranından ya da bir playlist'ten video ekleyebilir, bağlantıyı pencereye sürükleyip bırakabilirsin." />
           </Border>
           <ItemsControl ItemsSource="{Binding Queue.Jobs}" Style="{StaticResource VirtualList}" MaxHeight="480">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Border Style="{StaticResource JobCard}">
+                <Border Style="{StaticResource JobCard}" Tag="{Binding DataContext, ElementName=Root}">
                   <Border.InputBindings>
                     <MouseBinding MouseAction="LeftClick" Command="{Binding DataContext.SelectCommand, ElementName=Root}" CommandParameter="{Binding}" />
                   </Border.InputBindings>
+                  <!-- Menü ayrı bir görsel ağaçta: komutlara kartın Tag'indeki görünüm modeli üzerinden ulaşılır -->
+                  <Border.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Duraklat" Style="{StaticResource MiPause}" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.PauseCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Pause}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Devam et" Style="{StaticResource MiResume}" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.ResumeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Tekrar dene" Style="{StaticResource MiRetry}" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.RetryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Refresh}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Sıranın başına al" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.MoveToFrontCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.ArrowUp}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Sıranın sonuna al" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.MoveToEndCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.ArrowDown}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <Separator />
+                      <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="yt-dlp komutunu kopyala" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.CopyCommandCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Copy}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <Separator />
+                      <MenuItem Header="İptal et" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.CancelCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.X}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                    </ContextMenu>
+                  </Border.ContextMenu>
                   <StackPanel>
                     <DockPanel>
                       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -287,10 +370,14 @@
                         Click="Filter_Click" Tag="warn">
             <TextBlock><Run Text="Uyarılı ·" /> <Run Text="{Binding HWarn, Mode=OneWay}" /></TextBlock>
           </ToggleButton>
-          <TextBox Width="200" Text="{Binding HistoryQuery, UpdateSourceTrigger=PropertyChanged, Delay=250}" Tag="Başlık veya kanal" Margin="0,0,8,0" />
+          <TextBox x:Name="SearchBox" Width="200" Text="{Binding HistoryQuery, UpdateSourceTrigger=PropertyChanged, Delay=250}" Tag="Başlık veya kanal  (Ctrl+F)" Margin="0,0,8,0"
+                   AutomationProperties.Name="Geçmişte ara" />
           <Button Style="{StaticResource BtnSm}" Content="Temizle" Command="{Binding ClearHistoryCommand}" />
         </StackPanel>
-        <TextBlock Style="{StaticResource H2}" Text="Geçmiş" VerticalAlignment="Center" FontSize="19" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Style="{StaticResource H2}" Text="Geçmiş" FontSize="19" />
+          <TextBlock Style="{StaticResource Small}" Text="Çift tık: oynat · sağ tık: diğer işlemler" Margin="0,2,0,0" />
+        </StackPanel>
       </DockPanel>
 
       <Border Style="{StaticResource Card}" CornerRadius="16">
@@ -308,7 +395,50 @@
           <ItemsControl ItemsSource="{Binding HistoryView}" Style="{StaticResource VirtualList}" MaxHeight="520">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Border BorderBrush="{DynamicResource Raised}" BorderThickness="0,1,0,0" Padding="12,6">
+                <Border Style="{StaticResource HistoryRow}" Tag="{Binding DataContext, ElementName=Root}">
+                  <Border.InputBindings>
+                    <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.OpenOrRevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                  </Border.InputBindings>
+                  <Border.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Oynat" CommandParameter="{Binding}" Visibility="{Binding FilePath, Converter={StaticResource Vis}}"
+                                Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Klasörde göster" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <Separator />
+                      <MenuItem Header="Aynı ayarlarla tekrar indir" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.RedownloadCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Download}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Farklı kalitede indir…" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.ReopenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Video}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <Separator />
+                      <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <Separator />
+                      <MenuItem Header="Dosyayı geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                                Visibility="{Binding FilePath, Converter={StaticResource Vis}}"
+                                Command="{Binding PlacementTarget.Tag.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Geçmişten kaldır" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.RemoveHistoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.X}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                    </ContextMenu>
+                  </Border.ContextMenu>
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="3*" /><ColumnDefinition Width="1.4*" /><ColumnDefinition Width="140" /><ColumnDefinition Width="80" />

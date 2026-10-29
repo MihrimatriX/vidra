@@ -57,6 +57,19 @@ public sealed partial class DownloadViewModel : ObservableObject
         _comments = d.Comments;
         _mode = d.Mode;
         _musicMode = d.MusicMode;
+        host.Queue.History.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Recent));
+    }
+
+    /// <summary>Boş ekranda: son indirilenler (aynı video bir kez) — farklı kalitede tekrar açmak ya da oynatmak için.</summary>
+    public IReadOnlyList<HistoryEntry> Recent =>
+        _host.Queue.History.Where(h => h.Status == JobStatus.Done).DistinctBy(h => h.Url).Take(5).ToList();
+
+    [RelayCommand]
+    private async Task Reopen(HistoryEntry? h)
+    {
+        if (h is null) return;
+        Url = h.Url;
+        await Analyze();
     }
 
     // Profiller: hazırlar + kullanıcının kaydettikleri
@@ -193,9 +206,16 @@ public sealed partial class DownloadViewModel : ObservableObject
     {
         var links = YouTubeUrl.ExtractVideoLinks(text);
         if (links.Count < 2) return false;
-        _host.Queue.Enqueue(links.Select(l => new NewJob(l, l, _host.Settings.Defaults, Source: "Toplu yapıştırma")));
-        _main.Go(Page.Queue);
+        EnqueueLinks(links, "Toplu yapıştırma");
         return true;
+    }
+
+    /// <summary>Video bağlantılarını varsayılan biçimle kuyruğa alır (başlıklar indirme başlayınca dolar).</summary>
+    public void EnqueueLinks(IReadOnlyList<string> links, string source)
+    {
+        _host.Queue.Enqueue(links.Select(l => new NewJob(l, l, _host.Settings.Defaults, Source: source)));
+        _main.Go(Page.Queue);
+        _main.ShowToast($"{links.Count} video kuyruğa eklendi");
     }
 
     [RelayCommand]
@@ -460,6 +480,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         if (Info is not { } v) return;
         _host.Queue.Enqueue([new NewJob(v.Url, v.Title, BuildOptions(), v.Channel, v.Thumbnail, v.Duration)], startNow);
         if (startNow) _main.Go(Page.Queue);
+        else _main.ShowToast("Kuyruğa eklendi (bekletiliyor)", "Kuyruğu aç", () => _main.Go(Page.Queue));
     }
 
     [RelayCommand] private void DownloadNow() => Enqueue(true);

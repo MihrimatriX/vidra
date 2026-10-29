@@ -16,7 +16,11 @@ public sealed record NewJob(
     string? Thumbnail = null,
     double? Duration = null,
     string? OutputTemplate = null,
-    string? Source = null);
+    string? Source = null)
+{
+    /// <summary>Kuyruktaki işi aynı ayarlarla yeniden oluşturmak için (bekleyen işler, iptali geri alma).</summary>
+    public static NewJob From(DownloadJob j) => new(j.Url, j.Title, j.Options, j.Channel, j.Thumbnail, j.Duration, j.OutputTemplate, j.Source);
+}
 
 /// <summary>
 /// Eşzamanlılık sınırlı indirme kuyruğu.
@@ -85,7 +89,7 @@ public sealed partial class DownloadQueue : ObservableObject
     {
         var pending = Snapshot()
             .Where(j => j.Status is not (JobStatus.Done or JobStatus.Canceled))
-            .Select(j => new NewJob(j.Url, j.Title, j.Options, j.Channel, j.Thumbnail, j.Duration, j.OutputTemplate, j.Source))
+            .Select(NewJob.From)
             .ToList();
         return JsonStore.WriteAsync(_paths.PendingFile, pending);
     }
@@ -152,6 +156,31 @@ public sealed partial class DownloadQueue : ObservableObject
         if (i > 0) Jobs.Move(i, 0);
     });
 
+    public void MoveToEnd(DownloadJob j) => _dispatch(() =>
+    {
+        var i = Jobs.IndexOf(j);
+        if (i >= 0 && i < Jobs.Count - 1) Jobs.Move(i, Jobs.Count - 1);
+    });
+
+    /// <summary>Hata almış işlerin hepsini yeniden sıraya koyar.</summary>
+    public int RetryFailed()
+    {
+        var failed = Snapshot().Where(j => j.Status == JobStatus.Error).ToList();
+        foreach (var j in failed) Retry(j);
+        return failed.Count;
+    }
+
+    /// <summary>Bitmemiş işlerin hepsini iptal eder; geri alabilmek için iptal edilenleri döndürür.</summary>
+    public IReadOnlyList<DownloadJob> CancelAll()
+    {
+        var jobs = Snapshot().Where(j => j.Status is not (JobStatus.Done or JobStatus.Canceled)).ToList();
+        // Önce bekleyenler: koşan süreçler öldürülünce Schedule sıradaki işi başlatmasın
+        var running = jobs.Where(j => j.Status is JobStatus.Running or JobStatus.Processing).ToList();
+        foreach (var j in jobs.Except(running)) Cancel(j);
+        foreach (var j in running) Cancel(j);
+        return jobs;
+    }
+
     public void PauseAll()
     {
         foreach (var j in Snapshot())
@@ -177,6 +206,37 @@ public sealed partial class DownloadQueue : ObservableObject
     public void RemoveHistory(HistoryEntry h)
     {
         _dispatch(() => History.Remove(h));
+        _ = SaveHistoryAsync();
+    }
+
+    /// <summary>İptali geri alma: iptal kayıtları geçmişten düşer.</summary>
+    public void RemoveHistory(IEnumerable<string> ids)
+    {
+        var set = ids.ToHashSet(StringComparer.Ordinal);
+        _dispatch(() =>
+        {
+            for (var i = History.Count - 1; i >= 0; i--)
+                if (set.Contains(History[i].Id)) History.RemoveAt(i);
+        });
+        _ = SaveHistoryAsync();
+    }
+
+    /// <summary>Silinen kayıtları geri koyar (geri al): tarih sırasına yerleşir, zaten olanlar atlanır.</summary>
+    public void RestoreHistory(IEnumerable<HistoryEntry> entries)
+    {
+        var items = entries.ToList();
+        _dispatch(() =>
+        {
+            var have = History.Select(h => h.Id).ToHashSet(StringComparer.Ordinal);
+            foreach (var e in items)
+            {
+                if (!have.Add(e.Id)) continue;
+                var i = 0;
+                while (i < History.Count && History[i].FinishedAt >= e.FinishedAt) i++;
+                History.Insert(i, e);
+            }
+            while (History.Count > HistoryLimit) History.RemoveAt(History.Count - 1);
+        });
         _ = SaveHistoryAsync();
     }
 

@@ -124,3 +124,12 @@ public sealed class DescribeConverter : IValueConverter
     public object Convert(object? value, Type t, object? p, CultureInfo c) => value is Vidra.Core.Models.DownloadOptions o ? o.Describe() : "";
     public object ConvertBack(object? value, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }
+
+/// <summary>Icons.xaml anahtarı ("I.Download") → geometri; görünüm modelleri ikonu adıyla taşır (komut paleti).</summary>
+public sealed class IconKeyConverter : IValueConverter
+{
+    public object? Convert(object? value, Type t, object? p, CultureInfo c) =>
+        value is string key ? Application.Current.TryFindResource(key) as Geometry : null;
+
+    public object ConvertBack(object? value, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+}
