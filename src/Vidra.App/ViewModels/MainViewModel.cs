@@ -54,6 +54,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private ToastMessage? _toast;
     private readonly DispatcherTimer _toastTimer = new();
+    private bool _toastHeld;
     private string _trayTip = "";
 
     public MainViewModel(AppHost host)
@@ -74,7 +75,8 @@ public sealed partial class MainViewModel : ObservableObject
         _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); Toast = null; };
 
         host.SettingsStore.Changed += (_, _) => RefreshStatus();
-        host.Queue.Jobs.CollectionChanged += (_, _) => RefreshStatus();
+        var refreshStatus = Ui.Coalesce(RefreshStatus);
+        host.Queue.Jobs.CollectionChanged += (_, _) => refreshStatus();
         host.Clipboard.LinkCopied += (_, link) =>
         {
             if (Download.Url.Trim() == link) return;
@@ -161,12 +163,14 @@ public sealed partial class MainViewModel : ObservableObject
         Toast = new ToastMessage(text, actionLabel, action);
         _toastTimer.Stop();
         _toastTimer.Interval = TimeSpan.FromSeconds(action is null ? 3.5 : 7);
-        _toastTimer.Start();
+        // Fare zaten bildirimin üstündeyse yenisi de altından kaybolmasın (ayrılınca süre işler)
+        if (!_toastHeld) _toastTimer.Start();
     }
 
     /// <summary>Fare bildirimin üstündeyken kapanmasın (okurken ya da "Geri al"a uzanırken).</summary>
     public void HoldToast(bool hold)
     {
+        _toastHeld = hold;
         if (Toast is null) return;
         _toastTimer.Stop();
         if (hold) return;
@@ -179,10 +183,16 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var t = Toast;
         Toast = null;
+        _toastHeld = false;
         t?.Action?.Invoke();
     }
 
-    [RelayCommand] private void DismissToast() => Toast = null;
+    [RelayCommand]
+    private void DismissToast()
+    {
+        Toast = null;
+        _toastHeld = false; // bildirim kapanınca MouseLeave gelmez
+    }
 
     /// <summary>Kartlardaki "YouTube'da aç": yalnızca http(s) adresleri varsayılan tarayıcıya gider.</summary>
     [RelayCommand]

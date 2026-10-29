@@ -93,6 +93,7 @@ public partial class App : Application
         {
             try
             {
+                window.SavePlacement(); // OnClosing yolu çalışmaz; ayarlar aşağıda hemen yazılır
                 _host.Queue.BeginShutdown();
                 _host.Queue.PauseAll();
                 _host.Queue.SavePendingAsync().GetAwaiter().GetResult();

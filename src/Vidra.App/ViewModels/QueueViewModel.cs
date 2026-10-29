@@ -30,8 +30,10 @@ public sealed partial class QueueViewModel : ObservableObject
         _main = main;
         HistoryView = CollectionViewSource.GetDefaultView(host.Queue.History);
         HistoryView.Filter = o => o is HistoryEntry h && MatchesHistory(h);
-        host.Queue.Jobs.CollectionChanged += (_, _) => RefreshCounts();
-        host.Queue.History.CollectionChanged += (_, _) => RefreshCounts();
+        // Toplu değişikliklerde (kuyruğu boşalt, geçmişi geri al) her öğe için değil, bir kez say
+        var refresh = Ui.Coalesce(RefreshCounts);
+        host.Queue.Jobs.CollectionChanged += (_, _) => refresh();
+        host.Queue.History.CollectionChanged += (_, _) => refresh();
         host.Queue.Drained += (_, _) => Application.Current?.Dispatcher.BeginInvoke(OnDrained);
         // Zamanlama kapanıştan sonra da geçerli: saat gelene kadar kuyruk başlamasın
         host.Queue.Held = host.Settings.ScheduledStart is not null;
@@ -202,12 +204,7 @@ public sealed partial class QueueViewModel : ObservableObject
         var jobs = _host.Queue.CancelAll();
         if (jobs.Count == 0) return;
         _main.ShowToast($"{jobs.Count} iş iptal edildi", "Geri al", () =>
-        {
-            _host.Queue.RemoveHistory(jobs.Select(j => j.Id));
-            var waiting = jobs.Where(j => before.GetValueOrDefault(j.Id) is JobStatus.Paused or JobStatus.Error).ToList();
-            _host.Queue.Enqueue(jobs.Except(waiting).Select(NewJob.From).ToList());
-            _host.Queue.Enqueue(waiting.Select(NewJob.From).ToList(), startNow: false);
-        });
+            _ = _host.Queue.RestoreCanceledAsync(jobs, j => before.GetValueOrDefault(j.Id) is JobStatus.Paused or JobStatus.Error));
     }
 
     [RelayCommand]
@@ -254,22 +251,33 @@ public sealed partial class QueueViewModel : ObservableObject
         else Reveal(p);
     }
 
-    /// <summary>Dosyayı geri dönüşüm kutusuna taşır (kalıcı silmez); geçmiş kaydı kalır.</summary>
+    /// <summary>
+    /// Dosyayı geri dönüşüm kutusuna taşır; geçmiş kaydı kalır. Geri dönüşüm kutusu olmayan sürücülerde (ağ, bazı USB)
+    /// Windows kalıcı silme onayı sorar: sessiz seçenek orada sormadan kalıcı silerdi.
+    /// </summary>
     [RelayCommand]
     private void DeleteFile(object? p)
     {
         if (p is not HistoryEntry { FilePath: { } path } || !File.Exists(path)) return;
         try
         {
-            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.AllDialogs,
                 Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-            _main.ShowToast("Dosya geri dönüşüm kutusuna taşındı");
+            if (File.Exists(path)) return;
+            _main.ShowToast(IsFixedDrive(path) ? "Dosya geri dönüşüm kutusuna taşındı" : "Dosya silindi");
             _main.Library.Refresh();
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or OperationCanceledException)
+        catch (OperationCanceledException) { } // kullanıcı Windows'un onay penceresinde vazgeçti
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             _main.ShowToast($"Dosya silinemedi: {e.Message}");
         }
+    }
+
+    private static bool IsFixedDrive(string path)
+    {
+        try { return new DriveInfo(Path.GetPathRoot(Path.GetFullPath(path))!).DriveType == DriveType.Fixed; }
+        catch (ArgumentException) { return false; } // UNC yolu: sürücü harfi yok
     }
     [RelayCommand] private void IncConcurrency() => Concurrency++;
     [RelayCommand] private void DecConcurrency() => Concurrency--;

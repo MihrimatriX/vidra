@@ -61,6 +61,16 @@ public class LinkExtractionTests
 
     [Fact]
     public void Nothing_in_plain_text() => Assert.Empty(YouTubeUrl.ExtractLinks("merhaba dünya"));
+
+    [Theory]
+    [InlineData("https://www.notyoutube.com/watch?v=abc")]
+    [InlineData("https://evil-youtube.com/watch?v=abc")]
+    [InlineData("https://youtube.com.example.org/watch?v=abc")]
+    public void Look_alike_hosts_are_ignored(string text) => Assert.Empty(YouTubeUrl.ExtractLinks(text));
+
+    [Fact]
+    public void Same_video_in_two_forms_counts_once() =>
+        Assert.Single(YouTubeUrl.ExtractLinks("https://youtu.be/abc123 ve https://www.youtube.com/watch?v=abc123"));
 }
 
 public class QueueProgressTests

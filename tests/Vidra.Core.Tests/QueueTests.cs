@@ -188,10 +188,22 @@ public class QueueTests : IDisposable
         Assert.Equal(2, _runner.Started.Count);
         Assert.All(_queue.History, h => Assert.Equal(JobStatus.Canceled, h.Status));
 
-        _queue.RemoveHistory(canceled.Select(j => j.Id));
-        _queue.Enqueue(canceled.Select(NewJob.From), startNow: false);
+        await _queue.RestoreCanceledAsync(canceled, _ => true);
         Assert.Empty(_queue.History);
         Assert.Equal(["a", "b", "c"], _queue.Jobs.Select(j => j.Title));
+        Assert.All(_queue.Jobs, j => Assert.Equal(JobStatus.Paused, j.Status));
+    }
+
+    [Fact]
+    public async Task Undo_right_after_cancel_waits_for_killed_processes()
+    {
+        _queue.Enqueue([Job("a"), Job("b")]);
+        var canceled = _queue.CancelAll();
+        // Hemen geri al: koşan işlerin süreçleri henüz bitmedi (Finish sonradan gelir)
+        await _queue.RestoreCanceledAsync(canceled, _ => false);
+        Assert.Empty(_queue.History); // geç gelen "iptal" kaydı kalmadı
+        Assert.Equal(["a", "b"], _queue.Jobs.Select(j => j.Title));
+        Assert.Equal(4, _runner.Started.Count); // eskiler bittikten sonra yeniden başladılar
     }
 
     [Fact]

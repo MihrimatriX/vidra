@@ -209,6 +209,22 @@ public sealed partial class DownloadQueue : ObservableObject
         _ = SaveHistoryAsync();
     }
 
+    /// <summary>
+    /// CancelAll'ı geri al. Önce öldürülen süreçlerin gerçekten bitmesini (işin kuyruktan düşmesini) bekler:
+    /// aksi hâlde eski süreç aynı .part dosyasını tutarken yenisi başlar ve geç gelen "iptal" kaydı geçmişte kalır.
+    /// Sonra iptal kayıtlarını siler ve işleri geri koyar; <paramref name="wasWaiting"/> olanlar duraklatılmış döner.
+    /// </summary>
+    public async Task RestoreCanceledAsync(IReadOnlyList<DownloadJob> jobs, Func<DownloadJob, bool> wasWaiting, TimeSpan? timeout = null)
+    {
+        var set = jobs.ToHashSet();
+        var until = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (Snapshot().Any(set.Contains) && DateTime.UtcNow < until) await Task.Delay(50);
+        RemoveHistory(jobs.Select(j => j.Id));
+        var waiting = jobs.Where(wasWaiting).ToList();
+        Enqueue(jobs.Except(waiting).Select(NewJob.From).ToList());
+        Enqueue(waiting.Select(NewJob.From).ToList(), startNow: false);
+    }
+
     /// <summary>İptali geri alma: iptal kayıtları geçmişten düşer.</summary>
     public void RemoveHistory(IEnumerable<string> ids)
     {

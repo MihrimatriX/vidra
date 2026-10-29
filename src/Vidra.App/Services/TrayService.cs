@@ -31,7 +31,12 @@ public sealed class TrayService : IDisposable
         _icon.BalloonTipClicked += (_, _) => Show();
     }
 
-    public void SetTooltip(string text) => _icon.Text = text.Length > 63 ? text[..63] : text;
+    /// <summary>.NET'te NotifyIcon 127 karaktere izin verir (.NET Framework'te 63); sınır aşılırsa kısaltılır.</summary>
+    public void SetTooltip(string text)
+    {
+        try { _icon.Text = text.Length > 127 ? text[..127] : text; }
+        catch (ArgumentOutOfRangeException) { _icon.Text = text.Length > 63 ? text[..63] : text; }
+    }
 
     public void Notify(string title, string text, bool warning = false) =>
         _icon.ShowBalloonTip(4000, title, text, warning ? Forms.ToolTipIcon.Warning : Forms.ToolTipIcon.Info);

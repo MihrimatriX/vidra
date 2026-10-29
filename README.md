@@ -41,7 +41,7 @@ arayüz `Vidra.App` (WPF) içinde. yt-dlp, ffmpeg/ffprobe ve Deno ilk açılış
 
 ```powershell
 dotnet run --project src/Vidra.App            # geliştirme
-dotnet test                                    # 129 birim testi (Core)
+dotnet test                                    # 134 birim testi (Core)
 dotnet publish src/Vidra.App -c Release -r win-x64 -o publish   # tek, bağımsız Vidra.exe (~175 MB)
 
 # Küçük sürüm (.NET 9 Desktop Runtime kurulu makineler için, ~3 MB):

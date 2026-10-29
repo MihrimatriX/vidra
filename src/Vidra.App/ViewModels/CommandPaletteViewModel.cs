@@ -48,7 +48,8 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
     {
         if (Items.Count == 0) return;
         var i = Selected is null ? -1 : Items.IndexOf(Selected);
-        Selected = Items[(i + delta + Items.Count) % Items.Count];
+        // Seçim yokken ↓ ilkine, ↑ sonuncuya gider
+        Selected = i < 0 ? Items[delta > 0 ? 0 : Items.Count - 1] : Items[(i + delta + Items.Count) % Items.Count];
     }
 
     /// <summary>Eşzamanlı: önceki komut (ör. bağlantı analizi) sürerken palet yeniden açılıp başka komut çalıştırılabilsin.</summary>
