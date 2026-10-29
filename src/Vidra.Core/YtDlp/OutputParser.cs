@@ -7,6 +7,7 @@ public abstract record OutputLine;
 public sealed record DownloadLine(string Status, long Downloaded, long? Total, double? Speed, double? Eta, string? FormatId) : OutputLine;
 public sealed record PostprocessLine(string Status, string Name) : OutputLine;
 public sealed record DoneLine(string FilePath) : OutputLine;
+public sealed record MetaLine(string? Channel, string Title) : OutputLine;
 public sealed record ErrorLine(ErrorKind Kind, string Message) : OutputLine;
 public sealed record WarningLine(string Message) : OutputLine;
 public sealed record OtherLine(string Text) : OutputLine;
@@ -20,6 +21,13 @@ public static class OutputParser
 
         if (line.StartsWith(YtDlpArgs.MarkDone, StringComparison.Ordinal))
             return new DoneLine(line[YtDlpArgs.MarkDone.Length..]);
+
+        if (line.StartsWith(YtDlpArgs.MarkMeta, StringComparison.Ordinal))
+        {
+            // kanal|başlık — başlık '|' içerebilir, kanal içermez
+            var p = line[YtDlpArgs.MarkMeta.Length..].Split('|', 2);
+            return new MetaLine(p[0] is "" or "NA" ? null : p[0], p.Length > 1 ? p[1] : "");
+        }
 
         if (line.StartsWith(YtDlpArgs.MarkDl, StringComparison.Ordinal))
         {
@@ -57,6 +65,10 @@ public static class OutputParser
         var m = message.ToLowerInvariant();
         // YouTube'un bot doğrulaması: üyelik değil, IP/oturum güveni sorunu (veri merkezi, VPN, yoğun kullanım)
         if (m.Contains("not a bot")) return ErrorKind.BotCheck;
+        // Henüz başlamamış canlı yayın / prömiyer: "This live event will begin in 2 hours", "Premieres in 3 hours"
+        if (m.Contains("live event will begin") || m.Contains("premieres in") || m.Contains("premiere will begin") ||
+            m.Contains("will begin in a few moments") || m.Contains("waiting for scheduled"))
+            return ErrorKind.Upcoming;
         if (m.Contains("members") || m.Contains("join this channel") || m.Contains("sign in to confirm") ||
             m.Contains("cookies") || m.Contains("private video") || m.Contains("login required") || m.Contains("sign in"))
             return ErrorKind.Auth;
@@ -97,6 +109,7 @@ public static class OutputParser
         ErrorKind.Unavailable => "Video kaldırılmış, özel ya da bölgende erişilemiyor.",
         ErrorKind.Ffmpeg => "ffmpeg işlemi başarısız oldu: " + message,
         ErrorKind.Network => "Bağlantı hatası: " + message,
+        ErrorKind.Upcoming => "Yayın henüz başlamadı. Başlayınca otomatik indirmek için kuyruğa alabilirsin.",
         _ => message,
     };
 

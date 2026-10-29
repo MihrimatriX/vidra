@@ -57,8 +57,25 @@ public sealed class TrayService : IDisposable
 
 public static class PowerService
 {
+    private const uint EsContinuous = 0x80000000, EsSystemRequired = 0x00000001;
+    private static bool _awake;
+
     /// <summary>Bilgisayarı uyku moduna alır (kuyruk bitince isteğe bağlı).</summary>
     public static void Sleep() => SetSuspendState(false, false, false);
+
+    /// <summary>
+    /// Açıkken sistem kendiliğinden uykuya geçmez (ekran yine kapanabilir). İş parçacığına bağlı bir durumdur:
+    /// hep aynı (arayüz) thread'inden çağrılmalı.
+    /// </summary>
+    public static void KeepAwake(bool on)
+    {
+        if (on == _awake) return;
+        _awake = on;
+        _ = SetThreadExecutionState(on ? EsContinuous | EsSystemRequired : EsContinuous);
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern uint SetThreadExecutionState(uint flags);
 
     [DllImport("powrprof.dll", SetLastError = true)]
     private static extern bool SetSuspendState(bool hibernate, bool forceCritical, bool disableWakeEvent);

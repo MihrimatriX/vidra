@@ -19,7 +19,8 @@ public enum UpdateChannel { Stable, Nightly }
 
 public enum JobStatus { Queued, Running, Processing, Paused, Done, Error, Canceled }
 
-public enum ErrorKind { Auth, BotCheck, Unavailable, Network, Ffmpeg, RateLimited, Unknown }
+/// <summary>Upcoming: canlı yayın/prömiyer henüz başlamadı (beklenerek indirilebilir).</summary>
+public enum ErrorKind { Auth, BotCheck, Unavailable, Network, Ffmpeg, RateLimited, Unknown, Upcoming }
 
 public enum LinkKind { Video, Playlist, Channel, Feed }
 
