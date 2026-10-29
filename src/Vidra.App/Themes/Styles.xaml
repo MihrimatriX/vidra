@@ -13,42 +13,45 @@
   <CornerRadius x:Key="RSm">10</CornerRadius>
   <CornerRadius x:Key="RMd">14</CornerRadius>
   <CornerRadius x:Key="RLg">18</CornerRadius>
+  <!-- Sayfa kenar boşlukları: kayan sayfalar (PagePad) ve kendi listesi kayan, pencereyi dolduran sayfalar (PagePadFill) -->
+  <Thickness x:Key="PagePad">32,18,32,32</Thickness>
+  <Thickness x:Key="PagePadFill">32,18,32,18</Thickness>
 
   <!-- ============ Metin ============ -->
   <Style x:Key="H1" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
-    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontSize" Value="26" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
   <Style x:Key="H2" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontSize" Value="19" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
   <Style x:Key="H3" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontSize" Value="16" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
   <Style x:Key="Eyebrow" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource Text2}" />
     <Setter Property="Typography.Capitals" Value="AllSmallCaps" />
   </Style>
   <Style x:Key="Body2" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="Foreground" Value="{DynamicResource Text2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <Style x:Key="Small" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="12.5" />
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
   </Style>
   <Style x:Key="Mono" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="12.5" />
     <Setter Property="Foreground" Value="{DynamicResource Text2}" />
   </Style>
 
@@ -61,7 +64,7 @@
   </Style>
   <Style x:Key="Tile" TargetType="Border" BasedOn="{StaticResource Card}">
     <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
-    <Setter Property="Padding" Value="12" />
+    <Setter Property="Padding" Value="14" />
   </Style>
   <Style x:Key="Notice" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource WarnSoft}" />
@@ -77,7 +80,7 @@
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="7,2" />
     <Setter Property="Margin" Value="0,0,6,0" />
-    <Setter Property="TextElement.FontSize" Value="11" />
+    <Setter Property="TextElement.FontSize" Value="11.5" />
     <Setter Property="TextElement.FontWeight" Value="SemiBold" />
     <Setter Property="TextElement.Foreground" Value="{DynamicResource Text2}" />
   </Style>
@@ -117,7 +120,7 @@
     <Setter Property="Padding" Value="14,0" />
     <Setter Property="MinHeight" Value="36" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -175,9 +178,9 @@
     <Setter Property="Tag" Value="12" />
   </Style>
   <Style x:Key="BtnSm" TargetType="Button" BasedOn="{StaticResource Btn}">
-    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="MinHeight" Value="30" />
     <Setter Property="Padding" Value="10,0" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="12.5" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Tag" Value="8" />
   </Style>
@@ -255,7 +258,7 @@
     <Setter Property="Padding" Value="6,1" />
     <Setter Property="Margin" Value="0,0,4,0" />
     <Setter Property="TextElement.FontFamily" Value="{StaticResource MonoFont}" />
-    <Setter Property="TextElement.FontSize" Value="11.5" />
+    <Setter Property="TextElement.FontSize" Value="12" />
     <Setter Property="TextElement.Foreground" Value="{DynamicResource Text2}" />
   </Style>
 
@@ -271,15 +274,15 @@
   <Style x:Key="NavItem" TargetType="RadioButton">
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
     <Setter Property="Foreground" Value="{DynamicResource Text2}" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Cursor" Value="Hand" />
-    <Setter Property="Margin" Value="0,0,0,2" />
+    <Setter Property="Margin" Value="0,0,0,3" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="RadioButton">
           <Grid>
-            <Border x:Name="Bd" Background="Transparent" CornerRadius="10" MinHeight="34" Padding="10,0">
+            <Border x:Name="Bd" Background="Transparent" CornerRadius="10" MinHeight="38" Padding="12,0">
               <ContentPresenter VerticalAlignment="Center" />
             </Border>
             <Border x:Name="Bar" Width="3" Height="18" CornerRadius="1.5" HorizontalAlignment="Left" Background="{DynamicResource Accent}" Visibility="Hidden" />
@@ -305,7 +308,7 @@
   <Style x:Key="Pill" TargetType="ToggleButton">
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
-    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontSize" Value="13" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Margin" Value="0,0,6,6" />
     <Setter Property="Template">
@@ -377,8 +380,8 @@
                       Foreground="{DynamicResource Muted}" RenderTransformOrigin="0.5,0.5">
                 <c:Icon.RenderTransform><RotateTransform Angle="-90" /></c:Icon.RenderTransform>
               </c:Icon>
-              <ContentPresenter DockPanel.Dock="Left" VerticalAlignment="Center" TextElement.FontWeight="SemiBold" TextElement.FontSize="13" />
-              <TextBlock x:Name="Sum" Text="{TemplateBinding Tag}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="12,0,0,0"
+              <ContentPresenter DockPanel.Dock="Left" VerticalAlignment="Center" TextElement.FontWeight="SemiBold" TextElement.FontSize="14" />
+              <TextBlock x:Name="Sum" Text="{TemplateBinding Tag}" Foreground="{DynamicResource Muted}" FontSize="12.5" Margin="12,0,0,0"
                          VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             </DockPanel>
           </Border>
@@ -415,8 +418,8 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                <ContentPresenter TextElement.FontWeight="SemiBold" TextElement.FontSize="13" />
-                <TextBlock Text="{TemplateBinding Tag}" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                <ContentPresenter TextElement.FontWeight="SemiBold" TextElement.FontSize="14" />
+                <TextBlock Text="{TemplateBinding Tag}" FontSize="12.5" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" Margin="0,2,0,0" />
               </StackPanel>
               <Border x:Name="Track" Grid.Column="1" Width="40" Height="24" CornerRadius="12" Background="{DynamicResource Line2}" VerticalAlignment="Center">
                 <Ellipse x:Name="Knob" Width="18" Height="18" Fill="White" HorizontalAlignment="Left" Margin="3,0" />
@@ -455,8 +458,8 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                <ContentPresenter TextElement.FontWeight="SemiBold" TextElement.FontSize="13" />
-                <TextBlock Text="{TemplateBinding Tag}" FontSize="12" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                <ContentPresenter TextElement.FontWeight="SemiBold" TextElement.FontSize="14" />
+                <TextBlock Text="{TemplateBinding Tag}" FontSize="12.5" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
               </StackPanel>
               <Border x:Name="Track" Grid.Column="1" Width="34" Height="20" CornerRadius="10" Background="{DynamicResource Line2}" VerticalAlignment="Center">
                 <Ellipse x:Name="Knob" Width="14" Height="14" Fill="White" HorizontalAlignment="Left" Margin="3,0" />
@@ -575,11 +578,11 @@
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Foreground" Value="{DynamicResource Text2}" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ListBoxItem">
-          <Border x:Name="Bd" MinHeight="30" Padding="12,0" CornerRadius="8" Background="Transparent" Margin="1.5">
+          <Border x:Name="Bd" MinHeight="32" Padding="14,0" CornerRadius="8" Background="Transparent" Margin="1.5">
             <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center" />
           </Border>
           <ControlTemplate.Triggers>
@@ -629,7 +632,7 @@
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Foreground" Value="{DynamicResource Text2}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="15" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ListBoxItem">
@@ -672,7 +675,7 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="MinHeight" Value="36" />
     <Setter Property="Padding" Value="10,0" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="Template">
       <Setter.Value>
@@ -703,7 +706,7 @@
   <Style TargetType="TextBox" BasedOn="{StaticResource Input}" />
   <Style x:Key="InputMono" TargetType="TextBox" BasedOn="{StaticResource Input}">
     <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
   </Style>
 
   <!-- Etiketli alan: Header üstte, içerik altta -->
@@ -714,7 +717,7 @@
       <Setter.Value>
         <ControlTemplate TargetType="HeaderedContentControl">
           <StackPanel>
-            <ContentPresenter ContentSource="Header" TextElement.FontSize="13" TextElement.Foreground="{DynamicResource Text2}" Margin="0,0,0,6" />
+            <ContentPresenter ContentSource="Header" TextElement.FontSize="14" TextElement.Foreground="{DynamicResource Text2}" Margin="0,0,0,6" />
             <ContentPresenter />
           </StackPanel>
         </ControlTemplate>
@@ -762,7 +765,7 @@
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line2}" />
     <Setter Property="MinHeight" Value="36" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
       <Setter.Value>
@@ -882,12 +885,12 @@
     <Setter Property="Foreground" Value="{DynamicResource InvertInk}" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="8,5" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="12.5" />
   </Style>
 
   <!-- Tablolar için hücre metni -->
   <Style x:Key="Cell" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -895,7 +898,7 @@
   </Style>
   <Style x:Key="CellMono" TargetType="TextBlock" BasedOn="{StaticResource Cell}">
     <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="12.5" />
     <Setter Property="Foreground" Value="{DynamicResource Text2}" />
   </Style>
 
@@ -920,7 +923,7 @@
   <Style TargetType="ContextMenu">
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="HasDropShadow" Value="False" />
     <Setter Property="Template">
       <Setter.Value>
@@ -944,11 +947,11 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="MenuItem">
-          <Border x:Name="Bd" Background="Transparent" CornerRadius="7" Padding="10,0" MinHeight="32">
+          <Border x:Name="Bd" Background="Transparent" CornerRadius="7" Padding="12,0" MinHeight="34">
             <DockPanel>
               <ContentPresenter DockPanel.Dock="Left" ContentSource="Icon" Width="16" Height="16" Margin="0,0,10,0" VerticalAlignment="Center"
                                 TextElement.Foreground="{DynamicResource Text2}" />
-              <TextBlock DockPanel.Dock="Right" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource Muted}" FontSize="12"
+              <TextBlock DockPanel.Dock="Right" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource Muted}" FontSize="12.5"
                          Margin="24,0,0,0" VerticalAlignment="Center" />
               <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" />
             </DockPanel>
@@ -983,7 +986,7 @@
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
     <Setter Property="Foreground" Value="{DynamicResource InvertAccent}" />
     <Setter Property="FontWeight" Value="Bold" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Padding" Value="10,0" />
     <Setter Property="MinHeight" Value="30" />

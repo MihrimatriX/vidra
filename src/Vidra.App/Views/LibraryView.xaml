@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:Vidra.App.Controls"
              x:Name="Root">
-  <Grid Margin="20,14,20,12">
+  <Grid Margin="{StaticResource PagePadFill}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
@@ -41,7 +41,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Border Margin="0,0,12,12" Padding="8" CornerRadius="12" BorderThickness="1" Background="{DynamicResource Surface}"
+                <Border Margin="0,0,16,16" Padding="10" CornerRadius="14" BorderThickness="1" Background="{DynamicResource Surface}"
                         Tag="{Binding DataContext.Actions, ElementName=Root}"
                         PreviewMouseLeftButtonDown="Card_PreviewMouseLeftButtonDown" MouseMove="Card_MouseMove">
                   <Border.Style>
@@ -94,14 +94,14 @@
                       </Image>
                       <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,2"
                               Visibility="{Binding Duration, Converter={StaticResource Vis}}">
-                        <TextBlock Text="{Binding Duration, Converter={StaticResource Dur}}" Foreground="White" FontFamily="{StaticResource MonoFont}" FontSize="11.5" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Duration, Converter={StaticResource Dur}}" Foreground="White" FontFamily="{StaticResource MonoFont}" FontSize="12" FontWeight="SemiBold" />
                       </Border>
                       <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,3"
                               Visibility="{Binding Options.Mode, Converter={StaticResource EqVis}, ConverterParameter=Audio}">
                         <c:Icon Data="{StaticResource I.Music}" Size="14" Foreground="White" />
                       </Border>
                     </Grid>
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12.5" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="32"
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="32"
                                LineHeight="16" LineStackingStrategy="BlockLineHeight" Margin="2,8,2,0" ToolTip="{Binding Title}" />
                     <TextBlock Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" Margin="2,2,2,0">
                       <Run Text="{Binding Channel, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Size, Mode=OneWay, Converter={StaticResource Bytes}}" />

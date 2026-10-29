@@ -105,8 +105,19 @@ internal static class ScreenshotTour
         }
         await Save(w, $"{theme}-06-kuyruk");
 
-        // Sağ tık: kuyruktaki iş ve geçmiş satırı
+        // Sağ tık: kuyruktaki iş
         await SaveMenu(w, b => b.DataContext is DownloadJob { Status: JobStatus.Running }, $"{theme}-07-is-menusu", 200, 26);
+
+        // Günlük: kuyruk ekranında yer kaplamasın diye ayrı sayfa
+        vm.LogVm.Show(host.Queue.Jobs.FirstOrDefault());
+        await Settle(900);
+        await Save(w, $"{theme}-06c-gunluk");
+
+        // Geçmiş sekmesi ve satır menüsü
+        vm.Go(Page.Queue);
+        vm.QueueVm.Section = "history";
+        await Settle(900);
+        await Save(w, $"{theme}-06b-gecmis");
         await SaveMenu(w, b => b.DataContext is HistoryEntry, $"{theme}-08-gecmis-menusu", 260, 18);
 
         // Bildirim + geri al
@@ -148,6 +159,45 @@ internal static class ScreenshotTour
         vm.Go(Page.Stats);
         await Settle(1200);
         await Save(w, $"{theme}-14-istatistik");
+
+        // Kanal › Kurslar: liste kartlarında video sayısı ve üyelere özel rozeti
+        await ShowCourses(vm);
+        await Save(w, $"{theme}-15-kanal-kurslar");
+    }
+
+    /// <summary>
+    /// Örnek kanal (Kurslar sekmesi). Kart özetleri normalde her liste yt-dlp ile okununca gelir; turda yt-dlp
+    /// çağrısı başarısız olur, bu yüzden okuma denemesi bitince örnek özetler elle konur.
+    /// </summary>
+    private static async Task ShowCourses(MainViewModel vm)
+    {
+        var lists = new (string Title, int Film, ListStats Stats)[]
+        {
+            ("Blender Fundamentals", 0, new(24, 0, 3, 3 * 3600 + 12 * 60, 2 * 3600 + 40 * 60)),
+            ("Geometry Nodes: sıfırdan", 2, new(12, 12, 0, 5400, 5400)),
+            ("Grease Pencil ile 2D animasyon", 3, new(18, 4, 0, 2 * 3600 + 5 * 60, 2 * 3600 + 5 * 60)),
+            ("Karakter rigging", 5, new(9, 0, 9, 4100, 0)),
+        };
+        var info = new PlaylistInfo
+        {
+            Kind = LinkKind.Channel, Id = "UCSMOQeBJ2RAnuFungnQOxLg", Title = "Blender - Courses", Channel = "Blender",
+            Url = "https://www.youtube.com/@BlenderOfficial/courses",
+            Entries = lists.Select((l, i) => new PlaylistEntry
+            {
+                Id = $"PLtour{i}", Url = $"https://www.youtube.com/playlist?list=PLtour{i}", Title = l.Title, IsList = true, Thumbnail = Thumb(Films[l.Film].Id),
+            }).ToList(),
+        };
+        vm.Go(Page.Playlist);
+        vm.Playlist.ChannelTab = ChannelTab.Courses; // liste açılmadan seçilir: sekme değişimi yeniden yükleme başlatmasın
+        vm.Playlist.Show(info, info.Url);
+        await Settle(2500);
+        foreach (var (row, i) in vm.Playlist.Rows.Select((r, i) => (r, i)))
+        {
+            row.StatsError = null;
+            row.Stats = lists[i].Stats;
+        }
+        vm.Playlist.Rows[0].IsSelected = true;
+        await Settle(2500);
     }
 
     // ================= Örnek veri =================
@@ -195,6 +245,19 @@ internal static class ScreenshotTour
         ], startNow: false);
         Set(jobs[0], JobStatus.Running, 63, "Video akışı (1/2)", 2_900_000, 41);
         Set(jobs[1], JobStatus.Running, 18, "Video akışı (1/2)", 1_400_000, 260);
+        foreach (var line in new[]
+        {
+            "[youtube] Extracting URL: https://www.youtube.com/watch?v=eRsGyueVLvQ",
+            "[youtube] eRsGyueVLvQ: Downloading webpage",
+            "[youtube] eRsGyueVLvQ: Downloading tv client config",
+            "[youtube] eRsGyueVLvQ: Downloading player 3d3ba064-main",
+            "[youtube] eRsGyueVLvQ: Downloading m3u8 information",
+            "[info] eRsGyueVLvQ: Downloading 1 format(s): 137+140",
+            "[download] Destination: Sintel - Open Movie by Blender Foundation.f137.mp4",
+            "[download]  63.0% of  774.00MiB at    2.77MiB/s ETA 00:41",
+        })
+            jobs[0].Log.Add(line);
+        jobs[0].Log.Flush();
         jobs[2].Status = JobStatus.Paused;
         jobs[2].Stage = "Duraklatıldı";
         jobs[2].Percent = 40;

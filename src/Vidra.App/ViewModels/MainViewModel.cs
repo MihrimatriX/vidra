@@ -14,7 +14,8 @@ using Vidra.Core.YtDlp;
 
 namespace Vidra.App.ViewModels;
 
-public enum Page { Download, Search, Playlist, Basket, Queue, Library, Stats, Account, Settings }
+/// <summary>Log: kenar çubuğunda yok, kuyruğun alt sayfası (bkz. LogViewModel).</summary>
+public enum Page { Download, Search, Playlist, Basket, Queue, Library, Stats, Account, Settings, Log }
 
 /// <summary>Alttaki kısa bildirim; Action varsa yanında düğme olarak (ör. "Geri al").</summary>
 public sealed record ToastMessage(string Text, string? ActionLabel, Action? Action);
@@ -30,6 +31,7 @@ public sealed partial class MainViewModel : ObservableObject
     public PlaylistViewModel Playlist { get; }
     public BasketViewModel Basket { get; }
     public QueueViewModel QueueVm { get; }
+    public LogViewModel LogVm { get; }
     public LibraryViewModel Library { get; }
     public AccountViewModel Account { get; }
     public SettingsViewModel Settings { get; }
@@ -72,6 +74,7 @@ public sealed partial class MainViewModel : ObservableObject
         Playlist = new PlaylistViewModel(host, this);
         Basket = new BasketViewModel(host, this);
         QueueVm = new QueueViewModel(host, this);
+        LogVm = new LogViewModel(host, this);
         Library = new LibraryViewModel(host, this);
         Account = new AccountViewModel(host, this);
         Settings = new SettingsViewModel(host);
@@ -95,6 +98,7 @@ public sealed partial class MainViewModel : ObservableObject
             var speed = host.Queue.TotalSpeed;
             SpeedLabel = speed > 0 ? Fmt.Speed(speed) : "";
             QueueVm.SampleSpeed(speed);
+            if (Page == Page.Log) LogVm.Selected?.Log.Flush(); // açık günlük canlı kalsın
             QueueVm.CheckSchedule();
             RefreshStatus(); // duraklat/hata gibi durum değişiklikleri koleksiyon olayı üretmez
             RefreshProgress();
@@ -147,12 +151,14 @@ public sealed partial class MainViewModel : ObservableObject
             Page.Stats => Stats,
             Page.Account => Account,
             Page.Settings => Settings,
+            Page.Log => LogVm,
             _ => Download,
         };
         if (value == Page.Account) _ = Account.RefreshAsync();
         if (value == Page.Settings) _ = Settings.RefreshToolsAsync();
         if (value == Page.Stats) Stats.Refresh(); // "bu hafta" gibi pencereler gün dönünce kayar
         if (value == Page.Library) Library.Refresh(); // silinen/taşınan dosyalar düşsün
+        if (value == Page.Queue) QueueVm.OnShown();
     }
 
     public void Go(Page p) => Page = p;
