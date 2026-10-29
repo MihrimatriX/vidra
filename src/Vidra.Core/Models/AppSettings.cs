@@ -69,8 +69,13 @@ public sealed class AppSettings
     /// <summary>Eklenti çerez gönderince oturumsuz Vidra kendiliğinden eklenti oturumuna geçsin. Eklenti oturumundan çıkış kapatır.</summary>
     public bool ExtensionSync { get; set; } = true;
 
+    /// <summary>Son pencere konumu ve boyutu (DIP). Kayıtlı ekran artık yoksa yok sayılır.</summary>
+    public WindowBounds? Window { get; set; }
+
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 }
+
+public sealed record WindowBounds(double Left, double Top, double Width, double Height, bool Maximized);
 
 /// <summary>Kayıtlı hesap. Dosyaları AppPaths.AccountCookiesFile/AccountProfileDir(Id) altında.</summary>
 public sealed record SavedAccount(string Id, string Name, DateTimeOffset ExportedAt, DateTimeOffset? ExpiresAt);

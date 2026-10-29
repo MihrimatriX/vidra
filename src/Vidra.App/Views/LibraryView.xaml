@@ -12,19 +12,22 @@
 
     <StackPanel>
       <TextBlock Style="{StaticResource H1}" Text="Kütüphane" />
-      <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,4,0,12" Text="İndirdiğin ve hâlâ diskte duran dosyalar." />
+      <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,4,0,12"
+                 Text="İndirdiğin ve hâlâ diskte duran dosyalar. Çift tıkla oynat, sağ tıkla diğer işlemler; kartı bir klasöre ya da uygulamaya sürükleyip bırakabilirsin." />
     </StackPanel>
 
     <WrapPanel Grid.Row="1" Margin="0,0,0,12">
-      <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="10,0,4,0" Width="280" Height="36" Margin="0,0,10,0">
+      <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="10,0,4,0" Width="280" Height="36" Margin="0,0,10,8">
         <DockPanel>
           <c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Search}" Size="15" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
-          <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged, Delay=250}" BorderThickness="0" Background="Transparent" Padding="8,0"
-                   VerticalContentAlignment="Center" Tag="Başlık veya kanal" AutomationProperties.Name="Kütüphanede ara" />
+          <TextBox x:Name="SearchBox" Text="{Binding Query, UpdateSourceTrigger=PropertyChanged, Delay=250}" BorderThickness="0" Background="Transparent" Padding="8,0"
+                   VerticalContentAlignment="Center" Tag="Başlık veya kanal  (Ctrl+F)" AutomationProperties.Name="Kütüphanede ara" />
         </DockPanel>
       </Border>
-      <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Filters}" SelectedValue="{Binding Filter}" Margin="0,0,12,0" VerticalAlignment="Center" />
-      <TextBlock Style="{StaticResource Small}" VerticalAlignment="Center">
+      <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Filters}" SelectedValue="{Binding Filter}" Margin="0,0,10,8" VerticalAlignment="Center" />
+      <ComboBox Width="150" ItemsSource="{Binding Sorts}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Sort}" Margin="0,0,12,8"
+                ToolTip="Sıralama" AutomationProperties.Name="Sıralama" />
+      <TextBlock Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,0,8">
         <Run Text="{Binding Count, Mode=OneWay}" /> dosya · <Run Text="{Binding TotalSize, Mode=OneWay, Converter={StaticResource Bytes}}" />
       </TextBlock>
     </WrapPanel>
@@ -38,7 +41,9 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Border Margin="0,0,12,12" Padding="8" CornerRadius="12" BorderThickness="1" Background="{DynamicResource Surface}">
+                <Border Margin="0,0,12,12" Padding="8" CornerRadius="12" BorderThickness="1" Background="{DynamicResource Surface}"
+                        Tag="{Binding DataContext.Actions, ElementName=Root}"
+                        PreviewMouseLeftButtonDown="Card_PreviewMouseLeftButtonDown" MouseMove="Card_MouseMove">
                   <Border.Style>
                     <Style TargetType="Border">
                       <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
@@ -47,6 +52,40 @@
                       </Style.Triggers>
                     </Style>
                   </Border.Style>
+                  <Border.InputBindings>
+                    <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.Actions.OpenOrRevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                  </Border.InputBindings>
+                  <!-- Menü ayrı bir görsel ağaçta: komutlara kartın Tag'indeki (Kuyruk ekranı) görünüm modeli üzerinden ulaşılır -->
+                  <Border.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Oynat" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Klasörde göster" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <Separator />
+                      <MenuItem Header="Farklı kalitede indir…" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.ReopenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Video}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                      <Separator />
+                      <MenuItem Header="Geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                                Command="{Binding PlacementTarget.Tag.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
+                      </MenuItem>
+                    </ContextMenu>
+                  </Border.ContextMenu>
                   <StackPanel>
                     <Grid Height="{Binding DataContext.Cards.ThumbHeight, ElementName=Root}">
                       <Border x:Name="Mask" CornerRadius="8" Background="{DynamicResource ThumbBg}" />
@@ -72,9 +111,9 @@
                     </TextBlock>
                     <WrapPanel Margin="0,8,0,0">
                       <Button Style="{StaticResource BtnSm}" Content="Oynat" Margin="0,0,6,0" CommandParameter="{Binding}"
-                              Command="{Binding DataContext.QueueVm.OpenCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                              Command="{Binding DataContext.Actions.OpenCommand, ElementName=Root}" />
                       <Button Style="{StaticResource BtnSm}" Content="Klasör" Margin="0,0,6,0" CommandParameter="{Binding}"
-                              Command="{Binding DataContext.QueueVm.RevealCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                              Command="{Binding DataContext.Actions.RevealCommand, ElementName=Root}" />
                       <Button Style="{StaticResource BtnSm}" Content="YouTube" CommandParameter="{Binding Url}"
                               Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                     </WrapPanel>
