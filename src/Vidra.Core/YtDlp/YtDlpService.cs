@@ -51,6 +51,7 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
         if (json.Length == 0 || json == "null" || json[0] != '{')
         {
             var err = LastError(r.StdErr);
+            if (OutputParser.MissingTab(err) is { } tab) throw new ProbeException($"Bu kanalda {tab.Label()} sekmesi yok.", ErrorKind.Unavailable);
             var k = OutputParser.Classify(err);
             throw new ProbeException(OutputParser.FriendlyError(k, string.IsNullOrWhiteSpace(err) ? "Video bilgisi alınamadı." : err), k);
         }
