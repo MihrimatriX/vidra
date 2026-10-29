@@ -60,7 +60,7 @@ arayüz `Vidra.App` (WPF) içinde. yt-dlp, ffmpeg/ffprobe ve Deno ilk açılış
 
 ```powershell
 dotnet run --project src/Vidra.App            # geliştirme
-dotnet test                                    # 171 birim testi (Core)
+dotnet test                                    # 172 birim testi (Core)
 dotnet publish src/Vidra.App -c Release -r win-x64 -o publish   # tek, bağımsız Vidra.exe (~175 MB)
 
 # Küçük sürüm (.NET 9 Desktop Runtime kurulu makineler için, ~3 MB):
@@ -70,6 +70,10 @@ dotnet publish src/Vidra.App -c Release -r win-x64 -p:SelfContained=false -p:Pub
 pwsh installer/build.ps1
 pwsh installer/make-icon.ps1                   # ikonu yeniden üret (renk/şekil değişince)
 ```
+
+**Sürüm yayınlama:** `Directory.Build.props`'ta `<Version>`'ı artır, notları `docs/releases/v<sürüm>.md` olarak yaz ve
+`main`'e al; ardından Actions › **Sürüm yayınla** › *Run workflow*. Workflow Windows'ta testleri çalıştırır, iki exe'yi
+derleyip açılışını dener ve `v<sürüm>` sürümünü bu dosyalarla yayınlar. Uygulama içi güncelleme bildirimi bu sürümü görür.
 
 Kurulum yönetici izni istemez (`%LOCALAPPDATA%\Programs\Vidra`), Başlat menüsüne ve isteğe bağlı masaüstüne kısayol
 ekler, Ayarlar › Uygulamalar'dan kaldırılabilir. Kaldırınca ayarlar ve geçmiş silinmez; yeni sürüm eskisinin üzerine kurulur.
