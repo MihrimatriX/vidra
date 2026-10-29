@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Vidra.Core.Models;
 
 namespace Vidra.Core.YtDlp;
@@ -13,8 +14,21 @@ public sealed record WarningLine(string Message) : OutputLine;
 public sealed record OtherLine(string Text) : OutputLine;
 
 /// <summary>--progress-template ile ürettiğimiz makine okunur satırları ve ERROR/WARNING satırlarını ayrıştırır.</summary>
-public static class OutputParser
+public static partial class OutputParser
 {
+    [GeneratedRegex(@"does not have an? (\w+) tab", RegexOptions.IgnoreCase)]
+    private static partial Regex MissingTabText();
+
+    /// <summary>"This channel does not have a courses tab" → Courses. Kanalların çoğunda Kurslar, Shorts ya da Canlı sekmesi yoktur.</summary>
+    public static ChannelTab? MissingTab(string message)
+    {
+        var m = MissingTabText().Match(message);
+        if (!m.Success) return null;
+        foreach (var t in Enum.GetValues<ChannelTab>())
+            if (string.Equals(t.Path(), m.Groups[1].Value, StringComparison.OrdinalIgnoreCase)) return t;
+        return null;
+    }
+
     public static OutputLine Parse(string raw)
     {
         var line = raw.TrimEnd('\r');

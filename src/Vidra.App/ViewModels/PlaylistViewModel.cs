@@ -28,6 +28,16 @@ public sealed partial class PlaylistRow(PlaylistEntry entry, int index, bool don
     public string Meta => string.Join(" · ", new[] { Fmt.Date(Entry.UploadDate), Entry.Views is { } v ? $"{Fmt.Count(v)} görüntülenme" : "" }.Where(s => s.Length > 0));
     // İndirilmiş videolar seçili gelmez; istenirse elle seçilip yeniden indirilebilir
     [ObservableProperty] private bool _isSelected = !entry.Unavailable && !entry.IsList && !done;
+
+    // Alt liste kartı: içerik arka planda okunur (bkz. PlaylistViewModel.LoadListStatsAsync)
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CountText), nameof(MembersText), nameof(MembersHint), nameof(StatsText))] private ListStats? _stats;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(StatsText))] private string? _statsError;
+    public string? CountText => Stats is { } s ? $"{s.Videos} video" : null;
+    public string? MembersText => Stats switch { { AllMembers: true } => "ÜYELERE ÖZEL", { Members: > 0 } s => $"{s.Members} ÜYE", _ => null };
+    public string? MembersHint => Stats is { Members: > 0 } s ? $"Üyelere özel: {s.Members} / {s.Videos} video" : null;
+    public string StatsText => StatsError is not null ? "Okunamadı"
+        : Stats is not { } s ? (Selectable ? "Okunuyor…" : "")
+        : string.Join(" · ", new[] { s.Seconds > 0 ? TimeText.Format(s.Seconds) : "", s.Done > 0 ? $"{s.Done} indirildi" : "" }.Where(x => x.Length > 0));
 }
 
 public sealed partial class PlaylistViewModel : ObservableObject
@@ -44,6 +54,9 @@ public sealed partial class PlaylistViewModel : ObservableObject
     private List<PlaylistRow> _all = [];
     private bool _bulk;
     private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _statsCts;
+    /// <summary>Okunmuş alt listeler: kart özeti için okunan liste açılırken ya da indirilirken yeniden okunmaz.</summary>
+    private readonly Dictionary<string, PlaylistInfo> _lists = new(StringComparer.Ordinal);
 
     public PlaylistViewModel(AppHost host, MainViewModel main)
     {
@@ -147,6 +160,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
     public async Task LoadAsync(string url, bool keepHistory = false)
     {
         _cts?.Cancel();
+        _statsCts?.Cancel();
         var cts = _cts = new CancellationTokenSource();
         SourceUrl = url;
         // Yeni açılan kanal bağlantısının sekmesi (…/playlists) seçilir; sekmesizse Videolar
@@ -177,7 +191,11 @@ public sealed partial class PlaylistViewModel : ObservableObject
 
     public void Show(PlaylistInfo p, string url, bool keepHistory = false)
     {
-        if (!keepHistory) _back.Clear();
+        if (!keepHistory)
+        {
+            _back.Clear();
+            _lists.Clear();
+        }
         SourceUrl = url;
         var archived = ArchivedIds();
         _all = p.Entries.Select((e, i) => new PlaylistRow(e, i + 1, archived.Contains(e.Id))).ToList();
@@ -201,6 +219,39 @@ public sealed partial class PlaylistViewModel : ObservableObject
         IsFollowed = _host.Follow.IsFollowed(url);
         MoreFilters = false;
         ApplyFilter();
+        _ = LoadListStatsAsync(IsListOfLists ? _all.Where(r => r.Selectable).ToList() : [], archived);
+    }
+
+    /// <summary>
+    /// Liste kartlarındaki video sayısı ve üyelere özel videolar: YouTube bunları liste ızgarasında (Playlistler, Kurslar)
+    /// vermez, her liste ayrıca okunur. Çok listeli kanalda YouTube'u boğmamak için aynı anda iki liste; başka sayfaya geçince durur.
+    /// </summary>
+    private async Task LoadListStatsAsync(IReadOnlyList<PlaylistRow> lists, HashSet<string> archived)
+    {
+        _statsCts?.Cancel();
+        if (lists.Count == 0) return;
+        var cts = _statsCts = new CancellationTokenSource();
+        using var gate = new SemaphoreSlim(2);
+        await Task.WhenAll(lists.Select(async r =>
+        {
+            try
+            {
+                await gate.WaitAsync(cts.Token);
+                try
+                {
+                    if (!_lists.TryGetValue(r.Entry.Url, out var p))
+                    {
+                        if (await _host.YtDlp.ProbeAsync(r.Entry.Url, ct: cts.Token) is not PlaylistInfo q) { r.StatsError = "Liste okunamadı."; return; }
+                        _lists[r.Entry.Url] = p = q;
+                    }
+                    r.Stats = ListStats.Of(p.Entries, archived);
+                    if (r.IsSelected) UpdateSelection(keepToast: true);
+                }
+                finally { gate.Release(); }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception e) { r.StatsError = e.Message; }
+        }));
     }
 
     private double Kbps => Mode == DownloadMode.Audio
@@ -241,12 +292,13 @@ public sealed partial class PlaylistViewModel : ObservableObject
 
     private IEnumerable<PlaylistRow> Selected => Rows.Where(r => r.IsSelected && r.Selectable);
 
-    private void UpdateSelection()
+    /// <param name="keepToast">Seçim değişmedi, yalnızca liste özeti geldi: sepete ekleme bildirimi silinmesin.</param>
+    private void UpdateSelection(bool keepToast = false)
     {
         if (_bulk) return;
         var sel = Selected.ToList();
         SelectedCount = sel.Count;
-        Toast = null;
+        if (!keepToast) Toast = null;
         var lists = sel.Count(r => r.Entry.IsList);
         SelectedLabel = (lists, videos: sel.Count - lists) switch
         {
@@ -255,9 +307,15 @@ public sealed partial class PlaylistViewModel : ObservableObject
             var (l, v) => $"{l} liste + {v} video seçili",
         };
         var secs = sel.Sum(r => r.Entry.Duration ?? 0);
+        // Seçili listelerin içeriği okunduysa indirilecek yeni videolar baştan bilinir (bkz. LoadListStatsAsync)
+        var stats = sel.Where(r => r.Entry.IsList).Select(r => r.Stats).ToList();
+        var count = sel.Count - lists + stats.Sum(s => s?.New ?? 0);
+        secs += stats.Sum(s => s?.NewSeconds ?? 0);
         SelectedSummary = sel.Count == 0 ? (IsListOfLists ? "İndirmek istediğin listeleri işaretle" : "Listeden video seç")
-            : lists > 0 ? "Listelerin videoları indirirken okunur, indirilmişler atlanır"
-            : $"{TimeText.Format(secs)} · ≈ {EstimateFor(secs)}";
+            : lists == 0 ? $"{TimeText.Format(secs)} · ≈ {EstimateFor(secs)}"
+            : stats.Any(s => s is null) ? "Listelerin videoları indirirken okunur, indirilmişler atlanır"
+            : count == 0 ? "Seçili listelerde indirilmemiş video yok"
+            : $"{count} video · {TimeText.Format(secs)} · ≈ {EstimateFor(secs)}";
         var candidates = Rows.Where(r => r.Selectable && !r.Done).ToList();
         AllSelected = candidates.Count > 0 && candidates.All(r => r.IsSelected);
     }
@@ -276,6 +334,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
     [RelayCommand]
     private async Task Reload()
     {
+        _lists.Clear();
         if (SourceUrl.Length > 0) await LoadAsync(SourceUrl, keepHistory: true);
     }
 
@@ -285,6 +344,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
     {
         if (_back.TryPop(out var url)) { await LoadAsync(url, keepHistory: true); return; }
         _cts?.Cancel();
+        _statsCts?.Cancel();
         Info = null;
         Rows.Clear();
         _all = [];
@@ -319,7 +379,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
                 BusyText = $"Listeler okunuyor {i + 1}/{lists.Count}: {list.Title}";
                 try
                 {
-                    if (await _host.YtDlp.ProbeAsync(list.Url) is PlaylistInfo p)
+                    if ((_lists.GetValueOrDefault(list.Url) ?? await _host.YtDlp.ProbeAsync(list.Url)) is PlaylistInfo p)
                         result.AddRange(p.Entries.Select((e, n) => (Entry: e, List: list.Title, Index: n + 1))
                             .Where(x => !x.Entry.IsList && !x.Entry.Unavailable && !archived.Contains(x.Entry.Id)));
                 }

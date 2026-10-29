@@ -24,7 +24,8 @@ public enum ErrorKind { Auth, BotCheck, Unavailable, Network, Ffmpeg, RateLimite
 
 public enum LinkKind { Video, Playlist, Channel, Feed }
 
-public enum ChannelTab { Videos, Shorts, Streams, Membership, Playlists }
+/// <summary>Courses: YouTube'un Kurslar sekmesi; öğeleri playlisttir (Playlists gibi alt liste kartları).</summary>
+public enum ChannelTab { Videos, Shorts, Streams, Membership, Playlists, Courses }
 
 public static class EnumText
 {
@@ -61,6 +62,17 @@ public static class EnumText
         ChannelTab.Streams => "streams",
         ChannelTab.Membership => "membership",
         ChannelTab.Playlists => "playlists",
+        ChannelTab.Courses => "courses",
         _ => "videos",
+    };
+
+    public static string Label(this ChannelTab t) => t switch
+    {
+        ChannelTab.Shorts => "Shorts",
+        ChannelTab.Streams => "Canlı",
+        ChannelTab.Membership => "Üyeler",
+        ChannelTab.Playlists => "Playlistler",
+        ChannelTab.Courses => "Kurslar",
+        _ => "Videolar",
     };
 }

@@ -177,8 +177,17 @@
                     <Image Height="92" Source="{Binding Entry.Thumbnail, Converter={StaticResource Thumb}, ConverterParameter=480}" Stretch="UniformToFill">
                       <Image.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Image.OpacityMask>
                     </Image>
+                    <!-- Video sayısı ve üyelere özel etiketi liste okununca gelir (bkz. PlaylistViewModel.LoadListStatsAsync) -->
                     <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,3">
-                      <c:Icon Data="{StaticResource I.Playlist}" Size="14" Foreground="White" />
+                      <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource I.Playlist}" Size="14" Foreground="White" />
+                        <TextBlock Text="{Binding CountText}" Foreground="White" FontSize="11.5" FontWeight="SemiBold" Margin="5,0,0,0" VerticalAlignment="Center"
+                                   Visibility="{Binding CountText, Converter={StaticResource Vis}}" />
+                      </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ChipGold}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6" ToolTip="{Binding MembersHint}"
+                            Visibility="{Binding MembersText, Converter={StaticResource Vis}}">
+                      <TextBlock Text="{Binding MembersText}" />
                     </Border>
                     <!-- Kart tıklanınca liste açılır; onay kutusu birden çok listeyi tek seferde indirmek için seçer -->
                     <CheckBox IsChecked="{Binding IsSelected}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
@@ -187,6 +196,9 @@
                   <TextBlock Text="{Binding Entry.Title}" FontWeight="SemiBold" FontSize="12.5" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="32" LineHeight="16" LineStackingStrategy="BlockLineHeight" Margin="3,7,3,0" />
                   <TextBlock Text="{Binding Entry.Channel}" Style="{StaticResource Small}" FontWeight="Normal" TextTrimming="CharacterEllipsis" Margin="3,1,3,0"
                              Visibility="{Binding Entry.Channel, Converter={StaticResource Vis}}" />
+                  <!-- Boşken de yer tutar: kartlar aynı yükseklikte kalsın -->
+                  <TextBlock Text="{Binding StatsText}" Style="{StaticResource Small}" FontWeight="Normal" TextTrimming="CharacterEllipsis" Margin="3,1,3,0"
+                             ToolTip="{Binding StatsError}" />
                 </StackPanel>
               </Button>
             </DataTemplate>

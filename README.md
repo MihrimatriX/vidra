@@ -14,7 +14,7 @@
 
 - **Orijinal kalite:** YouTube'daki akışlar dönüştürülmeden kaydedilir; bir seçim yeniden kodlamaya yol açıyorsa (MP3, kesin kesim) ekranda yazar
 - **Tek video, Shorts, canlı yayın:** kalite, biçim, kodek, altyazı, klip kesme, SponsorBlock
-- **Playlist ve kanal:** Videolar / Shorts / Canlı / Playlistler / Üyeler sekmeleri, filtreler, seçerek indirme
+- **Playlist ve kanal:** Videolar / Shorts / Canlı / Playlistler / Kurslar / Üyeler sekmeleri, filtreler, seçerek indirme; liste kartlarında video sayısı ve üyelere özel videolar
 - **Üyelere özel içerik:** üye olduğun kanalların üyelere özel videoları ve playlistleri
 - **Müzik modu:** MP3/FLAC, kare kapak, ses eşitleme, sanatçı/albüm/parça etiketleri
 - **Kuyruk ve geçmiş:** eşzamanlı indirme, duraklat/sürdür, bitince uyut, **zamanlanmış başlangıç**, istatistikler
@@ -60,7 +60,7 @@ arayüz `Vidra.App` (WPF) içinde. yt-dlp, ffmpeg/ffprobe ve Deno ilk açılış
 
 ```powershell
 dotnet run --project src/Vidra.App            # geliştirme
-dotnet test                                    # 172 birim testi (Core)
+dotnet test                                    # 174 birim testi (Core)
 dotnet publish src/Vidra.App -c Release -r win-x64 -o publish   # tek, bağımsız Vidra.exe (~175 MB)
 
 # Küçük sürüm (.NET 9 Desktop Runtime kurulu makineler için, ~3 MB):
@@ -90,7 +90,7 @@ açık/koyu temada PNG'ye çizer (`Services/ScreenshotTour.cs`, yalnızca Debug)
 |---|---|
 | **İndir** | Tek kutu: bağlantı yapıştır ya da yaz ve ara (birden çok link → hepsi kuyruğa); boşken **son indirilenler** (oynat ya da farklı kalitede yeniden aç); çok dilli videolarda **ses dili**; canlı yayında **baştan kaydet**, başlamamış yayında **başlayınca indir**. Video / Sadece ses; kalite kartları (boyut, kodek); biçim **Orijinal**/MP4/MKV/WebM; ses Orijinal/MP3/M4A/FLAC/WAV; **dönüştürme satırı** (kopyalanıyor mu, neyin yeniden kodlandığı). "Diğer seçenekler" altında: kodek (H.264/VP9/AV1), ≤30 fps, altyazı dilleri, **klip kesme** (anahtar karede kopyalayarak ya da kesin kesim; **birden çok aralık**, **"en çok tekrar oynatılan" grafiği** ve en çok izlenen kısmı öneren düğmeler), SponsorBlock, bölümler, hazır ayarlar, akış tablosu. |
 | **Ara** | YouTube'da arama; sonuçtan tek tıkla analiz, kuyruğa ya da sepete ekleme; YouTube'da aç, kanala git. |
-| **Playlist & kanal** | Videolar/Shorts/Canlı/Playlistler/**Üyeler** sekmeleri (sekmeli bağlantı doğrudan o sekmeyi açar); **kart ızgarası** ya da satır listesi (ikisi de sanallaştırılmış, binlerce video); aralık, tarih, süre, arama, "indirilmemiş/üye" filtreleri; süre ve boyut tahmini; **Takip et** (yeni videolar otomatik iner); "Playlistlerim" gibi alt listeleri açma ya da **birden çok listeyi seçip tek seferde indirme**; **Sepete ekle**; görünen listeyi **CSV**'ye aktarma. |
+| **Playlist & kanal** | Videolar/Shorts/Canlı/Playlistler/**Kurslar**/**Üyeler** sekmeleri (sekmeli bağlantı doğrudan o sekmeyi açar); playlist ve kurs kartlarında **video sayısı, süre, indirilmiş ve üyelere özel video sayısı** (listeler arka planda ikişer ikişer okunur); **kart ızgarası** ya da satır listesi (ikisi de sanallaştırılmış, binlerce video); aralık, tarih, süre, arama, "indirilmemiş/üye" filtreleri; süre ve boyut tahmini; **Takip et** (yeni videolar otomatik iner); "Playlistlerim" gibi alt listeleri açma ya da **birden çok listeyi seçip tek seferde indirme**; **Sepete ekle**; görünen listeyi **CSV**'ye aktarma. |
 | **Sepet** | Farklı playlist, kanal ve aramalardan toplanan videolar (diskte saklanır); video/ses, kalite ve ses biçimi bir kez seçilir, hepsi birlikte kuyruğa girer. |
 | **Kuyruk & geçmiş** | Eşzamanlılık ±, duraklat/sürdür/iptal/tekrar dene, sıranın başına/sonuna al, **hatalıların hepsini tekrar dene**, **kuyruğu boşalt** (geri alınabilir), toplam ilerleme yüzdesi, canlı hız grafiği, seçili işin yt-dlp günlüğü, "komutu kopyala" (çerez yolu maskelenir), **bitince uyut**, **şu saatte başlat** (kapanıştan sonra da geçerli); geçmişte filtre/arama, oynat (çift tık), klasörde göster, tekrar indir, **farklı kalitede indir**, bağlantıyı kopyala, YouTube'da aç, dosyayı geri dönüşüm kutusuna taşı (sağ tık). Bitmemiş işler kapanışta kaydedilir, açılışta duraklatılmış olarak geri gelir. |
 | **Kütüphane** | Diskte hâlâ duran indirmeler kart olarak; arama, video/ses filtresi, **sıralama** (yeni/eski/boyut/ad/kanal), çift tıkla oynat, klasörde göster, YouTube'da aç, geri dönüşüm kutusuna taşı; kartı sürükleyip dosyayı başka yere bırak. |
@@ -170,4 +170,8 @@ yalnızca şu durumlarda olur ve indirme ekranında yazar: ses MP3/FLAC/WAV'a d�
 - `Playlistlerim` (`feed/playlists`) akışının yt-dlp desteği sürüme göre değişebilir; boş dönerse yt-dlp'yi güncelle.
 - **Üyeler sekmesi:** yt-dlp kanalın `/membership` sekmesini okuyamadığı için Vidra kanal kimliğinden (`UC…`) üyelere özel
   listeyi (`UUMO…`) açar; bunun için kanalın videolar sekmesine bir ek sorgu yapılır.
+- **Kurslar sekmesi** yalnızca kurs yayımlayan kanallarda vardır; yoksa "Bu kanalda Kurslar sekmesi yok" yazar. Ücretli kursların
+  videoları satın alınmadan indirilemez.
+- **Liste kartlarındaki sayılar** için her liste ayrıca okunur (YouTube liste ızgarasında video sayısını vermez); çok listeli
+  kanallarda bu birkaç dakika sürebilir. Okunan liste açılırken ya da indirilirken yeniden okunmaz.
 - Yalnızca indirme hakkına sahip olduğun içerikleri indir; YouTube Kullanım Şartları geçerlidir.

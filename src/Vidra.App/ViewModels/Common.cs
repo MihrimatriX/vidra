@@ -40,7 +40,8 @@ public static class Choices
     public static readonly IReadOnlyList<Choice> Channels = [new(UpdateChannel.Stable, "Kararlı"), new(UpdateChannel.Nightly, "Nightly")];
 
     public static readonly IReadOnlyList<Choice> ChannelTabs =
-        [new(ChannelTab.Videos, "Videolar"), new(ChannelTab.Shorts, "Shorts"), new(ChannelTab.Streams, "Canlı"), new(ChannelTab.Playlists, "Playlistler"), new(ChannelTab.Membership, "Üyeler")];
+        new[] { ChannelTab.Videos, ChannelTab.Shorts, ChannelTab.Streams, ChannelTab.Playlists, ChannelTab.Courses, ChannelTab.Membership }
+            .Select(t => new Choice(t, t.Label())).ToList();
 
     public static readonly IReadOnlyList<Choice> RateLimits =
         [new("", "Sınırsız"), new("10M", "10 MB/s"), new("5M", "5 MB/s"), new("2M", "2 MB/s"), new("1M", "1 MB/s")];

@@ -62,6 +62,7 @@ public class UrlTests
     public void Tab_of_channel_link()
     {
         Assert.Equal(ChannelTab.Playlists, YouTubeUrl.TabOf("https://www.youtube.com/@kanal/playlists"));
+        Assert.Equal(ChannelTab.Courses, YouTubeUrl.TabOf("https://www.youtube.com/@kanal/courses"));
         Assert.Equal(ChannelTab.Videos, YouTubeUrl.TabOf("https://www.youtube.com/channel/UCx/videos/"));
         Assert.Null(YouTubeUrl.TabOf("https://www.youtube.com/@kanal"));
         Assert.Null(YouTubeUrl.TabOf("https://www.youtube.com/@kanal/featured"));
@@ -106,6 +107,15 @@ public class OutputParserTests
 
     [Fact]
     public void Error_line() => Assert.IsType<ErrorLine>(OutputParser.Parse("ERROR: [youtube] x: Private video"));
+
+    [Fact]
+    public void Missing_channel_tab()
+    {
+        Assert.Equal(ChannelTab.Courses, OutputParser.MissingTab("[youtube:tab] @membersclub: This channel does not have a courses tab"));
+        Assert.Equal(ChannelTab.Streams, OutputParser.MissingTab("The channel does not have a streams tab"));
+        Assert.Null(OutputParser.MissingTab("This channel does not have a podcasts tab"));
+        Assert.Null(OutputParser.MissingTab("Video unavailable"));
+    }
 }
 
 public class TemplateTests
@@ -258,6 +268,24 @@ public class FeedParsingTests
         Assert.True(p.Entries[0].IsList);
         Assert.Equal("https://www.youtube.com/playlist?list=PLabc", p.Entries[0].Url);
         Assert.False(p.Entries[1].IsList);
+    }
+
+    [Fact]
+    public void List_stats_count_members_and_downloaded()
+    {
+        var p = ProbeParser.ParsePlaylist(JsonDocument.Parse("""
+            {"_type":"playlist","id":"PL1","title":"Kurs","entries":[
+              {"id":"a","title":"Ders 1","duration":600},
+              {"id":"b","title":"Ders 2","duration":300,"availability":"subscriber_only"},
+              {"id":"c","title":"[Private video]"},
+              {"id":"d","title":"Ders 3","duration":100,"availability":"subscriber_only"}]}
+            """).RootElement, LinkKind.Playlist);
+        var s = ListStats.Of(p.Entries, new HashSet<string> { "a" });
+        Assert.Equal(new ListStats(3, 2, 1, 1000, 400), s);
+        Assert.Equal(2, s.New);
+        Assert.False(s.AllMembers);
+        Assert.True(ListStats.Of(p.Entries.Skip(1), new HashSet<string>()).AllMembers);
+        Assert.False(ListStats.Of([], new HashSet<string>()).AllMembers);
     }
 }
 
