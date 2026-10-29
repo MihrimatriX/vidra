@@ -269,3 +269,17 @@ public class IncognitoQueueTests : IDisposable
         Assert.Equal("Big Buck Bunny", _queue.History[0].Title);
     }
 }
+
+public class HeatmapGapTests
+{
+    [Fact]
+    public void Moments_are_separate_peaks_not_a_split_peak()
+    {
+        // Tek geniş tepe (100-160) ve ayrı küçük bir tepe (400-420): ikinci an bitişik parça değil, diğer tepe olmalı
+        HeatPoint[] p = [new(0, 100, 0.1), new(100, 160, 1.0), new(160, 400, 0.1), new(400, 420, 0.6), new(420, 600, 0.1)];
+        var w = Heatmap.BestWindows(p, 20, 2);
+        Assert.Equal(2, w.Count);
+        Assert.InRange(w[0].Start, 100, 140);
+        Assert.InRange(w[1].Start, 395, 405);
+    }
+}
