@@ -180,9 +180,13 @@ public sealed partial class DownloadQueue : ObservableObject
         _ = SaveHistoryAsync();
     }
 
+    /// <summary>Zamanlanmış başlangıç bekleniyor: sıradaki işler (sonradan eklenenler dahil) başlamaz.</summary>
+    public bool Held { get; set; }
+
     /// <summary>Eşzamanlılık sınırına kadar sıradaki işleri başlatır.</summary>
     public void Schedule()
     {
+        if (Held) return;
         var limit = Math.Max(1, _settings().Concurrency);
         // Anlık görüntüyü kilit DIŞINDA al: dispatch UI thread'ine senkron gider, kilit içinde çağırmak kilitlenme riski
         var jobs = Snapshot();
@@ -330,6 +334,7 @@ public sealed partial class DownloadQueue : ObservableObject
                 // İlerleme satırları son inen akışın (çoğu zaman ses) boyutunu taşır; geçmişe birleştirilmiş/dönüştürülmüş dosyanın gerçek boyutu yazılır
                 if (job.FilePath is { } fp && File.Exists(fp)) job.Total = new FileInfo(fp).Length;
                 if (code != 0 && lastError is not null) job.Warning ??= lastError.Message;
+                if (job.Options.Transcript && job.FilePath is { } tp) WriteTranscript(job, tp);
                 Finish(job);
             }
             else
@@ -344,6 +349,22 @@ public sealed partial class DownloadQueue : ObservableObject
             UpdateTotalSpeed();
             Schedule();
         }, TaskScheduler.Default);
+    }
+
+    private static void WriteTranscript(DownloadJob job, string mediaPath)
+    {
+        var o = job.Options;
+        // Altyazı da istendiyse .vtt dosyaları kalır; yalnızca döküm için indirildiyse silinir
+        var keepSubs = o.Subtitles && !(o.Mode == DownloadMode.Audio && o.MusicMode);
+        try
+        {
+            if (Export.WriteTranscripts(mediaPath, deleteSubs: !keepSubs) == 0)
+                job.Warning ??= "Metin döküm için seçili dillerde altyazı bulunamadı";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            job.Warning ??= $"Metin döküm yazılamadı: {e.Message}";
+        }
     }
 
     private void Finish(DownloadJob job)

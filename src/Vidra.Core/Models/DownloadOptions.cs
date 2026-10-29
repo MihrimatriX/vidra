@@ -62,6 +62,12 @@ public sealed record DownloadOptions
     /// <summary>Ses modunda: kare kapak, ses yüksekliği eşitleme, temiz sanatçı adı (bkz. YtDlpArgs.MusicArgs).</summary>
     public bool MusicMode { get; init; }
 
+    /// <summary>Altyazıdan zaman damgasız düz metin (.txt) döküm; indirme bitince Export.TranscriptFromVtt ile yazılır.</summary>
+    public bool Transcript { get; init; }
+
+    /// <summary>Yorumlar .info.json dosyasına yazılır.</summary>
+    public bool Comments { get; init; }
+
     /// <summary>Playlist'ten kuyruğa alınan işlerde dolu; tek video indirmesinde null.</summary>
     public PlaylistRef? Playlist { get; init; }
 

@@ -31,6 +31,8 @@
     <DataTemplate DataType="{x:Type vm:SearchViewModel}"><v:SearchView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:PlaylistViewModel}"><v:PlaylistView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:QueueViewModel}"><v:QueueView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:BasketViewModel}"><v:BasketView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:LibraryViewModel}"><v:LibraryView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:StatsViewModel}"><v:StatsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:AccountViewModel}"><v:AccountView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><v:SettingsView /></DataTemplate>
@@ -69,6 +71,16 @@
           <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Playlist}" Margin="0,0,10,0" /><TextBlock Text="Playlist &amp; kanal" /></StackPanel>
         </RadioButton>
         <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
+                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Basket}">
+          <DockPanel>
+            <Border DockPanel.Dock="Right" Background="{DynamicResource Raised}" CornerRadius="10" Padding="7,1" Margin="8,0,0,0"
+                    Visibility="{Binding Basket.Items.Count, Converter={StaticResource Vis}}">
+              <TextBlock Text="{Binding Basket.Items.Count}" FontSize="11.5" FontWeight="Bold" />
+            </Border>
+            <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Basket}" Margin="0,0,10,0" /><TextBlock Text="Sepet" /></StackPanel>
+          </DockPanel>
+        </RadioButton>
+        <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
                      IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Queue}">
           <DockPanel>
             <Border DockPanel.Dock="Right" Background="{DynamicResource Accent}" CornerRadius="10" Padding="7,1" Margin="8,0,0,0"
@@ -77,6 +89,10 @@
             </Border>
             <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Clock}" Margin="0,0,10,0" /><TextBlock Text="Kuyruk &amp; geçmiş" /></StackPanel>
           </DockPanel>
+        </RadioButton>
+        <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
+                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Library}">
+          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Library}" Margin="0,0,10,0" /><TextBlock Text="Kütüphane" /></StackPanel>
         </RadioButton>
 
         <Border DockPanel.Dock="Top" Height="1" Background="{DynamicResource Line}" Margin="10,10,10,10" />

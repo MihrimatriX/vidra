@@ -17,7 +17,12 @@
 - **Playlist ve kanal:** Videolar / Shorts / Canlı / Playlistler / Üyeler sekmeleri, filtreler, seçerek indirme
 - **Üyelere özel içerik:** üye olduğun kanalların üyelere özel videoları ve playlistleri
 - **Müzik modu:** MP3/FLAC, kare kapak, ses eşitleme, sanatçı/albüm/parça etiketleri
-- **Kuyruk ve geçmiş:** eşzamanlı indirme, duraklat/sürdür, bitince uyut, istatistikler
+- **Kuyruk ve geçmiş:** eşzamanlı indirme, duraklat/sürdür, bitince uyut, **zamanlanmış başlangıç**, istatistikler
+- **Video kartları:** playlist, kanal, arama ve kütüphanede kart ızgarası; her kartta **YouTube'da aç**, kanal adına tıklayınca kanal uygulamada açılır
+- **Sepet ve çoklu liste:** birden çok playlisti tek seferde seç; farklı playlist, kanal ve aramalardan videoları sepette topla, biçimi bir kez seçip hepsini indir
+- **Tarayıcı eklentisi (Chrome/Edge/Brave):** YouTube oturumunu Vidra ile sürekli eşitler, böylece hesaptan atılma biter; YouTube'da sağ tık › "Vidra ile indir"
+- **Birden çok hesap:** uygulama içi girişle eklenen hesaplar arasında tek tıkla geçiş
+- **Araştırma için:** playlist/kanal listesini Excel'e (CSV) aktar, altyazıdan zaman damgasız metin döküm (.txt), yorumlar (.info.json)
 
 Windows 10 1809+ / 11 (x64). Kurulum yönetici izni istemez; yt-dlp, ffmpeg ve Deno ilk açılışta otomatik indirilir.
 Uygulama imzalı olmadığı için SmartScreen uyarısında **Ek bilgi → Yine de çalıştır** demen gerekebilir.
@@ -32,7 +37,7 @@ arayüz `Vidra.App` (WPF) içinde. yt-dlp, ffmpeg/ffprobe ve Deno ilk açılış
 
 ```powershell
 dotnet run --project src/Vidra.App            # geliştirme
-dotnet test                                    # 98 birim testi (Core)
+dotnet test                                    # 109 birim testi (Core)
 dotnet publish src/Vidra.App -c Release -r win-x64 -o publish   # tek, bağımsız Vidra.exe (~175 MB)
 
 # Küçük sürüm (.NET 9 Desktop Runtime kurulu makineler için, ~3 MB):
@@ -53,11 +58,13 @@ Geliştirme gereksinimleri: Windows 10 1809+ / 11, .NET 9 SDK, Microsoft Edge We
 | Ekran | Neler var |
 |---|---|
 | **İndir** | Tek kutu: bağlantı yapıştır ya da yaz ve ara (birden çok link → hepsi kuyruğa). Video / Sadece ses; kalite kartları (boyut, kodek); biçim **Orijinal**/MP4/MKV/WebM; ses Orijinal/MP3/M4A/FLAC/WAV; **dönüştürme satırı** (kopyalanıyor mu, neyin yeniden kodlandığı). "Diğer seçenekler" altında: kodek (H.264/VP9/AV1), ≤30 fps, altyazı dilleri, **klip kesme** (anahtar karede kopyalayarak ya da kesin kesim), SponsorBlock, bölümler, hazır ayarlar, akış tablosu. |
-| **Ara** | YouTube'da arama; sonuçtan tek tıkla analiz ya da kuyruğa ekleme. |
-| **Playlist & kanal** | Videolar/Shorts/Canlı/Playlistler/**Üyeler** sekmeleri (sekmeli bağlantı doğrudan o sekmeyi açar); aralık, tarih, süre, arama, "indirilmemiş/üye" filtreleri; süre ve boyut tahmini; sanallaştırılmış liste (binlerce video); **Takip et** (yeni videolar otomatik iner); "Playlistlerim" gibi alt listeleri açma. |
-| **Kuyruk & geçmiş** | Eşzamanlılık ±, duraklat/sürdür/iptal/tekrar dene, sıranın başına al, canlı hız grafiği, seçili işin yt-dlp günlüğü, "komutu kopyala" (çerez yolu maskelenir), **bitince uyut**; geçmişte filtre/arama, oynat, klasörde göster, tekrar indir. Bitmemiş işler kapanışta kaydedilir, açılışta duraklatılmış olarak geri gelir. |
+| **Ara** | YouTube'da arama; sonuçtan tek tıkla analiz, kuyruğa ya da sepete ekleme; YouTube'da aç, kanala git. |
+| **Playlist & kanal** | Videolar/Shorts/Canlı/Playlistler/**Üyeler** sekmeleri (sekmeli bağlantı doğrudan o sekmeyi açar); **kart ızgarası** ya da satır listesi (ikisi de sanallaştırılmış, binlerce video); aralık, tarih, süre, arama, "indirilmemiş/üye" filtreleri; süre ve boyut tahmini; **Takip et** (yeni videolar otomatik iner); "Playlistlerim" gibi alt listeleri açma ya da **birden çok listeyi seçip tek seferde indirme**; **Sepete ekle**; görünen listeyi **CSV**'ye aktarma. |
+| **Sepet** | Farklı playlist, kanal ve aramalardan toplanan videolar (diskte saklanır); video/ses, kalite ve ses biçimi bir kez seçilir, hepsi birlikte kuyruğa girer. |
+| **Kuyruk & geçmiş** | Eşzamanlılık ±, duraklat/sürdür/iptal/tekrar dene, sıranın başına al, canlı hız grafiği, seçili işin yt-dlp günlüğü, "komutu kopyala" (çerez yolu maskelenir), **bitince uyut**, **şu saatte başlat** (kapanıştan sonra da geçerli); geçmişte filtre/arama, oynat, klasörde göster, tekrar indir, YouTube'da aç. Bitmemiş işler kapanışta kaydedilir, açılışta duraklatılmış olarak geri gelir. |
+| **Kütüphane** | Diskte hâlâ duran indirmeler kart olarak; arama, video/ses filtresi, oynat, klasörde göster, YouTube'da aç. |
 | **İstatistik** | Toplam indirme, boyut ve süre; video/ses dağılımı; bu hafta; son 14 günün grafiği; en çok indirilen kanallar. |
-| **Hesabım** | **Uygulama içi YouTube girişi** (WebView2), oturum testi, çıkış; hesap akışları: Abonelikler, Daha sonra izle, Beğenilenler, Geçmiş, Playlistlerim; takip edilen listeler ve kontrol aralığı; nazik mod. |
+| **Hesabım** | **Tarayıcı eklentisi** (kurulum ve eşitleme durumu); **birden çok hesap** (ekle, adlandır, geç, kaldır); **uygulama içi YouTube girişi** (WebView2), oturum testi, çıkış; hesap akışları: Abonelikler, Daha sonra izle, Beğenilenler, Geçmiş, Playlistlerim; takip edilen listeler ve kontrol aralığı; nazik mod. |
 | **Ayarlar** | Çerez kaynağı (Vidra hesabı / Firefox / Chrome / Edge / Brave / cookies.txt), tarayıcı profili; klasör ve dosya adı şablonları (önizlemeli); format varsayılanları; -N/-R/hız sınırı/proxy; tema (açık/koyu/sistem), pano izleme, bildirimler, tepsi; bileşen sürümleri, yt-dlp güncellemesi (kararlı/nightly), yeniden indirme. |
 
 Ayrıca: sistem tepsisi + baloncuk bildirimleri, pano izleme (yoklamasız, `AddClipboardFormatListener`), tek örnek (ikinci açılış bağlantıyı mevcut pencereye iletir: `Vidra.exe <url>`), koyu başlık çubuğu.
@@ -72,6 +79,8 @@ src/Vidra.Core/                      (net9.0 — Windows'a bağımlı değil, Li
   Queue/         DownloadQueue (eşzamanlılık, duraklat = öldür + .part'tan devam, geçmiş, bekleyen işler)
   Follow/        FollowService (takip edilen listeleri aralıkla kontrol, arşivle karşılaştır)
   Auth/          NetscapeCookies (cookies.txt yazıcı, oturum algılama)
+  Browser/       BrowserBridge (eklentiyle native messaging: çerçeveleme, çerez listesi → cookies.txt)
+  Export.cs      Playlist → CSV (formül enjeksiyonuna karşı), WebVTT → düz metin döküm
   Tools/         ToolManager (bileşenleri indir/güncelle/sürüm oku)
   Storage/       AppPaths, JsonStore (atomik yazma), SettingsStore (debounce), ArchiveStore
 src/Vidra.App/                       (net9.0-windows — WPF)

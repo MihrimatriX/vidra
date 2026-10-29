@@ -18,6 +18,10 @@ public sealed record HistoryEntry
     public string? Source { get; init; }
     public DateTimeOffset FinishedAt { get; init; }
 
+    /// <summary>Kart kapağı: kaydedilen kapak WebP olabilir (WPF çözemez); mqdefault.jpg her videoda var ve gerçek JPEG.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ThumbUrl => VideoId is { Length: > 0 } id ? $"https://i.ytimg.com/vi/{id}/mqdefault.jpg" : Thumbnail;
+
     public static HistoryEntry From(DownloadJob j) => new()
     {
         Id = j.Id,

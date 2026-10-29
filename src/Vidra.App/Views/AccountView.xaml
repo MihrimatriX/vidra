@@ -86,6 +86,72 @@
         </StackPanel>
       </Border>
 
+      <!-- ===== Tarayıcı eklentisi: oturumun tek sahibi gerçek tarayıcı olur, dışa aktarılmış kopya bayatlamaz ===== -->
+      <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,0,18">
+        <StackPanel>
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+              <Button Command="{Binding InstallExtensionCommand}" Margin="0,0,8,0" Content="Eklentiyi kur" />
+              <Button Style="{StaticResource BtnPrimary}" Command="{Binding UseExtensionCommand}" Content="Eklenti oturumunu kullan"
+                      Visibility="{Binding UsesExtension, Converter={StaticResource Vis}, ConverterParameter=!}" />
+            </StackPanel>
+            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Tarayıcı eklentisi" Style="{StaticResource H3}" />
+                <Border Style="{StaticResource ChipOk}" Margin="10,0,0,0" Visibility="{Binding UsesExtension, Converter={StaticResource Vis}}"><TextBlock Text="Kullanılıyor" /></Border>
+              </StackPanel>
+              <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0"
+                         Text="Chrome, Edge ya da Brave'deki YouTube oturumunu Vidra ile sürekli eşitler: YouTube çerezleri yeniledikçe Vidra da yenisini alır, hesaptan atılma biter. YouTube'da sağ tık › &quot;Vidra ile indir&quot; de ekler." />
+              <TextBlock Style="{StaticResource Small}" Margin="0,4,0,0" Text="{Binding ExtensionState}" />
+            </StackPanel>
+          </DockPanel>
+          <Border Margin="0,14,0,0" Style="{StaticResource Tile}" Background="{DynamicResource Surface2}" Visibility="{Binding ExtensionHelp, Converter={StaticResource Vis}}">
+            <StackPanel>
+              <TextBlock Text="Kurulum (bir kez)" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6" />
+              <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Text="1 · Tarayıcının adres çubuğuna chrome://extensions yaz (Edge: edge://extensions, Brave: brave://extensions)." />
+              <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Text="2 · &quot;Geliştirici modu&quot;nu aç." />
+              <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Text="3 · &quot;Paketlenmemiş öğe yükle&quot;ye bas ve az önce açılan klasörü seç." />
+              <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Text="4 · Tarayıcıda YouTube'a giriş yapılıysa eklenti birkaç saniye içinde oturumu Vidra'ya gönderir." />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Hesaplar: uygulama içi girişle eklenenler, tek tıkla geçiş ===== -->
+      <DockPanel Margin="0,0,0,10">
+        <Button DockPanel.Dock="Right" Command="{Binding AddAccountCommand}">
+          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Plus}" Size="15" Margin="0,0,8,0" /><TextBlock Text="Hesap ekle" /></StackPanel>
+        </Button>
+        <TextBlock Style="{StaticResource H2}" Text="Hesaplar" VerticalAlignment="Center" />
+      </DockPanel>
+      <Border Style="{StaticResource Card}" CornerRadius="16" Margin="0,0,0,24">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Body2}" Margin="18" Visibility="{Binding Accounts.Count, Converter={StaticResource Vis}, ConverterParameter=!}"
+                     Text="Uygulama içi girişle eklenen hesaplar burada listelenir; aralarında tek tıkla geçebilirsin." />
+          <ItemsControl ItemsSource="{Binding Accounts}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border BorderBrush="{DynamicResource Raised}" BorderThickness="0,0,0,1" Padding="18,10">
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                      <Border Style="{StaticResource ChipOk}" Margin="0,0,8,0" Visibility="{Binding Active, Converter={StaticResource Vis}}"><TextBlock Text="Etkin" /></Border>
+                      <Button Style="{StaticResource BtnSm}" Content="Kullan" Margin="0,0,6,0" Visibility="{Binding Active, Converter={StaticResource Vis}, ConverterParameter=!}"
+                              Command="{Binding DataContext.UseAccountCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                      <Button Style="{StaticResource BtnSm}" Content="Kaldır" ToolTip="Hesabın oturum dosyalarını bu bilgisayardan siler"
+                              Command="{Binding DataContext.RemoveAccountCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                    </StackPanel>
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBox Text="{Binding Name}" Width="220" HorizontalAlignment="Left" FontWeight="SemiBold" AutomationProperties.Name="Hesap adı" ToolTip="Adı değiştirmek için yaz" />
+                      <TextBlock Style="{StaticResource Small}" Text="{Binding Detail}" Margin="0,4,0,0" />
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
       <!-- ===== Hesap akışları ===== -->
       <TextBlock Style="{StaticResource H2}" Text="Hesap akışları" Margin="0,0,0,10" />
       <ItemsControl ItemsSource="{Binding Feeds}" Margin="0,0,0,12">

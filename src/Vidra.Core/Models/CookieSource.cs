@@ -8,7 +8,14 @@ namespace Vidra.Core.Models;
 [JsonDerivedType(typeof(BrowserCookies), "browser")]
 [JsonDerivedType(typeof(FileCookies), "file")]
 [JsonDerivedType(typeof(AppLoginCookies), "app")]
+[JsonDerivedType(typeof(ExtensionCookies), "extension")]
 public abstract record CookieSource;
+
+/// <summary>
+/// Tarayıcı eklentisinin eşitlediği oturum: eklenti YouTube çerezleri her döndüğünde dosyayı yeniler,
+/// böylece oturumun tek sahibi gerçek tarayıcıdır ve dışa aktarılmış kopya bayatlamaz.
+/// </summary>
+public sealed record ExtensionCookies(string Path) : CookieSource;
 
 public sealed record NoCookies : CookieSource;
 

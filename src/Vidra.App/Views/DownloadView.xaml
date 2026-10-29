@@ -238,6 +238,8 @@
                   <CheckBox Style="{StaticResource SwitchRow}" IsChecked="{Binding Chapters}" Content="Bölüm işaretleri" Tag="Oynatıcıda bölümler görünsün" />
                   <CheckBox Style="{StaticResource SwitchRow}" IsChecked="{Binding SplitChapters}" Content="Bölümlere ayır" Tag="Her bölüm ayrı dosya" />
                   <CheckBox Style="{StaticResource SwitchRow}" IsChecked="{Binding UseArchive}" Content="Arşive kaydet" Tag="Aynı video ikinci kez inmesin" />
+                  <CheckBox Style="{StaticResource SwitchRow}" IsChecked="{Binding Transcript}" Content="Metin döküm" Tag="Altyazıdan zaman damgasız .txt (altyazı dillerinde)" />
+                  <CheckBox Style="{StaticResource SwitchRow}" IsChecked="{Binding Comments}" Content="Yorumlar" Tag="Yorumlar .info.json dosyasına yazılır" />
                 </ItemsControl>
               </Border>
 

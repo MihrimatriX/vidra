@@ -17,6 +17,12 @@ public sealed class SettingsStore(AppPaths paths)
         if (string.IsNullOrWhiteSpace(s.OutputDir)) s.OutputDir = AppPaths.DefaultOutputDir();
         // Giriş dosyası silinmişse (ör. elle) oturumu düşür
         if (s.Cookies is AppLoginCookies a && !File.Exists(a.Path)) s.Cookies = new NoCookies();
+        // Çoklu hesaptan önceki tek giriş: ilk hesap olarak listeye al
+        if (s.Accounts.Count == 0 && File.Exists(paths.AppCookiesFile))
+        {
+            var login = s.Cookies as AppLoginCookies;
+            s.Accounts.Add(new SavedAccount("default", "Hesap 1", login?.ExportedAt ?? File.GetLastWriteTime(paths.AppCookiesFile), login?.ExpiresAt));
+        }
         Current = s;
         return s;
     }

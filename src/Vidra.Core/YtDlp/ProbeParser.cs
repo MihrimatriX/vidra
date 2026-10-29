@@ -131,6 +131,8 @@ public static partial class ProbeParser
                     // mqdefault.jpg her videoda var, gerçek JPEG ve 16:9 (hqdefault 4:3 siyah bant taşır, hq720 eski videolarda yok)
                     Thumbnail = isList ? Thumb(e) : $"https://i.ytimg.com/vi/{id}/mqdefault.jpg",
                     Channel = owner is "View full playlist" or "Playlist" ? null : owner,
+                    ChannelUrl = Str(e, "channel_url") ?? Str(e, "uploader_url")
+                        ?? (Str(e, "channel_id") is { Length: > 0 } cid ? $"https://www.youtube.com/channel/{cid}" : null),
                 });
             }
 

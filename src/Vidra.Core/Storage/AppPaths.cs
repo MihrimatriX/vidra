@@ -24,12 +24,20 @@ public sealed class AppPaths
     public string AppCookiesFile => Path.Combine(LocalDir, "youtube-cookies.txt");
     /// <summary>Her yt-dlp sürecine verilen geçici çerez kopyaları (bkz. ProcessRunner.WithPrivateCookies).</summary>
     public string CookieCopyDir => Path.Combine(LocalDir, "cookie-copies");
+    public string ExtensionCookiesFile => Path.Combine(LocalDir, "extension-cookies.txt");
+    public string ExtensionDir => Path.Combine(LocalDir, "extension");
+    public string NativeHostManifest => Path.Combine(LocalDir, "native-host.json");
+
+    /// <summary>"default" ilk hesaptır: çoklu hesaptan önceki kurulumların dosyaları yerinde kalır.</summary>
+    public string AccountCookiesFile(string id) => id == "default" ? AppCookiesFile : Path.Combine(LocalDir, "accounts", id, "youtube-cookies.txt");
+    public string AccountProfileDir(string id) => id == "default" ? LoginProfileDir : Path.Combine(LocalDir, "accounts", id, "WebLogin");
 
     public string SettingsFile => Path.Combine(DataDir, "settings.json");
     public string HistoryFile => Path.Combine(DataDir, "history.json");
     public string PendingFile => Path.Combine(DataDir, "pending.json");
     public string FollowsFile => Path.Combine(DataDir, "follows.json");
     public string ArchiveFile => Path.Combine(DataDir, "archive.txt");
+    public string BasketFile => Path.Combine(DataDir, "basket.json");
     public string LogFile => Path.Combine(LocalDir, "vidra.log");
 
     public static string DefaultOutputDir() =>

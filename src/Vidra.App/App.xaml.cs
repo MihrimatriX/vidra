@@ -24,6 +24,17 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Tarayıcı eklentisi Vidra'yı native messaging host'u olarak başlatır (ilk argüman: chrome-extension://kimlik/).
+        // Pencere açmadan iletileri yanıtla; tek örnek kilidine dokunma. Task.Run: arayüz thread'inde beklemek kilitlenir.
+        if (e.Args.Length > 0 && e.Args[0].StartsWith("chrome-extension://", StringComparison.Ordinal))
+        {
+            var code = 1;
+            try { code = Task.Run(ExtensionService.RunHostAsync).GetAwaiter().GetResult(); }
+            catch (Exception ex) { Log(ex); }
+            Shutdown(code);
+            return;
+        }
+
         // Tek örnek: ikinci açılış (ör. "Vidra ile aç" ya da kısayol) bağlantıyı mevcut pencereye iletir
         _mutex = new Mutex(true, InstanceName, out var first);
         _ownsMutex = first;
@@ -63,6 +74,8 @@ public partial class App : Application
         _host.Clipboard.Attach(window);
         _host.Clipboard.Enabled = _host.Settings.WatchClipboard;
         _host.Follow.StartBackgroundLoop();
+        try { ExtensionService.RegisterHost(_host.Paths); }
+        catch (Exception ex) { Log(ex); } // kayıt olmazsa yalnızca eklenti bağlanamaz
         // Kuyruk olayları arka plan thread'inden gelir: pencereye dokunmadan önce UI thread'ine geç
         _host.Queue.JobFinished += (_, j) => Dispatcher.BeginInvoke(() =>
         {
@@ -94,16 +107,21 @@ public partial class App : Application
         if (e.Args.Length > 0 && e.Args[0].Length > 0) _ = vm.OpenLinkAsync(e.Args[0]);
     }
 
-    private static void ForwardToRunningInstance(string arg)
+    /// <returns>Çalışan bir Vidra'ya iletildiyse true.</returns>
+    internal static bool ForwardToRunningInstance(string arg)
     {
+        // Çalışan örnek yoksa boru da yoktur: Connect'in zaman aşımını bekleme
+        if (!Mutex.TryOpenExisting(InstanceName, out var m)) return false;
+        m.Dispose();
         try
         {
             using var client = new NamedPipeClientStream(".", InstanceName, PipeDirection.Out);
             client.Connect(1500);
             using var w = new StreamWriter(client);
             w.WriteLine(arg);
+            return true;
         }
-        catch { /* çalışan örnek yanıt vermiyorsa sessizce çık */ }
+        catch { return false; /* çalışan örnek yanıt vermiyor */ }
     }
 
     private async Task ListenForLinksAsync(MainViewModel vm, CancellationToken ct)
@@ -118,6 +136,8 @@ public partial class App : Application
                 var line = (await r.ReadLineAsync(ct))?.Trim();
                 await Dispatcher.InvokeAsync(async () =>
                 {
+                    // Eklentinin çerez eşitlemesi arka planda olur: pencereyi öne getirme
+                    if (line == Core.Browser.BrowserBridge.CookiesSyncedSignal) { Host.Account.OnExtensionSynced(); return; }
                     Host.Tray?.Show();
                     if (!string.IsNullOrEmpty(line)) await vm.OpenLinkAsync(line);
                 });

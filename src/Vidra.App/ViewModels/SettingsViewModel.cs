@@ -57,6 +57,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<CookieChoice> CookieChoices { get; } =
     [
+        new("extension", "Tarayıcı eklentisi", "Önerilen: oturum düşmez"),
         new("app", "Vidra hesabı", "Uygulama içi giriş"),
         new("firefox", "Firefox", "Önerilen tarayıcı"),
         new("chrome", "Chrome", "Kapalıyken"),
@@ -84,6 +85,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             var id = S.Cookies switch
             {
                 AppLoginCookies => "app",
+                ExtensionCookies => "extension",
                 BrowserCookies b => b.Browser.Arg(),
                 FileCookies => "file",
                 _ => "none",
@@ -97,9 +99,12 @@ public sealed partial class SettingsViewModel : ObservableObject
             {
                 case "none": Set(s => s.Cookies = new NoCookies()); break;
                 case "app":
-                    if (File.Exists(_host.Paths.AppCookiesFile))
-                        Set(s => s.Cookies = new AppLoginCookies(_host.Paths.AppCookiesFile, File.GetLastWriteTime(_host.Paths.AppCookiesFile), null));
+                    if (_host.Settings.Accounts.FirstOrDefault(a => File.Exists(_host.Paths.AccountCookiesFile(a.Id))) is { } acc) _host.Account.Use(acc);
                     else Notice = "Önce Hesabım ekranından giriş yap.";
+                    break;
+                case "extension":
+                    if (File.Exists(_host.Paths.ExtensionCookiesFile)) _host.Account.UseExtension();
+                    else Notice = "Önce Hesabım ekranından tarayıcı eklentisini kur; eklenti ilk eşitlemeden sonra seçilebilir.";
                     break;
                 case "file":
                     var dlg = new OpenFileDialog { Filter = "Netscape çerez dosyası (*.txt)|*.txt", Title = "cookies.txt seç" };

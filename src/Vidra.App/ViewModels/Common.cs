@@ -64,6 +64,44 @@ public sealed partial class Toggle(string id, string label, string? hint, bool o
     [ObservableProperty] private bool _isOn = on;
 }
 
+/// <summary>
+/// Sanallaştırılmış kart ızgarası: öğeler satırlara bölünür, satırlar VirtualizingStackPanel'de çizilir.
+/// WrapPanel sanallaştırmaz; binlerce videoluk bir kanalda binlerce kart ve aynı anda binlerce kapak indirmesi olurdu.
+/// Görünüm genişlik değişince Resize çağırır.
+/// </summary>
+public sealed partial class CardGrid : ObservableObject
+{
+    private const double MinCard = 230;
+    private IReadOnlyList<object> _items = [];
+
+    public System.Collections.ObjectModel.ObservableCollection<object[]> Rows { get; } = [];
+    [ObservableProperty] private int _columns = 4;
+    /// <summary>16:9 kapak yüksekliği; kart genişliğinden (iç boşluk ve aralık düşülerek) hesaplanır.</summary>
+    [ObservableProperty] private double _thumbHeight = 124;
+
+    public void SetItems(IEnumerable<object> items)
+    {
+        _items = items.ToList();
+        Rebuild();
+    }
+
+    public void Resize(double width)
+    {
+        if (width <= 0) return;
+        var cols = Math.Max(1, (int)(width / MinCard));
+        ThumbHeight = Math.Max(60, Math.Round((width / cols - 26) * 9 / 16));
+        if (cols == Columns && Rows.Count > 0) return;
+        Columns = cols;
+        Rebuild();
+    }
+
+    private void Rebuild()
+    {
+        Rows.Clear();
+        foreach (var r in _items.Chunk(Columns)) Rows.Add(r);
+    }
+}
+
 /// <summary>RadioButton ↔ enum için iki yönlü dönüştürücü.</summary>
 public sealed class EnumBoolConverter : IValueConverter
 {

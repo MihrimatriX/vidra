@@ -39,6 +39,8 @@
 
   <ItemGroup>
     <Resource Include="Assets\vidra.ico" />
+    <!-- Tarayıcı eklentisi: tek dosyalık exe'de taşınır, Hesabım › "Eklentiyi kur" klasöre çıkarır -->
+    <EmbeddedResource Include="Extension\*" LogicalName="ext/%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

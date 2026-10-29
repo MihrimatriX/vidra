@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Vidra",
+  "version": "0.3.0",
+  "description": "YouTube bağlantılarını Vidra'ya gönderir ve YouTube oturumunu Vidra ile eşitler.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu0aLGo1eGZ35yl3KXyd7tdkovscpng1GqVAgNVzuYvzBb2/ssLNybsrTnIfE2f6/WX8R/BWKcIDs30mxSUxfsau+gpvE48IP2/dRLmQ0/BMB+9dVllK+7oCSrWjLultcHm9aRJxp0vPpeX5RXUGMVIP5C0cVBmu7WVhGBhiYKEO2z5XS8J7wdwpB1RqpWHZdWnw++WJ2+qC+scXCakxFnXb7ml7HgR4obP9z0PnQhvLo4LGIEZKWfJ5XJcHlecKwer/Cdg0gYKIRxxonlDX15kf3QuQakByoq5zWFkF3k2Q7osg6qFnUXSiCkdJgqDv58y2h/0e0yhlmMcLK0klqaQIDAQAB",
+  "permissions": ["contextMenus", "cookies", "nativeMessaging"],
+  "host_permissions": ["*://*.youtube.com/*", "*://*.google.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Bu sayfayı Vidra'da aç", "default_icon": "icon.png" },
+  "icons": { "128": "icon.png" }
+}

@@ -48,23 +48,6 @@
         </DataTrigger>
       </Style.Triggers>
     </Style>
-    <!-- Uzun listeler kendi içinde kayar ve yalnızca görünen öğeleri çizer (sayfa ScrollViewer'ı sanallaştırmayı bozar) -->
-    <Style x:Key="VirtualList" TargetType="ItemsControl">
-      <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
-      <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
-      <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel" />
-      <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
-      <Setter Property="ItemsPanel">
-        <Setter.Value><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></Setter.Value>
-      </Setter>
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="ItemsControl">
-            <ScrollViewer Focusable="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsPresenter /></ScrollViewer>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
-    </Style>
   </UserControl.Resources>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -118,6 +101,26 @@
             </Viewbox>
           </StackPanel>
         </Border>
+        <!-- Zamanlama: kuyruk duraklatılır, saat gelince kendiliğinden başlar (sonradan eklenenler de bekler) -->
+        <Border Padding="6,2" Visibility="{Binding IsScheduled, Converter={StaticResource Vis}, ConverterParameter=!}">
+          <StackPanel Orientation="Horizontal">
+            <c:Icon Data="{StaticResource I.Clock}" Size="14" Margin="4,0,6,0" VerticalAlignment="Center" />
+            <TextBlock Text="Şu saatte başlat" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <TextBox Width="58" Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" VerticalContentAlignment="Center"
+                     Margin="0,0,6,0" AutomationProperties.Name="Başlama saati" />
+            <Button Style="{StaticResource BtnSm}" MinHeight="24" Padding="8,0" Content="Zamanla" Command="{Binding SetScheduleCommand}"
+                    ToolTip="Kuyruğu şimdi duraklatır, bu saatte kendiliğinden başlatır" />
+          </StackPanel>
+        </Border>
+        <Border Padding="6,2" Background="{DynamicResource AccentSoft}" Visibility="{Binding IsScheduled, Converter={StaticResource Vis}}">
+          <StackPanel Orientation="Horizontal">
+            <c:Icon Data="{StaticResource I.Clock}" Size="14" Margin="4,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentStrong}" />
+            <TextBlock Text="{Binding ScheduleLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <Button Style="{StaticResource BtnSm}" MinHeight="24" Padding="8,0" Content="İptal" Command="{Binding CancelScheduleCommand}" />
+          </StackPanel>
+        </Border>
+        <TextBlock Text="{Binding ScheduleError}" Foreground="{DynamicResource Warn}" VerticalAlignment="Center" Margin="4,0,0,6"
+                   Visibility="{Binding ScheduleError, Converter={StaticResource Vis}}" />
       </WrapPanel>
 
       <Grid Margin="0,0,0,24">
@@ -296,7 +299,7 @@
             <Grid TextElement.FontSize="12" TextElement.Foreground="{DynamicResource Muted}">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*" /><ColumnDefinition Width="1.4*" /><ColumnDefinition Width="140" /><ColumnDefinition Width="80" />
-                <ColumnDefinition Width="70" /><ColumnDefinition Width="110" /><ColumnDefinition Width="230" />
+                <ColumnDefinition Width="70" /><ColumnDefinition Width="110" /><ColumnDefinition Width="310" />
               </Grid.ColumnDefinitions>
               <TextBlock Text="Başlık" /><TextBlock Grid.Column="1" Text="Kanal" /><TextBlock Grid.Column="2" Text="Format" /><TextBlock Grid.Column="3" Text="Boyut" />
               <TextBlock Grid.Column="4" Text="Süre" /><TextBlock Grid.Column="5" Text="Tarih" /><TextBlock Grid.Column="6" Text="İşlem" TextAlignment="Right" />
@@ -309,7 +312,7 @@
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="3*" /><ColumnDefinition Width="1.4*" /><ColumnDefinition Width="140" /><ColumnDefinition Width="80" />
-                      <ColumnDefinition Width="70" /><ColumnDefinition Width="110" /><ColumnDefinition Width="230" />
+                      <ColumnDefinition Width="70" /><ColumnDefinition Width="110" /><ColumnDefinition Width="310" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
                       <TextBlock Text="{Binding Title}" FontWeight="Medium" FontSize="13" TextTrimming="CharacterEllipsis" />
@@ -328,6 +331,8 @@
                               Visibility="{Binding FilePath, Converter={StaticResource Vis}}" />
                       <Button Style="{StaticResource BtnSm}" Content="Klasör" Margin="0,0,6,0" Command="{Binding DataContext.RevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
                       <Button Style="{StaticResource BtnSm}" Content="Tekrar" Margin="0,0,6,0" Command="{Binding DataContext.RedownloadCommand, ElementName=Root}" CommandParameter="{Binding}" ToolTip="Aynı ayarlarla tekrar indir" />
+                      <Button Style="{StaticResource BtnSm}" Content="YouTube" Margin="0,0,6,0" ToolTip="Videoyu YouTube'da aç" CommandParameter="{Binding Url}"
+                              Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                       <Button Style="{StaticResource BtnIcon}" Width="34" Height="34" MinHeight="34" ToolTip="Geçmişten kaldır"
                               Command="{Binding DataContext.RemoveHistoryCommand, ElementName=Root}" CommandParameter="{Binding}">
                         <c:Icon Data="{StaticResource I.Trash}" Size="14" />

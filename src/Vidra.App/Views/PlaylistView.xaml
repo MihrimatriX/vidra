@@ -88,6 +88,10 @@
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
           <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding ChannelTabs}" SelectedValue="{Binding ChannelTab}" Margin="0,0,10,0"
                    Visibility="{Binding IsChannel, Converter={StaticResource Vis}}" />
+          <ToggleButton Style="{StaticResource Pill}" Content="Kartlar" IsChecked="{Binding CardView}" Margin="0,0,6,0" VerticalAlignment="Center"
+                        Visibility="{Binding HasVideos, Converter={StaticResource Vis}}" ToolTip="Kart ızgarası / satır listesi" />
+          <Button Style="{StaticResource BtnSm}" Content="CSV" Command="{Binding ExportCsvCommand}" Margin="0,0,6,0" Visibility="{Binding HasVideos, Converter={StaticResource Vis}}"
+                  ToolTip="Görünen listeyi Excel için CSV olarak kaydet" />
           <Button Style="{StaticResource BtnSm}" Command="{Binding ToggleFollowCommand}" Margin="0,0,6,0" Visibility="{Binding HasVideos, Converter={StaticResource Vis}}"
                   ToolTip="Yeni eklenen videolar otomatik indirilir">
             <StackPanel Orientation="Horizontal">
@@ -122,6 +126,7 @@
       <!-- Hata + filtreler -->
       <StackPanel Grid.Row="1">
         <ProgressBar IsIndeterminate="True" Height="3" Margin="0,0,0,10" Visibility="{Binding IsLoading, Converter={StaticResource Vis}}" />
+        <TextBlock Text="{Binding BusyText}" Style="{StaticResource Small}" Margin="0,-4,0,10" Visibility="{Binding BusyText, Converter={StaticResource Vis}}" />
         <Border Style="{StaticResource Notice}" Margin="0,0,0,12" Visibility="{Binding Error, Converter={StaticResource Vis}}">
           <TextBlock Text="{Binding Error}" TextWrapping="Wrap" FontSize="13" />
         </Border>
@@ -175,6 +180,9 @@
                     <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,3">
                       <c:Icon Data="{StaticResource I.Playlist}" Size="14" Foreground="White" />
                     </Border>
+                    <!-- Kart tıklanınca liste açılır; onay kutusu birden çok listeyi tek seferde indirmek için seçer -->
+                    <CheckBox IsChecked="{Binding IsSelected}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
+                              ToolTip="İndirmek için seç" AutomationProperties.Name="{Binding Entry.Title}" />
                   </Grid>
                   <TextBlock Text="{Binding Entry.Title}" FontWeight="SemiBold" FontSize="12.5" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="32" LineHeight="16" LineStackingStrategy="BlockLineHeight" Margin="3,7,3,0" />
                   <TextBlock Text="{Binding Entry.Channel}" Style="{StaticResource Small}" FontWeight="Normal" TextTrimming="CharacterEllipsis" Margin="3,1,3,0"
@@ -187,7 +195,94 @@
       </ScrollViewer>
 
       <!-- Video listesi: satıra tıklamak seçer/bırakır; sanallaştırılmış (kanallar binlerce video içerebilir) -->
-      <Border Grid.Row="2" Style="{StaticResource Card}" CornerRadius="14" ClipToBounds="True" Visibility="{Binding HasVideos, Converter={StaticResource Vis}}">
+      <Grid Grid.Row="2" Visibility="{Binding HasVideos, Converter={StaticResource Vis}}">
+      <!-- Kart ızgarası: satırlara bölünmüş, sanallaştırılmış (bkz. CardGrid). Karta tıklamak seçer/bırakır. -->
+      <Grid Visibility="{Binding CardView, Converter={StaticResource Vis}}">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <Button Style="{StaticResource BtnLink}" Foreground="{DynamicResource Text}" Command="{Binding ToggleAllCommand}" Padding="0" Margin="2,0,0,8" HorizontalAlignment="Left"
+                ToolTip="İndirilmemiş videoların hepsini seç / bırak">
+          <StackPanel Orientation="Horizontal">
+            <CheckBox IsChecked="{Binding AllSelected, Mode=OneWay}" IsHitTestVisible="False" Focusable="False" />
+            <TextBlock Text="Tümünü seç" Margin="8,0,0,0" FontSize="13" />
+          </StackPanel>
+        </Button>
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding Cards.Rows}" Style="{StaticResource VirtualList}" SizeChanged="Cards_SizeChanged">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <ItemsControl ItemsSource="{Binding}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><UniformGrid Rows="1" Columns="{Binding DataContext.Cards.Columns, ElementName=Root}" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,0,12,12" Padding="8" CornerRadius="12" BorderThickness="1" MouseLeftButtonUp="Row_Click">
+                      <Border.Style>
+                        <Style TargetType="Border">
+                          <Setter Property="Background" Value="{DynamicResource Surface}" />
+                          <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+                          <Setter Property="Cursor" Value="Hand" />
+                          <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Line2}" /></Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                              <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+                              <Setter Property="BorderBrush" Value="{DynamicResource AccentStrong}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Selectable}" Value="False">
+                              <Setter Property="Opacity" Value="0.55" />
+                              <Setter Property="Cursor" Value="Arrow" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Border.Style>
+                      <StackPanel>
+                        <Grid Height="{Binding DataContext.Cards.ThumbHeight, ElementName=Root}">
+                          <Border x:Name="Mask" CornerRadius="8" Background="{DynamicResource ThumbBg}" />
+                          <Image Source="{Binding Entry.Thumbnail, Converter={StaticResource Thumb}, ConverterParameter=320}" Stretch="UniformToFill">
+                            <Image.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Image.OpacityMask>
+                          </Image>
+                          <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding Selectable}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
+                                    AutomationProperties.Name="{Binding Entry.Title}" />
+                          <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,2"
+                                  Visibility="{Binding Entry.Duration, Converter={StaticResource Vis}}">
+                            <TextBlock Text="{Binding DurationText}" Foreground="White" FontFamily="{StaticResource MonoFont}" FontSize="11.5" FontWeight="SemiBold" />
+                          </Border>
+                          <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,3"
+                                  Visibility="{Binding Entry.IsList, Converter={StaticResource Vis}}">
+                            <c:Icon Data="{StaticResource I.Playlist}" Size="14" Foreground="White" />
+                          </Border>
+                          <Button Style="{StaticResource BtnGhostIcon}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4" Width="30" Height="30" MinHeight="30"
+                                  Background="#D914171C" Foreground="White" ToolTip="YouTube'da aç" AutomationProperties.Name="YouTube'da aç"
+                                  Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Entry.Url}">
+                            <c:Icon Data="{StaticResource I.External}" Size="14" />
+                          </Button>
+                        </Grid>
+                        <TextBlock Text="{Binding Entry.Title}" FontWeight="SemiBold" FontSize="12.5" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="32"
+                                   LineHeight="16" LineStackingStrategy="BlockLineHeight" Margin="2,8,2,0" ToolTip="{Binding Entry.Title}" />
+                        <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="18" HorizontalAlignment="Left" Margin="2,2,2,0" FontSize="12" FontWeight="Normal"
+                                Foreground="{DynamicResource Text2}" Content="{Binding Entry.Channel}" ToolTip="Kanalı aç"
+                                Visibility="{Binding Entry.ChannelUrl, Converter={StaticResource Vis}}"
+                                Command="{Binding DataContext.OpenChannelCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Entry.ChannelUrl}" />
+                        <TextBlock Text="{Binding Meta}" Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" Margin="2,2,2,0" />
+                        <WrapPanel Margin="2,6,0,0">
+                          <Border Style="{StaticResource ChipOk}" Visibility="{Binding Done, Converter={StaticResource Vis}}"><TextBlock Text="İndirildi" /></Border>
+                          <Border Style="{StaticResource ChipWarn}" Visibility="{Binding Entry.Unavailable, Converter={StaticResource Vis}}"><TextBlock Text="Erişilemiyor" /></Border>
+                          <Border Style="{StaticResource ChipGold}" Visibility="{Binding Entry.MembersOnly, Converter={StaticResource Vis}}"><TextBlock Text="ÜYE" /></Border>
+                          <Button Style="{StaticResource BtnSm}" MinHeight="22" Padding="8,0" FontSize="11.5" Content="Listeyi aç" Visibility="{Binding Entry.IsList, Converter={StaticResource Vis}}"
+                                  Command="{Binding DataContext.OpenSubListCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                        </WrapPanel>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Grid.Row="1" Style="{StaticResource Body2}" Margin="4" Text="Filtreye uyan video yok."
+                   Visibility="{Binding Rows.Count, Converter={StaticResource Vis}, ConverterParameter=!}" />
+      </Grid>
+
+      <Border Style="{StaticResource Card}" CornerRadius="14" ClipToBounds="True" Visibility="{Binding CardView, Converter={StaticResource Vis}, ConverterParameter=!}">
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
           <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="12,4">
@@ -232,6 +327,7 @@
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="34" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
                   <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding Selectable}" Margin="0,0,10,0" VerticalAlignment="Center" AutomationProperties.Name="{Binding Entry.Title}" />
                   <TextBlock Grid.Column="1" Text="{Binding Index}" Style="{StaticResource CellMono}" FontSize="11.5" Foreground="{DynamicResource Muted}" />
@@ -251,6 +347,11 @@
                     </StackPanel>
                   </StackPanel>
                   <TextBlock Grid.Column="4" Text="{Binding DurationText}" Style="{StaticResource CellMono}" TextAlignment="Right" Margin="0" />
+                  <Button Grid.Column="5" Style="{StaticResource BtnGhostIcon}" Width="30" Height="30" MinHeight="30" Margin="8,0,0,0" ToolTip="YouTube'da aç"
+                          AutomationProperties.Name="YouTube'da aç" CommandParameter="{Binding Entry.Url}"
+                          Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                    <c:Icon Data="{StaticResource I.External}" Size="14" />
+                  </Button>
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -259,10 +360,11 @@
                      Visibility="{Binding Rows.Count, Converter={StaticResource Vis}, ConverterParameter=!}" />
         </Grid>
       </Border>
+      </Grid>
 
       <!-- İndirme çubuğu: ne kadar seçildi · video mu ses mi · kalite · indir -->
       <Border Grid.Row="3" Margin="0,10,0,0" Padding="12,8" CornerRadius="12" Background="{DynamicResource Surface}"
-              BorderBrush="{DynamicResource Line2}" BorderThickness="1" Visibility="{Binding HasVideos, Converter={StaticResource Vis}}">
+              BorderBrush="{DynamicResource Line2}" BorderThickness="1" Visibility="{Binding HasInfo, Converter={StaticResource Vis}}">
         <DockPanel>
           <Button DockPanel.Dock="Right" Style="{StaticResource BtnPrimary}" Command="{Binding EnqueueSelectedCommand}" IsEnabled="{Binding CanEnqueue}" MinWidth="120">
             <StackPanel Orientation="Horizontal">
@@ -270,9 +372,14 @@
               <TextBlock Text="İndir" />
             </StackPanel>
           </Button>
+          <Button DockPanel.Dock="Right" Command="{Binding AddToBasketCommand}" IsEnabled="{Binding CanEnqueue}" Margin="0,0,8,0"
+                  ToolTip="Seçilenleri sepete ekle: başka playlist ve kanallardan da topla, hepsini birlikte indir">
+            <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Basket}" Size="16" Margin="0,0,8,0" /><TextBlock Text="Sepete ekle" /></StackPanel>
+          </Button>
           <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="150">
-            <TextBlock FontWeight="SemiBold" FontSize="14"><Run Text="{Binding SelectedCount, Mode=OneWay}" /> video seçili</TextBlock>
-            <TextBlock Text="{Binding SelectedSummary}" Style="{StaticResource Small}" />
+            <TextBlock Text="{Binding SelectedLabel}" FontWeight="SemiBold" FontSize="14" />
+            <TextBlock Text="{Binding SelectedSummary}" Style="{StaticResource Small}" Visibility="{Binding Toast, Converter={StaticResource Vis}, ConverterParameter=!}" />
+            <TextBlock Text="{Binding Toast}" Style="{StaticResource Small}" Foreground="{DynamicResource Ok}" Visibility="{Binding Toast, Converter={StaticResource Vis}}" />
           </StackPanel>
           <WrapPanel VerticalAlignment="Center">
             <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Modes}" SelectedValue="{Binding Mode}" Margin="0,0,10,0" VerticalAlignment="Center" />

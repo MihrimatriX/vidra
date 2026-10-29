@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ using Vidra.Core.YtDlp;
 
 namespace Vidra.App.ViewModels;
 
-public enum Page { Download, Search, Playlist, Queue, Stats, Account, Settings }
+public enum Page { Download, Search, Playlist, Basket, Queue, Library, Stats, Account, Settings }
 
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -23,7 +24,9 @@ public sealed partial class MainViewModel : ObservableObject
     public SearchViewModel Search { get; }
     public StatsViewModel Stats { get; }
     public PlaylistViewModel Playlist { get; }
+    public BasketViewModel Basket { get; }
     public QueueViewModel QueueVm { get; }
+    public LibraryViewModel Library { get; }
     public AccountViewModel Account { get; }
     public SettingsViewModel Settings { get; }
     public SetupViewModel Setup { get; }
@@ -48,7 +51,9 @@ public sealed partial class MainViewModel : ObservableObject
         Search = new SearchViewModel(host, this);
         Stats = new StatsViewModel(host);
         Playlist = new PlaylistViewModel(host, this);
+        Basket = new BasketViewModel(host, this);
         QueueVm = new QueueViewModel(host, this);
+        Library = new LibraryViewModel(host);
         Account = new AccountViewModel(host, this);
         Settings = new SettingsViewModel(host);
         Setup = new SetupViewModel(host);
@@ -68,6 +73,7 @@ public sealed partial class MainViewModel : ObservableObject
             var speed = host.Queue.TotalSpeed;
             SpeedLabel = speed > 0 ? Fmt.Speed(speed) : "";
             QueueVm.SampleSpeed(speed);
+            QueueVm.CheckSchedule();
             RefreshStatus(); // duraklat/hata gibi durum değişiklikleri koleksiyon olayı üretmez
         };
         _timer.Start();
@@ -80,7 +86,9 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Page.Search => Search,
             Page.Playlist => Playlist,
+            Page.Basket => Basket,
             Page.Queue => QueueVm,
+            Page.Library => Library,
             Page.Stats => Stats,
             Page.Account => Account,
             Page.Settings => Settings,
@@ -89,9 +97,22 @@ public sealed partial class MainViewModel : ObservableObject
         if (value == Page.Account) _ = Account.RefreshAsync();
         if (value == Page.Settings) _ = Settings.RefreshToolsAsync();
         if (value == Page.Stats) Stats.Refresh(); // "bu hafta" gibi pencereler gün dönünce kayar
+        if (value == Page.Library) Library.Refresh(); // silinen/taşınan dosyalar düşsün
     }
 
     public void Go(Page p) => Page = p;
+
+    /// <summary>Kartlardaki "YouTube'da aç": yalnızca http(s) adresleri varsayılan tarayıcıya gider.</summary>
+    [RelayCommand]
+    private void OpenInBrowser(string? url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme is "https" or "http")
+            Process.Start(new ProcessStartInfo(u.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    /// <summary>Karttaki kanal adı: kanalı uygulama içinde (Playlist &amp; kanal ekranında) açar.</summary>
+    [RelayCommand]
+    private Task OpenChannel(string? url) => url is not null && YouTubeUrl.Classify(url) == LinkKind.Channel ? OpenLinkAsync(url) : Task.CompletedTask;
 
     /// <summary>Kenar çubuğundaki hesap satırı: bağlıysa Hesabım'ı açar, değilse girişi başlatır.</summary>
     [RelayCommand]
@@ -146,7 +167,8 @@ public sealed partial class MainViewModel : ObservableObject
         CookieActive = c is not NoCookies;
         CookieLabel = c switch
         {
-            AppLoginCookies => "YouTube hesabı bağlı",
+            AppLoginCookies => _host.Account.Active is { } a ? $"YouTube: {a.Name}" : "YouTube hesabı bağlı",
+            ExtensionCookies => "Tarayıcı oturumu (eklenti)",
             BrowserCookies b => $"Çerezler: {b.Browser.Label()}",
             FileCookies => "Çerezler: cookies.txt",
             _ => "Giriş yapılmadı",

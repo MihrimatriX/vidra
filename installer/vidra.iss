@@ -48,6 +48,13 @@ Source: "..\publish\Vidra.exe"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{autoprograms}\Vidra"; Filename: "{app}\Vidra.exe"
 Name: "{autodesktop}\Vidra"; Filename: "{app}\Vidra.exe"; Tasks: desktopicon
 
+[Registry]
+; Tarayıcı eklentisinin native messaging kaydını Vidra her açılışta kendisi yazar; kaldırınca silinsin
+Root: HKCU; Subkey: "Software\Google\Chrome\NativeMessagingHosts\com.vidra.app"; ValueType: none; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Microsoft\Edge\NativeMessagingHosts\com.vidra.app"; ValueType: none; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.vidra.app"; ValueType: none; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Chromium\NativeMessagingHosts\com.vidra.app"; ValueType: none; Flags: uninsdeletekey dontcreatekey
+
 [Run]
 Filename: "{app}\Vidra.exe"; Description: "{cm:LaunchProgram,Vidra}"; Flags: nowait postinstall skipifsilent
 

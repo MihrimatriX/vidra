@@ -80,6 +80,7 @@ public static class YtDlpArgs
         BrowserCookies b => ["--cookies-from-browser", b.Profile is { Length: > 0 } p ? $"{b.Browser.Arg()}:{p}" : b.Browser.Arg()],
         FileCookies f => ["--cookies", f.Path],
         AppLoginCookies a => ["--cookies", a.Path],
+        ExtensionCookies x => ["--cookies", x.Path],
         _ => [],
     };
 
@@ -98,12 +99,16 @@ public static class YtDlpArgs
         var a = new List<string>();
         var langs = o.SubLangs ?? s.SubLangs;
         // Müzik dosyasının yanında altyazı dosyası istenmez
-        if (o.Subtitles && langs.Count > 0 && !(o.Mode == DownloadMode.Audio && o.MusicMode))
+        var subs = o.Subtitles && langs.Count > 0 && !(o.Mode == DownloadMode.Audio && o.MusicMode);
+        if (subs || (o.Transcript && langs.Count > 0))
         {
             a.AddRange(["--write-subs", "--write-auto-subs", "--sub-langs", string.Join(',', langs)]);
+            // Döküm VTT'den çıkarılır; --write-subs açıkken gömme sonrası dosyalar silinmez
+            if (o.Transcript) a.AddRange(["--sub-format", "vtt/best"]);
             // Ses modunda gömülecek video yok; altyazı ayrı dosya olarak kalır
-            if (o.Mode == DownloadMode.Video) a.Add("--embed-subs");
+            if (subs && o.Mode == DownloadMode.Video) a.Add("--embed-subs");
         }
+        if (o.Comments) a.AddRange(["--write-info-json", "--write-comments"]);
         if (o.EmbedThumbnail) a.Add("--embed-thumbnail");
         if (o.EmbedMetadata)
         {

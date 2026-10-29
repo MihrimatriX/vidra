@@ -57,8 +57,34 @@ public sealed class AppSettings
     /// <summary>Kullanıcının kaydettiği profiller (hazır profiller DownloadProfile.BuiltIns'te).</summary>
     public List<DownloadProfile> Profiles { get; set; } = [];
 
+    /// <summary>Uygulama içi girişle eklenen YouTube hesapları; etkin olan Cookies'teki AppLoginCookies yoludur.</summary>
+    public List<SavedAccount> Accounts { get; set; } = [];
+
+    /// <summary>Kuyruğun duraklatılıp bu saatte kendiliğinden başlaması (null = zamanlama yok).</summary>
+    public DateTimeOffset? ScheduledStart { get; set; }
+
+    /// <summary>Playlist/kanal ekranında kart ızgarası (false: satır listesi).</summary>
+    public bool PlaylistCards { get; set; } = true;
+
+    /// <summary>Eklenti çerez gönderince oturumsuz Vidra kendiliğinden eklenti oturumuna geçsin. Eklenti oturumundan çıkış kapatır.</summary>
+    public bool ExtensionSync { get; set; } = true;
+
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 }
+
+/// <summary>Kayıtlı hesap. Dosyaları AppPaths.AccountCookiesFile/AccountProfileDir(Id) altında.</summary>
+public sealed record SavedAccount(string Id, string Name, DateTimeOffset ExportedAt, DateTimeOffset? ExpiresAt);
+
+/// <summary>Sepetteki video: biçim indirme anında seçilir. Playlist'ten geldiyse klasör şablonu için liste adı ve sırası.</summary>
+public sealed record BasketItem(
+    string Url,
+    string Title,
+    string? Channel,
+    string? Thumbnail,
+    double? Duration,
+    string? Source,
+    string? PlaylistTitle = null,
+    int PlaylistIndex = 0);
 
 /// <summary>Takip edilen playlist/kanal/akış — yeni videolar otomatik kuyruğa alınır.</summary>
 public sealed partial class FollowedSource : ObservableObject

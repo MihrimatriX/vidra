@@ -18,4 +18,10 @@ public partial class PlaylistView : UserControl
             if (d is ButtonBase) return;
         if (sender is FrameworkElement { DataContext: PlaylistRow { Selectable: true } r }) r.IsSelected = !r.IsSelected;
     }
+
+    /// <summary>Kart sütun sayısı ve kapak yüksekliği genişlikten (kaydırma çubuğu düşülerek) hesaplanır.</summary>
+    private void Cards_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (DataContext is PlaylistViewModel vm) vm.Cards.Resize(e.NewSize.Width - SystemParameters.VerticalScrollBarWidth);
+    }
 }

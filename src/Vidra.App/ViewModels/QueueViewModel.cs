@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -31,7 +32,55 @@ public sealed partial class QueueViewModel : ObservableObject
         host.Queue.Jobs.CollectionChanged += (_, _) => RefreshCounts();
         host.Queue.History.CollectionChanged += (_, _) => RefreshCounts();
         host.Queue.Drained += (_, _) => Application.Current?.Dispatcher.BeginInvoke(OnDrained);
+        // Zamanlama kapanıştan sonra da geçerli: saat gelene kadar kuyruk başlamasın
+        host.Queue.Held = host.Settings.ScheduledStart is not null;
         RefreshCounts();
+    }
+
+    // ---- Zamanlama: kuyruk bekletilir (sonradan eklenenler dahil), saat gelince kendiliğinden başlar
+    [ObservableProperty] private string _scheduleTime = "02:00";
+    [ObservableProperty] private string? _scheduleError;
+    public bool IsScheduled => _host.Settings.ScheduledStart is not null;
+    public string ScheduleLabel => _host.Settings.ScheduledStart is { } t ? $"{t.LocalDateTime:d MMM HH:mm} için zamanlandı" : "";
+
+    [RelayCommand]
+    private void SetSchedule()
+    {
+        if (!TimeOnly.TryParseExact(ScheduleTime.Trim(), ["H:mm", "HH:mm"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var t))
+        {
+            ScheduleError = "Saati 02:00 biçiminde yaz";
+            return;
+        }
+        ScheduleError = null;
+        var at = DateTime.Today + t.ToTimeSpan();
+        if (at <= DateTime.Now) at = at.AddDays(1);
+        _host.Queue.Held = true;
+        _host.Queue.PauseAll();
+        _host.SettingsStore.Update(s => s.ScheduledStart = at);
+        NotifySchedule();
+    }
+
+    [RelayCommand]
+    private void CancelSchedule()
+    {
+        _host.Queue.Held = false;
+        _host.SettingsStore.Update(s => s.ScheduledStart = null);
+        NotifySchedule();
+    }
+
+    /// <summary>Saniyede bir (MainViewModel zamanlayıcısı): saat geldiyse bekleyen ve duraklatılmış işleri başlat.</summary>
+    public void CheckSchedule()
+    {
+        if (_host.Settings.ScheduledStart is not { } t || DateTimeOffset.Now < t) return;
+        CancelSchedule();
+        _host.Queue.ResumeAll();
+        if (_host.Settings.Notifications) _host.Tray?.Notify("Zamanlanmış indirme başladı", $"{_host.Queue.Jobs.Count} iş kuyrukta.");
+    }
+
+    private void NotifySchedule()
+    {
+        OnPropertyChanged(nameof(IsScheduled));
+        OnPropertyChanged(nameof(ScheduleLabel));
     }
 
     public DownloadQueue Queue => _host.Queue;
@@ -146,7 +195,7 @@ public sealed partial class QueueViewModel : ObservableObject
     {
         if (p is not DownloadJob j) return;
         if (j.LastArgs is null) return;
-        var cookie = _host.Settings.Cookies switch { AppLoginCookies a => a.Path, FileCookies f => f.Path, _ => null };
+        var cookie = _host.Settings.Cookies switch { AppLoginCookies a => a.Path, FileCookies f => f.Path, ExtensionCookies x => x.Path, _ => null };
         CopyText(YtDlpArgs.ToCommandLine("yt-dlp", j.LastArgs, cookie));
     }
 

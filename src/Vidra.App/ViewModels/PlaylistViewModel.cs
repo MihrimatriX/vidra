@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -20,7 +22,8 @@ public sealed partial class PlaylistRow(PlaylistEntry entry, int index, bool don
     public PlaylistEntry Entry { get; } = entry;
     public int Index { get; } = index;
     public bool Done { get; } = done;
-    public bool Selectable => !Entry.Unavailable && !Entry.IsList;
+    /// <summary>Alt listeler de seçilebilir: indirirken içleri okunur (bkz. CollectAsync).</summary>
+    public bool Selectable => !Entry.Unavailable;
     public string DurationText => TimeText.Format(Entry.Duration);
     public string Meta => string.Join(" · ", new[] { Fmt.Date(Entry.UploadDate), Entry.Views is { } v ? $"{Fmt.Count(v)} görüntülenme" : "" }.Where(s => s.Length > 0));
     // İndirilmiş videolar seçili gelmez; istenirse elle seçilip yeniden indirilebilir
@@ -91,6 +94,19 @@ public sealed partial class PlaylistViewModel : ObservableObject
     [ObservableProperty] private bool _onlyMembers;
 
     public ObservableCollection<PlaylistRow> Rows { get; } = [];
+    public CardGrid Cards { get; } = new();
+
+    public bool CardView
+    {
+        get => _host.Settings.PlaylistCards;
+        set { _host.SettingsStore.Update(s => s.PlaylistCards = value); OnPropertyChanged(); }
+    }
+
+    /// <summary>Seçili listeler okunurken ilerleme ("Listeler okunuyor 2/5…").</summary>
+    [ObservableProperty] private string? _busyText;
+    /// <summary>Sepete ekleme / dışa aktarma sonucu; seçim değişince kaybolur.</summary>
+    [ObservableProperty] private string? _toast;
+    [ObservableProperty] private string _selectedLabel = "";
 
     [ObservableProperty] private int _membersCount;
     [ObservableProperty] private int _doneCount;
@@ -163,8 +179,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
     {
         if (!keepHistory) _back.Clear();
         SourceUrl = url;
-        var archived = new ArchiveStore(_host.Paths.ArchiveFile).ReadIds();
-        foreach (var h in _host.Queue.History.Where(h => h.Status == JobStatus.Done && h.VideoId is not null)) archived.Add(h.VideoId!);
+        var archived = ArchivedIds();
         _all = p.Entries.Select((e, i) => new PlaylistRow(e, i + 1, archived.Contains(e.Id))).ToList();
         foreach (var r in _all) r.PropertyChanged += (_, a) => { if (a.PropertyName == nameof(PlaylistRow.IsSelected)) UpdateSelection(); };
         IsListOfLists = _all.Count > 0 && _all.All(r => r.Entry.IsList);
@@ -213,7 +228,15 @@ public sealed partial class PlaylistViewModel : ObservableObject
 
         Rows.Clear();
         foreach (var r in visible) Rows.Add(r);
+        Cards.SetItems(Rows);
         UpdateSelection();
+    }
+
+    private HashSet<string> ArchivedIds()
+    {
+        var ids = new ArchiveStore(_host.Paths.ArchiveFile).ReadIds();
+        foreach (var h in _host.Queue.History.Where(h => h.Status == JobStatus.Done && h.VideoId is not null)) ids.Add(h.VideoId!);
+        return ids;
     }
 
     private IEnumerable<PlaylistRow> Selected => Rows.Where(r => r.IsSelected && r.Selectable);
@@ -223,8 +246,18 @@ public sealed partial class PlaylistViewModel : ObservableObject
         if (_bulk) return;
         var sel = Selected.ToList();
         SelectedCount = sel.Count;
+        Toast = null;
+        var lists = sel.Count(r => r.Entry.IsList);
+        SelectedLabel = (lists, videos: sel.Count - lists) switch
+        {
+            (0, var v) => $"{v} video seçili",
+            (var l, 0) => $"{l} liste seçili",
+            var (l, v) => $"{l} liste + {v} video seçili",
+        };
         var secs = sel.Sum(r => r.Entry.Duration ?? 0);
-        SelectedSummary = sel.Count == 0 ? "Listeden video seç" : $"{TimeText.Format(secs)} · ≈ {EstimateFor(secs)}";
+        SelectedSummary = sel.Count == 0 ? (IsListOfLists ? "İndirmek istediğin listeleri işaretle" : "Listeden video seç")
+            : lists > 0 ? "Listelerin videoları indirirken okunur, indirilmişler atlanır"
+            : $"{TimeText.Format(secs)} · ≈ {EstimateFor(secs)}";
         var candidates = Rows.Where(r => r.Selectable && !r.Done).ToList();
         AllSelected = candidates.Count > 0 && candidates.All(r => r.IsSelected);
     }
@@ -267,16 +300,84 @@ public sealed partial class PlaylistViewModel : ObservableObject
         MusicMode = MusicMode,
     };
 
+    /// <summary>Seçili videolar + seçili alt listelerin videoları. Listeler tek tek okunur; indirilmişler ve erişilemeyenler atlanır.</summary>
+    private async Task<List<(PlaylistEntry Entry, string List, int Index)>> CollectAsync()
+    {
+        var picked = Selected.ToList();
+        var result = picked.Where(r => !r.Entry.IsList).Select(r => (r.Entry, Title, r.Index)).ToList();
+        var lists = picked.Where(r => r.Entry.IsList).ToList();
+        if (lists.Count == 0) return result;
+
+        var archived = ArchivedIds();
+        var errors = new List<string>();
+        IsLoading = true;
+        try
+        {
+            for (var i = 0; i < lists.Count; i++)
+            {
+                var list = lists[i].Entry;
+                BusyText = $"Listeler okunuyor {i + 1}/{lists.Count}: {list.Title}";
+                try
+                {
+                    if (await _host.YtDlp.ProbeAsync(list.Url) is PlaylistInfo p)
+                        result.AddRange(p.Entries.Select((e, n) => (Entry: e, List: list.Title, Index: n + 1))
+                            .Where(x => !x.Entry.IsList && !x.Entry.Unavailable && !archived.Contains(x.Entry.Id)));
+                }
+                catch (Exception e) { errors.Add($"{list.Title}: {e.Message}"); }
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+            BusyText = null;
+        }
+        Error = errors.Count > 0 ? string.Join("\n", errors) : null;
+        return result;
+    }
+
     [RelayCommand]
-    private void EnqueueSelected()
+    private async Task EnqueueSelected()
     {
         if (Info is not { } p) return;
+        var items = await CollectAsync();
+        if (items.Count == 0) { Toast = "İndirilecek yeni video yok"; return; }
         var o = Options();
         var source = $"{KindLabel}: {Title}";
-        _host.Queue.Enqueue(Selected.Select(r => new NewJob(
-            r.Entry.Url, r.Entry.Title, o with { Playlist = new PlaylistRef(Title, r.Index) }, p.Channel, r.Entry.Thumbnail, r.Entry.Duration,
-            Templates.ResolvePlaylist(_host.Settings.PlaylistTemplate, Title, r.Index), source)).ToList());
+        _host.Queue.Enqueue(items.Select(x => new NewJob(
+            x.Entry.Url, x.Entry.Title, o with { Playlist = new PlaylistRef(x.List, x.Index) }, x.Entry.Channel ?? p.Channel, x.Entry.Thumbnail, x.Entry.Duration,
+            Templates.ResolvePlaylist(_host.Settings.PlaylistTemplate, x.List, x.Index), source)).ToList());
         _main.Go(Page.Queue);
+    }
+
+    [RelayCommand]
+    private async Task AddToBasket()
+    {
+        var items = await CollectAsync();
+        var source = $"{KindLabel}: {Title}";
+        var n = _main.Basket.Add(items.Select(x => new BasketItem(x.Entry.Url, x.Entry.Title, x.Entry.Channel ?? Info?.Channel, x.Entry.Thumbnail,
+            x.Entry.Duration, source, x.List, x.Index)));
+        Toast = n > 0 ? $"{n} video sepete eklendi" : "Seçilenler zaten sepette";
+    }
+
+    /// <summary>Görünen (filtrelenmiş) satırları CSV'ye yazar; ayırıcı bölgesel ayardan (Türkçe Windows'ta ';').</summary>
+    [RelayCommand]
+    private void ExportCsv()
+    {
+        if (Info is null || Rows.Count == 0) return;
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = string.Concat(Title.Split(Path.GetInvalidFileNameChars())) + ".csv",
+        };
+        if (dlg.ShowDialog() != true) return;
+        try
+        {
+            // BOM: Excel UTF-8'i ancak onunla tanır (yoksa Türkçe karakterler bozulur)
+            File.WriteAllText(dlg.FileName, Export.PlaylistCsv(Rows.Select(r => (r.Index, r.Entry, r.Done)), CultureInfo.CurrentCulture.TextInfo.ListSeparator),
+                new UTF8Encoding(true));
+            Toast = $"{Rows.Count} satır dışa aktarıldı";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Error = e.Message; }
     }
 
     /// <summary>Takip: mevcut videolar "görüldü" sayılır, yalnızca bundan sonra gelenler otomatik iner.</summary>

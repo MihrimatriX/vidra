@@ -19,9 +19,11 @@ public sealed partial class SearchResult(PlaylistEntry entry) : ObservableObject
 
     /// <summary>Süresi olmayan sonuç canlı yayındır: hızlı indirme bitmez, yalnızca İndir ekranında açılabilir.</summary>
     public bool IsLive => Entry.Duration is null;
-    public string Meta => string.Join(" · ", new[] { Entry.Channel, Entry.Views is { } v ? $"{Fmt.Count(v)} görüntülenme" : null }
+    /// <summary>Kanal bağlantısı varsa kanal adı ayrı, tıklanabilir satırda gösterilir.</summary>
+    public string Meta => string.Join(" · ", new[] { Entry.ChannelUrl is null ? Entry.Channel : null, Entry.Views is { } v ? $"{Fmt.Count(v)} görüntülenme" : null }
         .Where(s => !string.IsNullOrEmpty(s)));
     [ObservableProperty] private bool _queued;
+    [ObservableProperty] private bool _inBasket;
 }
 
 public sealed partial class SearchViewModel(AppHost host, MainViewModel main) : ObservableObject
@@ -73,6 +75,14 @@ public sealed partial class SearchViewModel(AppHost host, MainViewModel main) : 
         Enqueue(r, DownloadProfile.BuiltIns.First(p => p.Options.Mode == DownloadMode.Audio).ApplyTo(host.Settings.Defaults));
 
     [RelayCommand] private void QuickVideo(SearchResult? r) => Enqueue(r, host.Settings.Defaults with { Mode = DownloadMode.Video });
+
+    [RelayCommand]
+    private void AddToBasket(SearchResult? r)
+    {
+        if (r is null || r.IsLive) return;
+        main.Basket.Add([new BasketItem(r.Entry.Url, r.Entry.Title, r.Entry.Channel, r.Entry.Thumbnail, r.Entry.Duration, $"Arama: {Query.Trim()}")]);
+        r.InBasket = true;
+    }
 
     private void Enqueue(SearchResult? r, DownloadOptions o)
     {

@@ -56,6 +56,9 @@ public sealed record PlaylistEntry
     public string? Thumbnail { get; init; }
     public string? Channel { get; init; }
 
+    /// <summary>Kanal sayfası (abonelik akışı ve aramada her video farklı kanaldan gelir: "kanala git").</summary>
+    public string? ChannelUrl { get; init; }
+
     /// <summary>Öğe video değil, alt liste (ör. "Playlistlerim" akışındaki her playlist).</summary>
     public bool IsList { get; init; }
 }

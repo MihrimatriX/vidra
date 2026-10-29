@@ -260,3 +260,122 @@ public class FeedParsingTests
         Assert.False(p.Entries[1].IsList);
     }
 }
+
+public class FeatureTests
+{
+    [Fact]
+    public void Flat_entries_carry_channel_url()
+    {
+        var p = ProbeParser.ParsePlaylist(JsonDocument.Parse("""
+            {"_type":"playlist","id":"subs","title":"s","entries":[
+              {"id":"a","title":"A","channel":"Kanal","channel_url":"https://www.youtube.com/@kanal"},
+              {"id":"b","title":"B","channel_id":"UC123"},
+              {"id":"c","title":"C"}
+            ]}
+            """).RootElement, LinkKind.Feed);
+        Assert.Equal("https://www.youtube.com/@kanal", p.Entries[0].ChannelUrl);
+        Assert.Equal("https://www.youtube.com/channel/UC123", p.Entries[1].ChannelUrl);
+        Assert.Null(p.Entries[2].ChannelUrl);
+    }
+
+    [Fact]
+    public void Transcript_without_subtitles_fetches_vtt_but_does_not_embed()
+    {
+        var a = YtDlpArgs.Extras(new DownloadOptions { Subtitles = false, Transcript = true }, new AppSettings());
+        Assert.Contains("--write-auto-subs", a);
+        Assert.Contains("vtt/best", a);
+        Assert.DoesNotContain("--embed-subs", a);
+        Assert.DoesNotContain("--write-comments", a);
+    }
+
+    [Fact]
+    public void Comments_go_to_info_json_and_extension_cookies_are_a_file()
+    {
+        var a = YtDlpArgs.Extras(new DownloadOptions { Comments = true }, new AppSettings());
+        Assert.Contains("--write-comments", a);
+        Assert.Contains("--write-info-json", a);
+        Assert.Equal(["--cookies", "C:\\x.txt"], YtDlpArgs.Cookies(new ExtensionCookies("C:\\x.txt")));
+    }
+
+    [Fact]
+    public void Csv_quotes_separators_and_neutralizes_formulas()
+    {
+        var csv = Export.PlaylistCsv([
+            (1, new PlaylistEntry { Id = "a", Url = "https://youtu.be/a", Title = "Şarkı; \"canlı\"", UploadDate = "20260102", Duration = 61.7, Views = 5 }, true),
+            (2, new PlaylistEntry { Id = "b", Url = "https://youtu.be/b", Title = "=HYPERLINK(\"x\")" }, false),
+        ], ";");
+        var lines = csv.Split("\r\n");
+        Assert.StartsWith("Sıra;Başlık;", lines[0]);
+        Assert.Equal("1;\"Şarkı; \"\"canlı\"\"\";https://youtu.be/a;;2026-01-02;61;5;;evet", lines[1]);
+        Assert.StartsWith("2;\"'=HYPERLINK(\"\"x\"\")\";", lines[2]);
+    }
+
+    [Fact]
+    public void Vtt_transcript_drops_timing_tags_and_rolling_duplicates()
+    {
+        const string vtt = """
+            WEBVTT
+            Kind: captions
+            Language: en
+
+            00:00:00.000 --> 00:00:02.000 align:start position:0%
+            merhaba<00:00:00.500><c> dünya</c>
+
+            00:00:02.000 --> 00:00:04.000 align:start position:0%
+            merhaba dünya
+            bugün &amp; yarın
+            """;
+        Assert.Equal("merhaba dünya\nbugün & yarın\n", Export.TranscriptFromVtt(vtt));
+    }
+
+    [Fact]
+    public async Task Native_messages_roundtrip_and_eof_is_null()
+    {
+        var ms = new MemoryStream();
+        await Vidra.Core.Browser.BrowserBridge.WriteAsync(ms, new { type = "open", url = "https://youtu.be/x" });
+        ms.Position = 0;
+        using var doc = await Vidra.Core.Browser.BrowserBridge.ReadAsync(ms);
+        Assert.Equal("open", doc!.RootElement.GetProperty("type").GetString());
+        Assert.Null(await Vidra.Core.Browser.BrowserBridge.ReadAsync(ms));
+        await Assert.ThrowsAsync<InvalidDataException>(() => Vidra.Core.Browser.BrowserBridge.ReadAsync(new MemoryStream([0xFF, 0xFF, 0xFF, 0x7F])));
+    }
+
+    [Fact]
+    public void Extension_cookies_become_a_logged_in_session()
+    {
+        var cookies = Vidra.Core.Browser.BrowserBridge.ParseCookies(JsonDocument.Parse("""
+            [{"name":"SAPISID","value":"a","domain":".youtube.com","path":"/","secure":true,"expirationDate":1800000000.5},
+             {"name":"SID","value":"b","domain":".youtube.com","path":"/","session":true},
+             {"name":"","value":"skip","domain":".youtube.com"}]
+            """).RootElement);
+        Assert.Equal(2, cookies.Count);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1_800_000_000_500), cookies[0].Expires);
+        Assert.Null(cookies[1].Expires);
+        Assert.True(NetscapeCookies.LooksLoggedIn(cookies));
+    }
+
+    /// <summary>Manifest'teki anahtar değişip kimlik sabiti güncellenmezse tarayıcı host'a bağlanmayı reddeder.</summary>
+    [Fact]
+    public void Extension_manifest_key_matches_allowed_origin()
+    {
+        var manifest = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "Vidra.App", "Extension", "manifest.json"));
+        var key = JsonDocument.Parse(File.ReadAllText(manifest)).RootElement.GetProperty("key").GetString()!;
+        // Chrome: SHA-256(genel anahtar) ilk 16 bayt, her yarım bayt 'a' + değer
+        var hash = System.Security.Cryptography.SHA256.HashData(Convert.FromBase64String(key));
+        var id = string.Concat(hash.Take(16).SelectMany(b => new[] { (char)('a' + (b >> 4)), (char)('a' + (b & 15)) }));
+        Assert.Equal(Vidra.Core.Browser.BrowserBridge.ExtensionId, id);
+    }
+
+    [Fact]
+    public void Legacy_single_login_becomes_first_account()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "vidra-acc-" + Guid.NewGuid().ToString("N"));
+        var paths = new Vidra.Core.Storage.AppPaths(Path.Combine(dir, "d"), Path.Combine(dir, "l"));
+        File.WriteAllText(paths.AppCookiesFile, "# Netscape HTTP Cookie File\n");
+        var s = new Vidra.Core.Storage.SettingsStore(paths).Load();
+        var acc = Assert.Single(s.Accounts);
+        Assert.Equal("default", acc.Id);
+        Assert.Equal(paths.AppCookiesFile, paths.AccountCookiesFile(acc.Id));
+        Directory.Delete(dir, true);
+    }
+}

@@ -53,6 +53,8 @@ public sealed partial class DownloadViewModel : ObservableObject
         _embedThumbnail = d.EmbedThumbnail;
         _sponsorBlock = d.SponsorBlock;
         _chapters = d.Chapters;
+        _transcript = d.Transcript;
+        _comments = d.Comments;
         _mode = d.Mode;
         _musicMode = d.MusicMode;
     }
@@ -126,6 +128,8 @@ public sealed partial class DownloadViewModel : ObservableObject
     [ObservableProperty] private bool _embedThumbnail;
     [ObservableProperty] private bool _sponsorBlock;
     [ObservableProperty] private bool _chapters;
+    [ObservableProperty] private bool _transcript;
+    [ObservableProperty] private bool _comments;
 
     // Hesaplanan özet
     public ObservableCollection<StreamRow> StreamRows { get; } = [];
@@ -170,6 +174,8 @@ public sealed partial class DownloadViewModel : ObservableObject
     partial void OnEmbedThumbnailChanged(bool value) => Recalculate();
     partial void OnSponsorBlockChanged(bool value) => Recalculate();
     partial void OnSplitChaptersChanged(bool value) => Recalculate();
+    partial void OnTranscriptChanged(bool value) => Recalculate();
+    partial void OnCommentsChanged(bool value) => Recalculate();
     partial void OnContainerChanged(ContainerFormat value) => RebuildQualities();
     partial void OnCodecChanged(CodecPreference value) => RebuildQualities();
     partial void OnMaxFps30Changed(bool value) => RebuildQualities();
@@ -378,6 +384,8 @@ public sealed partial class DownloadViewModel : ObservableObject
         SplitChapters = SplitChapters,
         Clip = CurrentClip(),
         MusicMode = MusicMode,
+        Transcript = Transcript,
+        Comments = Comments,
     };
 
     private void Recalculate()
@@ -433,6 +441,8 @@ public sealed partial class DownloadViewModel : ObservableObject
         if (o.Chapters && v.Chapters.Count > 0) more.Add("bölüm işaretleri");
         if (o.SplitChapters) more.Add("bölümlere ayır");
         if (o.EmbedThumbnail) more.Add("kapak & etiket");
+        if (o.Transcript) more.Add("metin döküm");
+        if (o.Comments) more.Add("yorumlar");
         MoreSummary = more.Count > 0 ? string.Join(" · ", more) : "Altyazı, klip, SponsorBlock, kodek";
 
         long? size = o.Mode == DownloadMode.Audio ? SelectedAudio?.Size : SelectedQuality?.Size;
