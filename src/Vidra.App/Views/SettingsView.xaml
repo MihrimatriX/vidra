@@ -5,8 +5,8 @@
              x:Name="Root">
   <UserControl.Resources>
     <Style x:Key="Section" TargetType="Border" BasedOn="{StaticResource Card}">
-      <Setter Property="Padding" Value="22" />
-      <Setter Property="Margin" Value="0,0,0,18" />
+      <Setter Property="Padding" Value="26" />
+      <Setter Property="Margin" Value="0,0,0,20" />
     </Style>
     <Style x:Key="SectionLink" TargetType="Button" BasedOn="{StaticResource Btn}">
       <Setter Property="Background" Value="Transparent" />
@@ -19,11 +19,11 @@
     </Style>
   </UserControl.Resources>
 
-  <Grid Margin="20,14,20,0">
+  <Grid Margin="32,18,32,0">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="210" />
-      <ColumnDefinition Width="28" />
-      <ColumnDefinition Width="*" MaxWidth="900" />
+      <ColumnDefinition Width="220" />
+      <ColumnDefinition Width="32" />
+      <ColumnDefinition Width="*" MaxWidth="1000" />
     </Grid.ColumnDefinitions>
 
     <!-- Bölüm menüsü -->
@@ -40,7 +40,7 @@
     <ScrollViewer x:Name="Scroller" Grid.Column="2" VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="0,0,8,48">
         <Border Style="{StaticResource Notice}" Margin="0,0,0,16" Visibility="{Binding Notice, Converter={StaticResource Vis}}">
-          <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="13" />
+          <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="14" />
         </Border>
 
         <!-- Hesap & çerezler -->
@@ -65,7 +65,7 @@
               <TextBox Style="{StaticResource InputMono}" Width="320" Text="{Binding BrowserProfile, UpdateSourceTrigger=LostFocus}" Tag="ör. Profile 1" />
             </HeaderedContentControl>
             <Border Style="{StaticResource Notice}" Margin="0,0,0,12" Visibility="{Binding ChromiumWarning, Converter={StaticResource Vis}}">
-              <TextBlock TextWrapping="Wrap" FontSize="13"
+              <TextBlock TextWrapping="Wrap" FontSize="14"
                          Text="Windows'ta Chromium tabanlı tarayıcılar açıkken çerez veritabanını kilitleyebilir. İndirme başlamadan tarayıcıyı kapatman gerekebilir — Firefox ya da uygulama içi giriş daha güvenilir." />
             </Border>
             <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="460" Margin="0" IsChecked="{Binding PoliteMode}"
@@ -185,7 +185,7 @@
           <StackPanel>
             <TextBlock Style="{StaticResource H2}" Text="Davranış &amp; görünüm" Margin="0,0,0,16" />
             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-              <TextBlock Text="Tema" Width="80" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource Text2}" />
+              <TextBlock Text="Tema" Width="80" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource Text2}" />
               <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Themes}" SelectedValue="{Binding Theme}" />
             </StackPanel>
             <c:UniformWrapPanel MinItemWidth="240">
@@ -245,12 +245,17 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <TextBox Text="{Binding UpdateLog, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" FontSize="12"
+            <TextBox Text="{Binding UpdateLog, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" FontSize="12.5"
                      Height="120" VerticalContentAlignment="Top" Padding="8" Background="{DynamicResource Surface2}" Margin="0,4,0,12"
                      Visibility="{Binding UpdateLog, Converter={StaticResource Vis}}" VerticalScrollBarVisibility="Auto" />
             <WrapPanel>
-              <Button Style="{StaticResource BtnSm}" Content="Bileşen klasörünü aç" Command="{Binding OpenBinDirCommand}" Margin="0,0,8,0" />
-              <Button Style="{StaticResource BtnSm}" Content="Veri klasörünü aç" Command="{Binding OpenDataDirCommand}" />
+              <Button Style="{StaticResource BtnSm}" Content="Bileşen klasörünü aç" Command="{Binding OpenBinDirCommand}" Margin="0,0,8,8" />
+              <Button Style="{StaticResource BtnSm}" Content="Veri klasörünü aç" Command="{Binding OpenDataDirCommand}" Margin="0,0,8,8" />
+              <!-- Günlük kuyruk ekranında yer kaplamasın diye ayrı sayfada; buradan da açılır -->
+              <Button Style="{StaticResource BtnSm}" Margin="0,0,8,8" ToolTip="Kuyruktaki işlerin yt-dlp çıktısı (hata ayıklama)"
+                      Command="{Binding DataContext.LogVm.OpenCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Terminal}" Size="14" Margin="0,0,6,0" /><TextBlock Text="İndirme günlüğü" /></StackPanel>
+              </Button>
             </WrapPanel>
           </StackPanel>
         </Border>

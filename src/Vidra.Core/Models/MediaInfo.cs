@@ -92,3 +92,20 @@ public sealed record PlaylistInfo
     public string Url { get; init; } = "";
     public IReadOnlyList<PlaylistEntry> Entries { get; init; } = [];
 }
+
+/// <summary>
+/// Alt liste kartındaki özet: erişilebilen videolar, bunların kaçı üyelere özel, kaçı indirilmiş.
+/// YouTube liste ızgarasında (Playlistler, Kurslar) bunları vermez; liste ayrıca okunur.
+/// </summary>
+public sealed record ListStats(int Videos, int Members, int Done, double Seconds, double NewSeconds)
+{
+    public bool AllMembers => Videos > 0 && Members == Videos;
+    public int New => Videos - Done;
+
+    public static ListStats Of(IEnumerable<PlaylistEntry> entries, IReadOnlySet<string> done)
+    {
+        var videos = entries.Where(e => !e.IsList && !e.Unavailable).ToList();
+        return new(videos.Count, videos.Count(e => e.MembersOnly), videos.Count(e => done.Contains(e.Id)),
+            videos.Sum(e => e.Duration ?? 0), videos.Where(e => !done.Contains(e.Id)).Sum(e => e.Duration ?? 0));
+    }
+}

@@ -89,6 +89,16 @@ public sealed partial class QueueViewModel : ObservableObject
     public DownloadQueue Queue => _host.Queue;
     public ICollectionView HistoryView { get; }
 
+    /// <summary>Kuyruk ve geçmiş ayrı sekmelerde: her biri pencerenin tüm yüksekliğini kullanır, iç içe kaydırma olmaz.</summary>
+    public IReadOnlyList<Choice> Sections { get; } = [new("queue", "Kuyruk"), new("history", "Geçmiş")];
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsHistory))] private string _section = "queue";
+    public bool IsHistory => Section == "history";
+
+    /// <summary>Ekran açılınca: kuyruk boşsa ve geçmiş varsa doğrudan geçmiş.</summary>
+    public void OnShown() => Section = Queue.Jobs.Count == 0 && Queue.History.Count > 0 ? "history" : "queue";
+
+    [RelayCommand] private void ShowHistory() => Section = "history";
+
     [ObservableProperty] private DownloadJob? _selected;
     [ObservableProperty] private string _historyFilter = "all";
     [ObservableProperty] private string _historyQuery = "";
@@ -162,7 +172,6 @@ public sealed partial class QueueViewModel : ObservableObject
             pts.Add(new Point(arr.Length == 1 ? 0 : i * 120.0 / (arr.Length - 1), 20 - arr[i] / max * 18));
         pts.Freeze();
         Sparkline = pts;
-        Selected?.Log.Flush(); // açık ayrıntı panelinin günlüğü canlı kalsın
     }
 
     private void OnDrained()
@@ -282,6 +291,7 @@ public sealed partial class QueueViewModel : ObservableObject
     [RelayCommand] private void IncConcurrency() => Concurrency++;
     [RelayCommand] private void DecConcurrency() => Concurrency--;
     [RelayCommand] private void OpenAccount() => _main.Go(Page.Account);
+    [RelayCommand] private void ShowLog(object? p) => _main.LogVm.Show(p as DownloadJob);
 
     [RelayCommand]
     private void CopyCommand(object? p)

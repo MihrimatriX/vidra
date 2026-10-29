@@ -4,17 +4,17 @@
              xmlns:c="clr-namespace:Vidra.App.Controls"
              x:Name="Root">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="20,14,20,24" MaxWidth="980" HorizontalAlignment="Left">
+    <StackPanel Margin="{StaticResource PagePad}" MaxWidth="1120" HorizontalAlignment="Left">
       <TextBlock Style="{StaticResource H1}" Text="Hesabım" Margin="0,0,0,6" />
       <TextBlock Style="{StaticResource Body2}" Margin="0,0,0,20" MaxWidth="760" HorizontalAlignment="Left"
                  Text="YouTube hesabını bağlayınca üyelere özel, yaş sınırlı ve sana özel videolar indirilebilir; abonelik akışın ve kayıtlı listelerin burada açılır." />
 
       <Border Style="{StaticResource Notice}" Margin="0,0,0,16" Visibility="{Binding Notice, Converter={StaticResource Vis}}">
-        <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="13" />
+        <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="14" />
       </Border>
 
       <!-- ===== Oturum kartı ===== -->
-      <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,0,18">
+      <Border Style="{StaticResource Card}" Padding="22" Margin="0,0,0,20">
         <StackPanel>
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -59,7 +59,7 @@
                 </Style.Triggers>
               </Style>
             </Border.Style>
-            <TextBlock Text="{Binding TestMessage}" FontSize="13" FontWeight="Medium" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding TestMessage}" FontSize="14" FontWeight="Medium" TextWrapping="Wrap" />
           </Border>
 
           <!-- Nasıl çalışır -->
@@ -68,15 +68,15 @@
               <ColumnDefinition /><ColumnDefinition Width="14" /><ColumnDefinition /><ColumnDefinition Width="14" /><ColumnDefinition />
             </Grid.ColumnDefinitions>
             <Border Style="{StaticResource Tile}" Background="{DynamicResource Surface2}">
-              <StackPanel><TextBlock Text="1 · Google'ın kendi sayfası" FontWeight="SemiBold" FontSize="13" />
+              <StackPanel><TextBlock Text="1 · Google'ın kendi sayfası" FontWeight="SemiBold" FontSize="14" />
                 <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0" Text="Giriş, Vidra içinde açılan Google sayfasında yapılır; şifren uygulamaya hiç iletilmez." /></StackPanel>
             </Border>
             <Border Grid.Column="2" Style="{StaticResource Tile}" Background="{DynamicResource Surface2}">
-              <StackPanel><TextBlock Text="2 · Ayrı, yerel oturum" FontWeight="SemiBold" FontSize="13" />
+              <StackPanel><TextBlock Text="2 · Ayrı, yerel oturum" FontWeight="SemiBold" FontSize="14" />
                 <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0" Text="Oturum tarayıcından bağımsızdır ve yalnızca bu bilgisayarda, kendi klasöründe saklanır." /></StackPanel>
             </Border>
             <Border Grid.Column="4" Style="{StaticResource Tile}" Background="{DynamicResource Surface2}">
-              <StackPanel><TextBlock Text="3 · Tek tıkla çıkış" FontWeight="SemiBold" FontSize="13" />
+              <StackPanel><TextBlock Text="3 · Tek tıkla çıkış" FontWeight="SemiBold" FontSize="14" />
                 <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,4,0,0" Text="Çıkış yapınca çerez dosyası ve giriş penceresinin verileri silinir." /></StackPanel>
             </Border>
           </Grid>
@@ -87,7 +87,7 @@
       </Border>
 
       <!-- ===== Tarayıcı eklentisi: oturumun tek sahibi gerçek tarayıcı olur, dışa aktarılmış kopya bayatlamaz ===== -->
-      <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,0,18">
+      <Border Style="{StaticResource Card}" Padding="22" Margin="0,0,0,20">
         <StackPanel>
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -107,7 +107,7 @@
           </DockPanel>
           <Border Margin="0,14,0,0" Style="{StaticResource Tile}" Background="{DynamicResource Surface2}" Visibility="{Binding ExtensionHelp, Converter={StaticResource Vis}}">
             <StackPanel>
-              <TextBlock Text="Kurulum (bir kez)" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6" />
+              <TextBlock Text="Kurulum (bir kez)" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,6" />
               <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Text="1 · Tarayıcının adres çubuğuna chrome://extensions yaz (Edge: edge://extensions, Brave: brave://extensions)." />
               <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Text="2 · &quot;Geliştirici modu&quot;nu aç." />
               <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Text="3 · &quot;Paketlenmemiş öğe yükle&quot;ye bas ve az önce açılan klasörü seç." />
@@ -164,7 +164,7 @@
               <DockPanel>
                 <c:Icon DockPanel.Dock="Right" Data="{StaticResource I.External}" Size="15" Foreground="{DynamicResource Muted}" VerticalAlignment="Top" />
                 <StackPanel>
-                  <TextBlock Text="{Binding Label}" FontSize="15" />
+                  <TextBlock Text="{Binding Label}" FontSize="16" />
                   <TextBlock Text="{Binding Hint}" Style="{StaticResource Small}" FontWeight="Normal" TextWrapping="Wrap" Margin="0,3,0,0" />
                 </StackPanel>
               </DockPanel>
@@ -178,7 +178,7 @@
       <!-- ===== Takip edilenler ===== -->
       <DockPanel Margin="0,0,0,10">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-          <TextBlock Text="Kontrol aralığı" FontSize="13" Foreground="{DynamicResource Text2}" VerticalAlignment="Center" Margin="0,0,8,0" />
+          <TextBlock Text="Kontrol aralığı" FontSize="14" Foreground="{DynamicResource Text2}" VerticalAlignment="Center" Margin="0,0,8,0" />
           <ComboBox Width="160" ItemsSource="{Binding FollowIntervals}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding FollowInterval}" />
         </StackPanel>
         <TextBlock Style="{StaticResource H2}" Text="Takip edilen listeler" VerticalAlignment="Center" />

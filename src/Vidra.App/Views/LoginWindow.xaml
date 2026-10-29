@@ -24,7 +24,7 @@
           <c:Icon Data="{StaticResource I.Lock}" Size="18" Foreground="{DynamicResource AccentStrong}" />
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
-          <TextBlock x:Name="Status" Text="Google hesabınla giriş yap" FontWeight="SemiBold" FontSize="14" />
+          <TextBlock x:Name="Status" Text="Google hesabınla giriş yap" FontWeight="SemiBold" FontSize="15" />
           <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap"
                      Text="Şifren Vidra'ya iletilmez; giriş Google'ın kendi sayfasında yapılır. Oturum yalnızca bu bilgisayarda saklanır." />
         </StackPanel>
@@ -36,7 +36,7 @@
     <Border x:Name="Rejected" Grid.Row="1" Style="{StaticResource Notice}" Margin="12" Visibility="Collapsed">
       <StackPanel>
         <TextBlock FontWeight="SemiBold" Text="Google bu pencerede girişe izin vermedi." />
-        <TextBlock TextWrapping="Wrap" Margin="0,4,0,10" FontSize="13"
+        <TextBlock TextWrapping="Wrap" Margin="0,4,0,10" FontSize="14"
                    Text="Bazı hesaplarda Google gömülü tarayıcıları engelliyor. Normal tarayıcında YouTube'a giriş yapıp oturumu oradan alabilirsin." />
         <StackPanel Orientation="Horizontal">
           <Button Style="{StaticResource BtnSm}" Content="Tarayıcıdan al" Click="UseBrowser_Click" Margin="0,0,8,0" />
