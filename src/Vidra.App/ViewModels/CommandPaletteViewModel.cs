@@ -113,6 +113,8 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
         yield return Go(Page.Stats, "İstatistik", "I.Chart", "7", "grafik");
         yield return Go(Page.Account, "Hesabım", "I.User", "8", "giriş oturum çerez eklenti takip");
         yield return Go(Page.Settings, "Ayarlar", "I.Settings", "9", "tercihler klasör tema");
+        yield return new("İndirme günlüğü", "yt-dlp'nin ham çıktısı: takılan ya da hata veren indirmeler için", "I.Terminal", "Sayfa", null,
+            Sync(() => main.LogVm.Show(null)), "log günlük çıktı hata ayıklama debug");
 
         var q = host.Queue;
         yield return new("Panodaki bağlantıyı aç", "Kopyaladığın video, playlist ya da kanal", "I.Clipboard", "Eylem", "Ctrl+V", main.PasteAsync, "yapıştır");

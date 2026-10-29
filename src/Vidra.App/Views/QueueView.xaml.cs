@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using Vidra.App.ViewModels;
 
 namespace Vidra.App.Views;
@@ -17,9 +19,16 @@ public partial class QueueView : UserControl
         }
     }
 
-    /// <summary>Günlük kutusu canlı akarken en alta kaydır.</summary>
-    private void Log_TextChanged(object sender, TextChangedEventArgs e)
+    /// <summary>Geçmiş satırındaki "⋯": satırın sağ tık menüsünü fare konumunda açar (menü komutları satırın Tag'ini kullanır).</summary>
+    private void More_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is TextBox t) t.ScrollToEnd();
+        for (var d = VisualTreeHelper.GetParent((DependencyObject)sender); d is not null; d = VisualTreeHelper.GetParent(d))
+        {
+            if (d is not FrameworkElement { ContextMenu: { } menu } row) continue;
+            menu.PlacementTarget = row;
+            menu.Placement = PlacementMode.MousePoint;
+            menu.IsOpen = true;
+            return;
+        }
     }
 }
