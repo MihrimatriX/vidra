@@ -1,0 +1,90 @@
+# Sürüm yayınlar: Directory.Build.props'taki sürümle Windows'ta Vidra-Setup.exe ve Vidra-Portable.exe derlenir,
+# testler ve açılış denemesi geçerse v<sürüm> etiketiyle GitHub sürümü açılır. Notlar docs/releases/v<sürüm>.md'den.
+# Başlatma: Actions › Sürüm yayınla › Run workflow (main üzerinde) ya da v<sürüm> etiketini push'la.
+# Kurulumu ya da sürümü değiştiren PR'larda kuru çalışır: her şey derlenip denenir, yalnızca yayın adımı atlanır.
+name: Sürüm yayınla
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths: ['installer/**', 'Directory.Build.props', 'docs/releases/**', '.github/workflows/release.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Sürümü belirle
+        id: ver
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
+          $tag = "v$version"
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $tag) {
+            throw "Etiket ($env:GITHUB_REF_NAME) Directory.Build.props sürümüyle ($tag) uyuşmuyor"
+          }
+          if (-not (Test-Path "docs/releases/$tag.md")) { throw "Sürüm notu yok: docs/releases/$tag.md" }
+          if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
+            gh release view $tag --json tagName 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) { throw "$tag zaten yayınlanmış; önce Directory.Build.props'ta sürümü artır" }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          exit 0
+
+      - name: Testler
+        run: dotnet test tests/Vidra.Core.Tests -c Release
+
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $find = { Get-Item "${env:ProgramFiles(x86)}\Inno Setup*\ISCC.exe", "$env:ProgramFiles\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 }
+          $iscc = & $find
+          if (-not $iscc) { choco install innosetup -y --no-progress; $iscc = & $find }
+          if (-not $iscc) { throw 'ISCC.exe bulunamadı' }
+          Write-Host "ISCC: $($iscc.FullName)"
+          $iscc.DirectoryName >> $env:GITHUB_PATH
+
+      - name: Derle (kurulum + taşınabilir exe)
+        shell: pwsh
+        run: ./installer/build.ps1
+
+      - name: Açılış denemesi
+        shell: pwsh
+        run: |
+          $p = Start-Process dist/Vidra-Portable.exe -PassThru
+          Start-Sleep -Seconds 20
+          if ($p.HasExited) { throw "Vidra-Portable.exe açılışta kapandı (çıkış kodu $($p.ExitCode))" }
+          Stop-Process -Id $p.Id -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vidra-${{ steps.ver.outputs.version }}
+          path: dist/*.exe
+          retention-days: 7
+
+      - name: GitHub sürümünü aç
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.ver.outputs.tag }}'
+          gh release create $tag dist/Vidra-Setup.exe dist/Vidra-Portable.exe `
+            --title "Vidra ${{ steps.ver.outputs.version }}" --notes-file "docs/releases/$tag.md" `
+            --target $env:GITHUB_SHA --latest

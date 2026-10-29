@@ -135,8 +135,8 @@
             <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="10,0,4,0" Width="280" Height="36" Margin="0,0,8,0">
               <DockPanel>
                 <c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Search}" Size="15" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
-                <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged, Delay=250}" BorderThickness="0" Background="Transparent" Padding="8,0"
-                         VerticalContentAlignment="Center" Tag="Başlıkta ara" AutomationProperties.Name="Başlıkta ara" />
+                <TextBox x:Name="SearchBox" Text="{Binding Query, UpdateSourceTrigger=PropertyChanged, Delay=250}" BorderThickness="0" Background="Transparent" Padding="8,0"
+                         VerticalContentAlignment="Center" Tag="Başlıkta ara  (Ctrl+F)" AutomationProperties.Name="Başlıkta ara" />
               </DockPanel>
             </Border>
             <ToggleButton Style="{StaticResource PillSolid}" Content="Yalnızca indirilmemiş" IsChecked="{Binding OnlyNew}" Margin="0,0,8,0" />

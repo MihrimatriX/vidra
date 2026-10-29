@@ -36,7 +36,7 @@ public sealed class AppHost : IAsyncDisposable
         SettingsStore = new SettingsStore(Paths);
         SettingsStore.Load();
         Http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        Http.DefaultRequestHeaders.UserAgent.ParseAdd("Vidra/0.2 (+https://github.com/yt-dlp/yt-dlp)");
+        Http.DefaultRequestHeaders.UserAgent.ParseAdd($"Vidra/{typeof(AppHost).Assembly.GetName().Version?.ToString(3)} (+https://github.com/yt-dlp/yt-dlp)");
         Tools = new ToolManager(Paths, Runner, Http);
         YtDlp = new YtDlpService(Runner, Tools, () => SettingsStore.Current);
         Queue = new DownloadQueue(Runner, Tools, () => SettingsStore.Current, Paths, Dispatch);

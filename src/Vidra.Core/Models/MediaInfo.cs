@@ -14,7 +14,18 @@ public sealed record StreamInfo(
 
 public sealed record QualityOption(int Height, double? MaxFps, bool Hdr, long? Size, IReadOnlyList<StreamInfo> Streams);
 
-public sealed record AudioInfo(string Id, string Codec, double? Abr, double? Asr, long? Size);
+/// <summary>
+/// Language: çok dilli videolarda ses izinin dili ("en-US"); IsDefault: YouTube'un varsayılan (orijinal) izi;
+/// AutoDub: YouTube'un otomatik dublajı.
+/// </summary>
+public sealed record AudioInfo(string Id, string Codec, double? Abr, double? Asr, long? Size,
+    string? Language = null, bool IsDefault = true, bool AutoDub = false);
+
+/// <summary>Seçilebilir ses dili (yalnızca birden çok dil varsa listelenir).</summary>
+public sealed record AudioLanguage(string Code, string Name, bool Original, bool AutoDub);
+
+/// <summary>YouTube'un "en çok tekrar oynatılan" grafiğinden bir dilim; Value 0..1.</summary>
+public sealed record HeatPoint(double Start, double End, double Value);
 
 public sealed record SubtitleTrack(string Code, string Name, bool Auto);
 
@@ -41,6 +52,15 @@ public sealed record VideoInfo
     public AudioInfo? AudioAac { get; init; }
     public IReadOnlyList<SubtitleTrack> Subtitles { get; init; } = [];
     public int AutoTranslateCount { get; init; }
+
+    /// <summary>Birden çok ses dili varsa (dublaj) seçenekler; orijinal en başta. Tek dilde boş.</summary>
+    public IReadOnlyList<AudioLanguage> AudioLanguages { get; init; } = [];
+
+    /// <summary>Tüm ses akışları (dil seçimine göre kopyalanacak akışı bulmak için).</summary>
+    public IReadOnlyList<AudioInfo> Audios { get; init; } = [];
+
+    /// <summary>"En çok tekrar oynatılan" grafiği; yeterince izlenmemiş videolarda boş.</summary>
+    public IReadOnlyList<HeatPoint> Heatmap { get; init; } = [];
 }
 
 public sealed record PlaylistEntry

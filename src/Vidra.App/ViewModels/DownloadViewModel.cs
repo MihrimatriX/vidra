@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Windows;
+using System.Windows.Media;
 using Microsoft.Win32;
 using Vidra.Core;
 using Vidra.Core.Models;
@@ -23,6 +25,16 @@ public sealed record QualityCard(int? Height, int Res, string Title, string Tag,
 public sealed record AudioCard(AudioFormat Format, string Title, string Detail, string SizeText, long? Size);
 
 public sealed record StreamRow(string Kind, string Id, string Detail, string Rate, string Size);
+
+/// <summary>Çoklu kesimde ek aralık (ilk aralık ClipStart/ClipEnd).</summary>
+public sealed partial class ClipRange(string start, string end) : ObservableObject
+{
+    [ObservableProperty] private string _start = start;
+    [ObservableProperty] private string _end = end;
+}
+
+/// <summary>Klip çubuğunda bir aralık; 0..1000 birimlik tuvalde (Viewbox ile genişliğe yayılır).</summary>
+public sealed record RangeBar(double Left, double Width);
 
 public sealed partial class DownloadViewModel : ObservableObject
 {
@@ -57,6 +69,19 @@ public sealed partial class DownloadViewModel : ObservableObject
         _comments = d.Comments;
         _mode = d.Mode;
         _musicMode = d.MusicMode;
+        host.Queue.History.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Recent));
+    }
+
+    /// <summary>Boş ekranda: son indirilenler (aynı video bir kez) — farklı kalitede tekrar açmak ya da oynatmak için.</summary>
+    public IReadOnlyList<HistoryEntry> Recent =>
+        _host.Queue.History.Where(h => h.Status == JobStatus.Done).DistinctBy(h => h.Url).Take(5).ToList();
+
+    [RelayCommand]
+    private async Task Reopen(HistoryEntry? h)
+    {
+        if (h is null) return;
+        Url = h.Url;
+        await Analyze();
     }
 
     // Profiller: hazırlar + kullanıcının kaydettikleri
@@ -124,6 +149,29 @@ public sealed partial class DownloadViewModel : ObservableObject
     [ObservableProperty] private bool _splitChapters;
     public ObservableCollection<Toggle> SponsorCats { get; } = [];
 
+    /// <summary>Ek kesim aralıkları; her biri ayrı dosya olarak iner.</summary>
+    public ObservableCollection<ClipRange> ExtraClips { get; } = [];
+    public ObservableCollection<RangeBar> ClipBars { get; } = [];
+
+    /// <summary>YouTube'un "en çok tekrar oynatılan" grafiği, 1000×40 birimlik tuvalde.</summary>
+    [ObservableProperty] private PointCollection _heatPoints = [];
+    public bool HasHeatmap => Info?.Heatmap.Count > 0;
+    public string ClipHint => HasHeatmap ? "Bir ya da birkaç aralık · en çok izleneni önerir" : "Yalnızca bir ya da birkaç aralığı indir";
+
+    // Ses dili (dublaj): "" = YouTube'un varsayılanı (orijinal)
+    public ObservableCollection<Choice> AudioLanguageChoices { get; } = [];
+    [ObservableProperty] private string _audioLanguage = "";
+    public bool HasAudioLanguages => AudioLanguageChoices.Count > 1;
+    public string AudioLanguageHint => Info?.AudioLanguages is { Count: > 1 } l
+        ? $"{l.Count} dil" + (l.Any(x => x.AutoDub) ? " · otomatik dublaj dahil" : "")
+        : "";
+
+    // Canlı yayın
+    [ObservableProperty] private bool _liveFromStart;
+
+    /// <summary>Henüz başlamamış yayın/prömiyer bağlantısı: "Başlayınca indir" düğmesi bunu kuyruğa alır.</summary>
+    [ObservableProperty] private string? _upcomingUrl;
+
     // Ortak anahtarlar
     [ObservableProperty] private bool _embedThumbnail;
     [ObservableProperty] private bool _sponsorBlock;
@@ -137,9 +185,6 @@ public sealed partial class DownloadViewModel : ObservableObject
     [ObservableProperty] private string _filePreview = "";
     [ObservableProperty] private string _clipText = "";
     [ObservableProperty] private bool _clipValid;
-    [ObservableProperty] private double _clipLeft;
-    [ObservableProperty] private double _clipWidth;
-    [ObservableProperty] private double _clipRight = 1;
     [ObservableProperty] private string _metaHighest = "—";
     [ObservableProperty] private string _metaAudio = "—";
     [ObservableProperty] private string _metaUpload = "—";
@@ -171,6 +216,8 @@ public sealed partial class DownloadViewModel : ObservableObject
     partial void OnClipStartChanged(string value) => Recalculate();
     partial void OnClipEndChanged(string value) => Recalculate();
     partial void OnClipPreciseChanged(bool value) => Recalculate();
+    partial void OnAudioLanguageChanged(string value) => Recalculate();
+    partial void OnLiveFromStartChanged(bool value) => Recalculate();
     partial void OnEmbedThumbnailChanged(bool value) => Recalculate();
     partial void OnSponsorBlockChanged(bool value) => Recalculate();
     partial void OnSplitChaptersChanged(bool value) => Recalculate();
@@ -193,9 +240,16 @@ public sealed partial class DownloadViewModel : ObservableObject
     {
         var links = YouTubeUrl.ExtractVideoLinks(text);
         if (links.Count < 2) return false;
-        _host.Queue.Enqueue(links.Select(l => new NewJob(l, l, _host.Settings.Defaults, Source: "Toplu yapıştırma")));
-        _main.Go(Page.Queue);
+        EnqueueLinks(links, "Toplu yapıştırma");
         return true;
+    }
+
+    /// <summary>Video bağlantılarını varsayılan biçimle kuyruğa alır (başlıklar indirme başlayınca dolar).</summary>
+    public void EnqueueLinks(IReadOnlyList<string> links, string source)
+    {
+        _host.Queue.Enqueue(links.Select(l => new NewJob(l, l, _host.Settings.Defaults, Source: source)));
+        _main.Go(Page.Queue);
+        _main.ShowToast($"{links.Count} video kuyruğa eklendi");
     }
 
     [RelayCommand]
@@ -229,6 +283,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         var cts = _probeCts = new CancellationTokenSource();
         IsLoading = true;
         Error = null;
+        UpcomingUrl = null;
         Info = null;
         ClipEnabled = false;
         ClipPrecise = false;
@@ -243,6 +298,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         {
             Error = e.Message;
             ErrorIsAuth = e.Kind is ErrorKind.Auth or ErrorKind.BotCheck;
+            UpcomingUrl = e.Kind == ErrorKind.Upcoming ? url : null;
         }
         catch (OperationCanceledException) { }
         catch (Exception e)
@@ -255,6 +311,16 @@ public sealed partial class DownloadViewModel : ObservableObject
             if (_probeCts == cts) IsLoading = false;
         }
     }
+
+#if DEBUG
+    /// <summary>Ekran görüntüsü turu: boş ekran (son indirilenler).</summary>
+    internal void ShowEmptyForTour()
+    {
+        Info = null;
+        Url = "";
+        Error = null;
+    }
+#endif
 
     public void ShowVideo(VideoInfo v)
     {
@@ -281,6 +347,20 @@ public sealed partial class DownloadViewModel : ObservableObject
             SubtitleLangs.Add(new Toggle(t.Code, t.Name, t.Auto ? "otomatik" : "manuel", wanted.Contains(t.Code)));
         foreach (var t in SubtitleLangs) t.PropertyChanged += (_, _) => Recalculate();
         SubsInfo = $"{v.Subtitles.Count(s => !s.Auto)} manuel · {v.AutoTranslateCount} dile otomatik çeviri";
+
+        AudioLanguageChoices.Clear();
+        foreach (var l in v.AudioLanguages)
+            AudioLanguageChoices.Add(new Choice(l.Original ? "" : l.Code, l.Original ? $"{l.Name} · orijinal" : l.AutoDub ? $"{l.Name} · otomatik dublaj" : l.Name));
+        _audioLanguage = "";
+        OnPropertyChanged(nameof(AudioLanguage));
+        OnPropertyChanged(nameof(HasAudioLanguages));
+        OnPropertyChanged(nameof(AudioLanguageHint));
+
+        ExtraClips.Clear();
+        LiveFromStart = false;
+        HeatPoints = BuildHeat(v);
+        OnPropertyChanged(nameof(HasHeatmap));
+        OnPropertyChanged(nameof(ClipHint));
 
         SponsorCats.Clear();
         foreach (var (id, label) in Vidra.Core.Models.SponsorCategories.All)
@@ -354,10 +434,102 @@ public sealed partial class DownloadViewModel : ObservableObject
     private static string AudioName(string codec) => codec switch { "opus" => "Opus", "mp4a" => "AAC", _ => codec };
 
     /// <summary>Seçime göre kopyalanacak ses akışı: MP4/M4A'da AAC, aksi hâlde en iyisi (genelde Opus).</summary>
-    private AudioInfo? AudioFor(AudioFormat f) => f == AudioFormat.M4a ? Info?.AudioAac ?? Info?.Audio : Info?.Audio;
+    private AudioInfo? AudioFor(AudioFormat f) => PickAudio(f == AudioFormat.M4a);
 
-    private AudioInfo? CurrentAudio(DownloadOptions o) => o.Mode == DownloadMode.Audio ? AudioFor(o.AudioFormat)
-        : o.Container == ContainerFormat.Mp4 ? Info?.AudioAac ?? Info?.Audio : Info?.Audio;
+    private AudioInfo? CurrentAudio(DownloadOptions o) => o.Mode == DownloadMode.Audio ? AudioFor(o.AudioFormat) : PickAudio(o.Container == ContainerFormat.Mp4);
+
+    /// <summary>Kopyalanacak ses akışı: seçili dildeki iz (yoksa varsayılan), MP4/M4A'da AAC tercihli.</summary>
+    private AudioInfo? PickAudio(bool aac)
+    {
+        if (Info is not { } v) return null;
+        var pool = AudioLanguage.Length > 0
+            ? v.Audios.Where(a => a.Language?.StartsWith(AudioLanguage, StringComparison.OrdinalIgnoreCase) == true).ToList()
+            : [];
+        if (pool.Count == 0) return aac ? v.AudioAac ?? v.Audio : v.Audio;
+        return aac ? pool.FirstOrDefault(a => a.Codec == "mp4a") ?? pool[0] : pool[0];
+    }
+
+    /// <summary>Basamaklı alan grafiği: her dilim kendi yüksekliğinde düz çizgi (YouTube'daki gibi tepeler okunur).</summary>
+    private static PointCollection BuildHeat(VideoInfo v)
+    {
+        var pts = new PointCollection();
+        var dur = v.Heatmap.Count > 0 ? v.Heatmap.Max(p => p.End) : 0;
+        if (dur > 0)
+        {
+            pts.Add(new Point(0, 40));
+            foreach (var h in v.Heatmap)
+            {
+                var y = 40 - h.Value * 36;
+                pts.Add(new Point(h.Start / dur * 1000, y));
+                pts.Add(new Point(h.End / dur * 1000, y));
+            }
+            pts.Add(new Point(1000, 40));
+        }
+        pts.Freeze();
+        return pts;
+    }
+
+    /// <summary>Geçerli ek aralıklar (bitiş başlangıçtan sonra).</summary>
+    private List<Clip> ExtraClipList() => ExtraClips
+        .Select(r => (r, a: TimeText.ToSeconds(r.Start), b: TimeText.ToSeconds(r.End)))
+        .Where(x => x.a is not null && x.b is not null && x.b > x.a)
+        .Select(x => new Clip(x.r.Start.Trim(), x.r.End.Trim(), ClipPrecise))
+        .ToList();
+
+    private void AddRange(string start, string end)
+    {
+        var r = new ClipRange(start, end);
+        r.PropertyChanged += (_, _) => Recalculate();
+        ExtraClips.Add(r);
+    }
+
+    /// <summary>Yeni aralık: sonuncunun bitişinden başlayan 30 saniye (video sonunu aşmadan).</summary>
+    [RelayCommand]
+    private void AddClipRange()
+    {
+        var last = ExtraClips.Count > 0 ? TimeText.ToSeconds(ExtraClips[^1].End) : TimeText.ToSeconds(ClipEnd);
+        var start = last ?? 0;
+        var end = Info?.Duration is { } d ? Math.Min(d, start + 30) : start + 30;
+        if (end <= start) start = Math.Max(0, end - 30);
+        ClipEnabled = true;
+        AddRange(TimeText.Format(start), TimeText.Format(end));
+        Recalculate();
+    }
+
+    [RelayCommand]
+    private void RemoveClipRange(ClipRange? r)
+    {
+        if (r is not null && ExtraClips.Remove(r)) Recalculate();
+    }
+
+    /// <summary>"30" / "60": en çok izlenen tek pencere; "3x20": çakışmayan en iyi üç an, her biri ayrı klip.</summary>
+    [RelayCommand]
+    private void PickHighlights(string? spec)
+    {
+        if (Info is not { Heatmap.Count: > 0 } v) return;
+        var (count, len) = spec switch { "60" => (1, 60d), "3x20" => (3, 20d), _ => (1, 30d) };
+        var w = Heatmap.BestWindows(v.Heatmap, len, count);
+        if (w.Count == 0) return;
+        ExtraClips.Clear();
+        ClipEnabled = true;
+        ShowMore = true;
+        ClipStart = TimeText.Format(w[0].Start);
+        ClipEnd = TimeText.Format(w[0].End);
+        foreach (var (a, b) in w.Skip(1)) AddRange(TimeText.Format(a), TimeText.Format(b));
+        Recalculate();
+    }
+
+    /// <summary>Henüz başlamamış yayın/prömiyer: kuyruğa al, yt-dlp başlama saatini bekleyip indirir.</summary>
+    [RelayCommand]
+    private void EnqueueWhenLive()
+    {
+        if (UpcomingUrl is not { } url) return;
+        _host.Queue.Enqueue([new NewJob(url, url, _host.Settings.Defaults with { WaitForLive = true }, Source: "Canlı yayın / prömiyer")]);
+        UpcomingUrl = null;
+        Error = null;
+        _main.Go(Page.Queue);
+        _main.ShowToast("Yayın başlayınca kendiliğinden indirilecek");
+    }
 
     private Clip? CurrentClip()
     {
@@ -383,6 +555,9 @@ public sealed partial class DownloadViewModel : ObservableObject
         Chapters = Chapters,
         SplitChapters = SplitChapters,
         Clip = CurrentClip(),
+        Clips = ClipEnabled && ExtraClipList() is { Count: > 0 } more ? more : null,
+        AudioLanguage = AudioLanguage.Length > 0 ? AudioLanguage : null,
+        LiveFromStart = Info?.Live == true && LiveFromStart,
         MusicMode = MusicMode,
         Transcript = Transcript,
         Comments = Comments,
@@ -393,16 +568,21 @@ public sealed partial class DownloadViewModel : ObservableObject
         if (Info is not { } v) return;
         var o = BuildOptions();
 
-        var clip = o.Clip;
-        double? clipSecs = clip is null ? null : TimeText.ToSeconds(clip.End) - TimeText.ToSeconds(clip.Start);
-        ClipValid = clip is not null;
+        var clips = YtDlpArgs.AllClips(o)
+            .Select(c => (Start: TimeText.ToSeconds(c.Start)!.Value, End: TimeText.ToSeconds(c.End)!.Value))
+            .Where(c => c.End > c.Start)
+            .ToList();
+        double? clipSecs = clips.Count == 0 ? null : clips.Sum(c => c.End - c.Start);
+        ClipValid = clips.Count > 0;
         ClipText = !ClipEnabled ? ""
+            : clips.Count > 1 ? $"{clips.Count} aralık · toplam {TimeText.Format(clipSecs)} · her aralık ayrı dosya olarak iner"
             : ClipValid ? $"Seçili aralık {TimeText.Format(clipSecs)} · yalnızca bu kısım indirilir"
             : "Zamanları 2:15 ya da 135 biçiminde gir; bitiş başlangıçtan sonra olmalı.";
         var ratio = clipSecs is { } cs && v.Duration is > 0 ? Math.Min(1, cs / v.Duration.Value) : 1;
-        ClipLeft = clip is not null && v.Duration is > 0 ? TimeText.ToSeconds(clip.Start)!.Value / v.Duration.Value : 0;
-        ClipWidth = clip is not null ? ratio : 0;
-        ClipRight = Math.Max(0, 1 - ClipLeft - ClipWidth);
+        ClipBars.Clear();
+        if (v.Duration is > 0 and var dur)
+            foreach (var c in clips)
+                ClipBars.Add(new RangeBar(Math.Clamp(c.Start / dur, 0, 1) * 1000, Math.Clamp((c.End - c.Start) / dur, 0, 1) * 1000));
 
         var video = o.Mode == DownloadMode.Video ? SelectedQuality?.Stream : null;
         var audio = CurrentAudio(o);
@@ -436,7 +616,10 @@ public sealed partial class DownloadViewModel : ObservableObject
         if (o.Mode == DownloadMode.Video && o.MaxFps30) more.Add("≤ 30 fps");
         if (o.Subtitles && o.SubLangs is { Count: > 0 } langs && !(o.Mode == DownloadMode.Audio && o.MusicMode))
             more.Add("altyazı " + string.Join('+', langs).ToUpperInvariant());
-        if (clip is not null) more.Add($"klip {TimeText.Format(clipSecs)}");
+        if (clips.Count > 1) more.Add($"{clips.Count} klip");
+        else if (clips.Count == 1) more.Add($"klip {TimeText.Format(clipSecs)}");
+        if (o.AudioLanguage is not null && AudioLanguageChoices.FirstOrDefault(c => Equals(c.Value, o.AudioLanguage)) is { } lang)
+            more.Add("ses: " + lang.Label.Split(" · ")[0]);
         if (o.SponsorBlock) more.Add("SponsorBlock");
         if (o.Chapters && v.Chapters.Count > 0) more.Add("bölüm işaretleri");
         if (o.SplitChapters) more.Add("bölümlere ayır");
@@ -460,6 +643,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         if (Info is not { } v) return;
         _host.Queue.Enqueue([new NewJob(v.Url, v.Title, BuildOptions(), v.Channel, v.Thumbnail, v.Duration)], startNow);
         if (startNow) _main.Go(Page.Queue);
+        else _main.ShowToast("Kuyruğa eklendi (bekletiliyor)", "Kuyruğu aç", () => _main.Go(Page.Queue));
     }
 
     [RelayCommand] private void DownloadNow() => Enqueue(true);
@@ -502,7 +686,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         var name = NewProfileName.Trim();
         if (name.Length == 0) return;
         // Videoya özel seçimler (klip, dil listesi) profile girmez
-        var p = new DownloadProfile(name, BuildOptions() with { Clip = null, SubLangs = null, Playlist = null });
+        var p = new DownloadProfile(name, BuildOptions() with { Clip = null, Clips = null, SubLangs = null, Playlist = null, AudioLanguage = null, LiveFromStart = false });
         _host.SettingsStore.Update(s => s.Profiles = [.. s.Profiles.Where(x => x.Name != name), p]);
         NewProfileName = "";
         SavingProfile = false;

@@ -16,6 +16,9 @@ public static class YtDlpArgs
     public const string MarkPp = "VIDRA:pp|";
     public const string MarkDone = "VIDRA:done|";
 
+    /// <summary>İndirme başlamadan: kanal|başlık (toplu yapıştırılan, başlığı bilinmeyen işler için).</summary>
+    public const string MarkMeta = "VIDRA:meta|";
+
     private const string ProgressTemplate =
         MarkDl + "%(progress.status)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|" +
         "%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s|%(info.format_id)s";
@@ -29,6 +32,8 @@ public static class YtDlpArgs
     /// </summary>
     public static List<string> Format(DownloadOptions o)
     {
+        // Dublaj: istenen dildeki ses izi; yoksa varsayılan (orijinal) iz — indirme hiçbir zaman dil yüzünden düşmez
+        var lang = LanguageFilter(o.AudioLanguage);
         if (o.Mode == DownloadMode.Audio)
         {
             // M4A/Opus istenirse o kodekteki akışı seç: ffmpeg yeniden kodlamak yerine kopyalar
@@ -38,6 +43,13 @@ public static class YtDlpArgs
                 AudioFormat.Opus => "ba[acodec=opus]/ba/b",
                 _ => "ba/b",
             };
+            if (lang is not null)
+                pick = o.AudioFormat switch
+                {
+                    AudioFormat.M4a => $"ba{lang}[acodec^=mp4a]/ba{lang}/{pick}",
+                    AudioFormat.Opus => $"ba{lang}[acodec=opus]/ba{lang}/{pick}",
+                    _ => $"ba{lang}/{pick}",
+                };
             var a = new List<string> { "-f", pick, "-x" };
             // --audio-format verilmezse yt-dlp "best" kullanır: akışın kendi kodeği, dönüştürme yok
             if (o.AudioFormat != AudioFormat.Original) a.AddRange(["--audio-format", o.AudioFormat.Ext()]);
@@ -61,7 +73,7 @@ public static class YtDlpArgs
         // MP4'e AAC konur; Opus'u MP4'e koymak bazı oynatıcılarda sorun çıkarır
         if (o.Container == ContainerFormat.Mp4) sort.Add("acodec:m4a");
 
-        var args = new List<string> { "-f", "bv*+ba/b" };
+        var args = new List<string> { "-f", lang is null ? "bv*+ba/b" : $"bv*+ba{lang}/bv*+ba/b" };
         // Tek başına "res" zaten yt-dlp'nin varsayılanı
         if (sort.Count > 1 || o.Height is not null) args.AddRange(["-S", string.Join(',', sort)]);
         var merge = o.Container switch
@@ -84,14 +96,42 @@ public static class YtDlpArgs
         _ => [],
     };
 
-    public static List<string> ClipArgs(Clip? clip)
+    /// <summary>"tr" / "en-US" → "[language^=tr]"; harf ve tire dışı karakter (biçim dizisine enjeksiyon) kabul edilmez.</summary>
+    public static string? LanguageFilter(string? code) =>
+        code is { Length: > 0 and <= 16 } c && c.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '-') ? $"[language^={c}]" : null;
+
+    public static List<string> ClipArgs(Clip? clip) => ClipArgs(clip is null ? [] : [clip]);
+
+    /// <summary>Geçerli kesim aralıkları: Clip + Clips (çoklu kesim).</summary>
+    public static IReadOnlyList<Clip> AllClips(DownloadOptions o) =>
+        new[] { o.Clip }.Concat(o.Clips ?? []).OfType<Clip>().Where(c => TimeText.IsTime(c.Start) && TimeText.IsTime(c.End)).ToList();
+
+    public static List<string> ClipArgs(IEnumerable<Clip> clips)
     {
-        if (clip is null || !TimeText.IsTime(clip.Start) || !TimeText.IsTime(clip.End)) return [];
-        var a = new List<string> { "--download-sections", $"*{clip.Start.Trim()}-{clip.End.Trim()}" };
+        var a = new List<string>();
+        var precise = false;
+        foreach (var c in clips)
+        {
+            if (!TimeText.IsTime(c.Start) || !TimeText.IsTime(c.End)) continue;
+            a.AddRange(["--download-sections", $"*{c.Start.Trim()}-{c.End.Trim()}"]);
+            precise |= c.Precise;
+        }
         // Anahtar karede kesmek kopyalar ama birkaç saniye kayabilir. Kesin kesim kesim noktalarına anahtar kare
         // ekler, bunun için videoyu yeniden kodlar; bayrak geneldir, SponsorBlock ve bölümlere ayırmayı da etkiler.
-        if (clip.Precise) a.Add("--force-keyframes-at-cuts");
+        if (precise) a.Add("--force-keyframes-at-cuts");
         return a;
+    }
+
+    /// <summary>
+    /// Birden çok aralık ayrı dosyalara iner; aynı adı taşıyıp birbirinin üstüne yazmasınlar diye
+    /// şablona aralığın başlangıç-bitiş saniyesi eklenir ("Başlık [id] (75-105).mp4").
+    /// </summary>
+    public static string WithSectionSuffix(string template)
+    {
+        const string ext = ".%(ext)s";
+        const string suffix = " (%(section_start)d-%(section_end)d)";
+        var i = template.LastIndexOf(ext, StringComparison.Ordinal);
+        return i < 0 ? template + suffix : template[..i] + suffix + template[i..];
     }
 
     public static List<string> Extras(DownloadOptions o, AppSettings s)
@@ -120,8 +160,11 @@ public static class YtDlpArgs
             a.AddRange(["--sponsorblock-remove", string.Join(',', s.SponsorCategories)]);
         if (o.SplitChapters)
             a.AddRange(["--split-chapters", "-o", "chapter:%(title)s/%(section_number)02d - %(section_title)s.%(ext)s"]);
-        a.AddRange(ClipArgs(o.Clip));
+        a.AddRange(ClipArgs(AllClips(o)));
         a.AddRange(MusicArgs(o));
+        // Henüz başlamamış yayın/prömiyer: başlama saatine kadar bekler, sonra 30 sn–5 dk aralıklarla dener
+        if (o.WaitForLive) a.AddRange(["--wait-for-video", "30-300"]);
+        if (o.LiveFromStart) a.Add("--live-from-start");
         return a;
     }
 
@@ -196,20 +239,25 @@ public static class YtDlpArgs
             "--progress-template", $"download:{ProgressTemplate}",
             "--progress-template", $"postprocess:{PpTemplate}",
             "--print", $"after_move:{MarkDone}%(filepath)s",
+            // before_dl: --print'in --simulate'i ima etmemesi için "video"dan sonraki bir aşama
+            "--print", $"before_dl:{MarkMeta}%(channel,uploader|)s|%(title)s",
             "--no-playlist", // tek video işi: URL'de list= olsa bile yalnızca bu video
             // Altyazı/kapak gibi yan adımlardaki hatalar (ör. 429) videoyu iptal etmesin.
             // Asıl indirme başarısız olursa yt-dlp yine 0 dışı kodla çıkar.
             "--ignore-errors",
             "--no-mtime",
             "-P", s.OutputDir,
-            "-o", outputTemplate ?? s.OutputTemplate,
+            "-o", AllClips(o).Count > 1 ? WithSectionSuffix(outputTemplate ?? s.OutputTemplate) : outputTemplate ?? s.OutputTemplate,
             "-N", Math.Max(1, s.Fragments).ToString(CultureInfo.InvariantCulture),
             "-R", s.Retries.ToString(CultureInfo.InvariantCulture),
         ]);
         if (!string.IsNullOrWhiteSpace(s.RateLimit)) a.AddRange(["-r", s.RateLimit!]);
-        if (s.UseArchive) a.AddRange(["--download-archive", t.ArchiveFile]);
+        // Klip tam video değildir: arşive girerse sonraki tam indirme atlanır (ya da tersi). Gizli mod iz bırakmaz.
+        if (s.UseArchive && !o.Incognito && AllClips(o).Count == 0) a.AddRange(["--download-archive", t.ArchiveFile]);
         a.AddRange(Format(o));
         a.AddRange(Extras(o, s));
+        // Ayarlardaki ek argümanlar en sonda: aynı bayrağı tekrar verirse yt-dlp sonrakini kullanır (ör. -f)
+        if (ExtraArgs.Parse(s.ExtraArgs) is { Error: null } extra) a.AddRange(extra.Args);
         a.AddRange(["--", url]);
         return a;
     }

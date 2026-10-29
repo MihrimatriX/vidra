@@ -147,6 +147,77 @@ public class QueueTests : IDisposable
         _runner.Started[0].Exit(0);
         await Until(() => fired == 1);
     }
+
+    [Fact]
+    public void Move_to_end_and_front()
+    {
+        _queue.Enqueue([Job("a"), Job("b"), Job("c")], startNow: false);
+        _queue.MoveToEnd(_queue.Jobs[0]);
+        Assert.Equal(["b", "c", "a"], _queue.Jobs.Select(j => j.Title));
+        _queue.MoveToFront(_queue.Jobs[2]);
+        Assert.Equal(["a", "b", "c"], _queue.Jobs.Select(j => j.Title));
+    }
+
+    [Fact]
+    public async Task Retry_failed_requeues_only_errors()
+    {
+        _settings.Concurrency = 1;
+        _queue.Enqueue([Job("a"), Job("b")]);
+        _runner.Started[0].Emit("ERROR: [youtube] a: Video unavailable");
+        _runner.Started[0].Exit(1);
+        var a = _queue.Jobs[0];
+        await Until(() => a.Status == JobStatus.Error);
+        _queue.Pause(_queue.Jobs[1]);
+        await Until(() => _queue.Jobs[1].Status == JobStatus.Paused);
+
+        Assert.Equal(1, _queue.RetryFailed());
+        Assert.NotEqual(JobStatus.Error, a.Status);
+        Assert.Null(a.ErrorMessage);
+        Assert.Equal(JobStatus.Paused, _queue.Jobs[1].Status);
+    }
+
+    [Fact]
+    public async Task Cancel_all_moves_everything_to_history_and_can_be_undone()
+    {
+        _queue.Enqueue([Job("a"), Job("b"), Job("c")]);
+        var canceled = _queue.CancelAll();
+        Assert.Equal(3, canceled.Count);
+        Assert.True(_runner.Started[0].Killed);
+        await Until(() => _queue.Jobs.Count == 0 && _queue.History.Count == 3);
+        // c hiç başlamadı: koşanlar öldürülünce sıradaki başlatılmamalı
+        Assert.Equal(2, _runner.Started.Count);
+        Assert.All(_queue.History, h => Assert.Equal(JobStatus.Canceled, h.Status));
+
+        await _queue.RestoreCanceledAsync(canceled, _ => true);
+        Assert.Empty(_queue.History);
+        Assert.Equal(["a", "b", "c"], _queue.Jobs.Select(j => j.Title));
+        Assert.All(_queue.Jobs, j => Assert.Equal(JobStatus.Paused, j.Status));
+    }
+
+    [Fact]
+    public async Task Undo_right_after_cancel_waits_for_killed_processes()
+    {
+        _queue.Enqueue([Job("a"), Job("b")]);
+        var canceled = _queue.CancelAll();
+        // Hemen geri al: koşan işlerin süreçleri henüz bitmedi (Finish sonradan gelir)
+        await _queue.RestoreCanceledAsync(canceled, _ => false);
+        Assert.Empty(_queue.History); // geç gelen "iptal" kaydı kalmadı
+        Assert.Equal(["a", "b"], _queue.Jobs.Select(j => j.Title));
+        Assert.Equal(4, _runner.Started.Count); // eskiler bittikten sonra yeniden başladılar
+    }
+
+    [Fact]
+    public void Restore_history_keeps_date_order_and_skips_duplicates()
+    {
+        HistoryEntry H(string id, int minutes) => new()
+        {
+            Id = id, Url = "https://youtu.be/" + id, Title = id, Options = new DownloadOptions(), Status = JobStatus.Done,
+            FinishedAt = DateTimeOffset.Now.AddMinutes(-minutes),
+        };
+        _queue.RestoreHistory([H("new", 1), H("old", 30)]);
+        _queue.RestoreHistory([H("mid", 10), H("new", 1)]);
+        Assert.Equal(["new", "mid", "old"], _queue.History.Select(h => h.Id));
+    }
 }
 
 public class PendingTests

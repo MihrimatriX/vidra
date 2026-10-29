@@ -9,11 +9,15 @@ using CommunityToolkit.Mvvm.Input;
 using Vidra.App.Services;
 using Vidra.Core;
 using Vidra.Core.Models;
+using Vidra.Core.Queue;
 using Vidra.Core.YtDlp;
 
 namespace Vidra.App.ViewModels;
 
 public enum Page { Download, Search, Playlist, Basket, Queue, Library, Stats, Account, Settings }
+
+/// <summary>Alttaki kısa bildirim; Action varsa yanında düğme olarak (ör. "Geri al").</summary>
+public sealed record ToastMessage(string Text, string? ActionLabel, Action? Action);
 
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -30,6 +34,7 @@ public sealed partial class MainViewModel : ObservableObject
     public AccountViewModel Account { get; }
     public SettingsViewModel Settings { get; }
     public SetupViewModel Setup { get; }
+    public CommandPaletteViewModel Palette { get; }
 
     [ObservableProperty] private Page _page = Page.Download;
     [ObservableProperty] private object? _current;
@@ -44,6 +49,20 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Pano izleme: kopyalanan bağlantı için üstte çıkan şerit.</summary>
     [ObservableProperty] private string? _clipboardLink;
 
+    /// <summary>Tüm kuyruğun ilerlemesi (görev çubuğu, tepsi ipucu); saniyede bir yenilenir.</summary>
+    [ObservableProperty] private QueueProgress _progress = QueueProgress.From([]);
+
+    [ObservableProperty] private ToastMessage? _toast;
+
+    /// <summary>Gizli mod (yalnızca bu oturum): yeni indirmeler geçmişe ve arşive yazılmaz.</summary>
+    [ObservableProperty] private bool _incognito;
+
+    /// <summary>GitHub'da daha yeni Vidra sürümü varsa; kenar çubuğunda bağlantı olarak görünür.</summary>
+    [ObservableProperty] private AppRelease? _update;
+    private readonly DispatcherTimer _toastTimer = new();
+    private bool _toastHeld;
+    private string _trayTip = "";
+
     public MainViewModel(AppHost host)
     {
         _host = host;
@@ -53,14 +72,17 @@ public sealed partial class MainViewModel : ObservableObject
         Playlist = new PlaylistViewModel(host, this);
         Basket = new BasketViewModel(host, this);
         QueueVm = new QueueViewModel(host, this);
-        Library = new LibraryViewModel(host);
+        Library = new LibraryViewModel(host, this);
         Account = new AccountViewModel(host, this);
         Settings = new SettingsViewModel(host);
         Setup = new SetupViewModel(host);
+        Palette = new CommandPaletteViewModel(host, this);
         Current = Download;
+        _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); Toast = null; };
 
         host.SettingsStore.Changed += (_, _) => RefreshStatus();
-        host.Queue.Jobs.CollectionChanged += (_, _) => RefreshStatus();
+        var refreshStatus = Ui.Coalesce(RefreshStatus);
+        host.Queue.Jobs.CollectionChanged += (_, _) => refreshStatus();
         host.Clipboard.LinkCopied += (_, link) =>
         {
             if (Download.Url.Trim() == link) return;
@@ -75,13 +97,46 @@ public sealed partial class MainViewModel : ObservableObject
             QueueVm.SampleSpeed(speed);
             QueueVm.CheckSchedule();
             RefreshStatus(); // duraklat/hata gibi durum değişiklikleri koleksiyon olayı üretmez
+            RefreshProgress();
         };
         _timer.Start();
         RefreshStatus();
+        if (host.Settings.CheckAppUpdates) _ = CheckUpdatesLaterAsync();
     }
+
+    private async Task CheckUpdatesLaterAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(8)); // açılışı yavaşlatmasın
+        await CheckUpdatesAsync(manual: false);
+    }
+
+    /// <summary>GitHub'daki son sürümü denetler; elle istenince "güncel" ya da "denetlenemedi" de der.</summary>
+    public async Task CheckUpdatesAsync(bool manual)
+    {
+        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var r = await AppUpdate.CheckAsync(_host.Http, cts.Token);
+        var current = typeof(MainViewModel).Assembly.GetName().Version ?? new System.Version(0, 0, 0);
+        if (r is not null && AppUpdate.IsNewer(r, current))
+        {
+            Update = r;
+            ShowToast($"Vidra {r.Tag} çıktı", "Sürüm notları", () => OpenInBrowser(r.Url));
+        }
+        else if (manual) ShowToast(r is null ? "Güncelleme denetlenemedi: GitHub'a ulaşılamadı" : $"Vidra güncel ({Version})");
+    }
+
+    [RelayCommand] private void OpenUpdate() { if (Update is { } r) OpenInBrowser(r.Url); }
+
+    partial void OnIncognitoChanged(bool value)
+    {
+        _host.Queue.Incognito = value;
+        ShowToast(value ? "Gizli mod açık: yeni indirmeler geçmişe ve arşive yazılmaz" : "Gizli mod kapandı");
+    }
+
+    [RelayCommand] private void ToggleIncognito() => Incognito = !Incognito;
 
     partial void OnPageChanged(Page value)
     {
+        Palette.Close();
         Current = value switch
         {
             Page.Search => Search,
@@ -101,6 +156,80 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public void Go(Page p) => Page = p;
+
+    /// <summary>Ctrl+1…9 ve palet: sayfa adıyla geçiş.</summary>
+    [RelayCommand]
+    private void GoTo(string? page)
+    {
+        if (Enum.TryParse<Page>(page, out var p)) Go(p);
+    }
+
+    [RelayCommand]
+    private void OpenPalette()
+    {
+        if (!Setup.IsVisible) Palette.Open();
+    }
+
+    /// <summary>Metin kutusu dışında Ctrl+V: panodaki bağlantıyı hangi ekrandan olursa olsun aç.</summary>
+    public async Task PasteAsync()
+    {
+        string text;
+        try { text = System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText() : ""; }
+        catch (System.Runtime.InteropServices.ExternalException) { return; } // pano başka uygulamada kilitli
+        ClipboardLink = null; // aynı bağlantı için üstteki şerit artık gereksiz
+        if (!await OpenTextAsync(text, "Pano")) ShowToast("Panoda YouTube bağlantısı yok");
+    }
+
+    /// <summary>
+    /// Sürükle-bırak, pano, .url/.txt dosyası: birden çok video bağlantısı → hepsi kuyruğa; tek bağlantı → türüne göre ekran.
+    /// </summary>
+    /// <returns>Metinde YouTube bağlantısı yoksa false.</returns>
+    public async Task<bool> OpenTextAsync(string text, string source)
+    {
+        var links = YouTubeUrl.ExtractLinks(text);
+        if (links.Count == 0) return false;
+        var videos = links.Where(l => YouTubeUrl.Classify(l) == LinkKind.Video).ToList();
+        if (videos.Count >= 2) Download.EnqueueLinks(videos, source);
+        else await OpenLinkAsync(links[0]);
+        return true;
+    }
+
+    /// <summary>Kısa bildirim; eylemli olanlar ("Geri al") daha uzun kalır. Yenisi eskisinin yerine geçer.</summary>
+    public void ShowToast(string text, string? actionLabel = null, Action? action = null)
+    {
+        Toast = new ToastMessage(text, actionLabel, action);
+        _toastTimer.Stop();
+        _toastTimer.Interval = TimeSpan.FromSeconds(action is null ? 3.5 : 7);
+        // Fare zaten bildirimin üstündeyse yenisi de altından kaybolmasın (ayrılınca süre işler)
+        if (!_toastHeld) _toastTimer.Start();
+    }
+
+    /// <summary>Fare bildirimin üstündeyken kapanmasın (okurken ya da "Geri al"a uzanırken).</summary>
+    public void HoldToast(bool hold)
+    {
+        _toastHeld = hold;
+        if (Toast is null) return;
+        _toastTimer.Stop();
+        if (hold) return;
+        _toastTimer.Interval = TimeSpan.FromSeconds(2.5);
+        _toastTimer.Start();
+    }
+
+    [RelayCommand]
+    private void ToastAction()
+    {
+        var t = Toast;
+        Toast = null;
+        _toastHeld = false;
+        t?.Action?.Invoke();
+    }
+
+    [RelayCommand]
+    private void DismissToast()
+    {
+        Toast = null;
+        _toastHeld = false; // bildirim kapanınca MouseLeave gelmez
+    }
 
     /// <summary>Kartlardaki "YouTube'da aç": yalnızca http(s) adresleri varsayılan tarayıcıya gider.</summary>
     [RelayCommand]
@@ -159,6 +288,18 @@ public sealed partial class MainViewModel : ObservableObject
         var next = ThemeService.IsDark ? ThemeMode.Light : ThemeMode.Dark;
         _host.SettingsStore.Update(s => s.Theme = next);
         ThemeService.Apply(next);
+    }
+
+    private void RefreshProgress()
+    {
+        var p = QueueProgress.From(_host.Queue.Jobs);
+        if (p != Progress) Progress = p;
+        // İndirirken ya da zamanlanmış başlangıç beklenirken sistem uykuya geçmesin (ekran yine kapanabilir)
+        PowerService.KeepAwake(_host.Settings.KeepAwake && (p.Running > 0 || (QueueVm.IsScheduled && p.Paused + p.Queued > 0)));
+        var tip = p.IsEmpty ? "Vidra" : $"Vidra · {p.Describe()}" + (p.Speed > 0 ? $" · {Fmt.Speed(p.Speed)}" : "");
+        if (tip == _trayTip) return;
+        _trayTip = tip;
+        _host.Tray?.SetTooltip(tip);
     }
 
     public void RefreshStatus()

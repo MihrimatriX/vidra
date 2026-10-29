@@ -92,6 +92,29 @@ public static partial class YouTubeUrl
             .Distinct()
             .ToList();
 
+    // Solda harf/nokta/tire olmamalı: "notyoutube.com" ya da "evil.youtube.com.example" eşleşmesin
+    [GeneratedRegex(@"(?<![\w.-])(?:https?://)?(?:(?:www|m|music)\.)?(?:youtube\.com|youtu\.be)/[^\s""'<>]+", RegexOptions.IgnoreCase)]
+    private static partial Regex LinkInText();
+
+    /// <summary>
+    /// Serbest metindeki her türden YouTube bağlantısı (sürükle-bırak, .url/.txt dosyaları): "URL=…" gibi önekler,
+    /// parantez/nokta gibi sondaki noktalama ve eksik şema tolere edilir. Sıra korunur; aynı video farklı
+    /// biçimde (youtu.be / watch?v=) iki kez geçse de bir kez alınır.
+    /// </summary>
+    public static IReadOnlyList<string> ExtractLinks(string text)
+    {
+        var list = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Match m in LinkInText().Matches(text))
+        {
+            var s = m.Value.TrimEnd(')', ']', '>', '.', ',', ';', '!', '?');
+            if (!s.StartsWith("http", StringComparison.OrdinalIgnoreCase)) s = "https://" + s;
+            if (Classify(s) is not { } kind) continue;
+            if (seen.Add(kind == LinkKind.Video && VideoId(s) is { } id ? "v:" + id : s)) list.Add(s);
+        }
+        return list;
+    }
+
     private static string? QueryValue(Uri u, string key)
     {
         foreach (var pair in u.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))

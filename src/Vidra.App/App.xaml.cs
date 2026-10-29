@@ -63,6 +63,18 @@ public partial class App : Application
     private void StartApp(StartupEventArgs e)
     {
         _host = new AppHost();
+#if DEBUG
+        // Ekran görüntüsü turu: kendi ayarlarıyla, dış etkiler (güncelleme bildirimi, pano, tepsi balonu) kapalı
+        var tour = e.Args.Length > 1 && e.Args[0] == "--screenshot-tour";
+        if (tour)
+            _host.SettingsStore.Update(s =>
+            {
+                s.CheckAppUpdates = false;
+                s.WatchClipboard = false;
+                s.Notifications = false;
+                s.Window = null;
+            });
+#endif
         ThemeService.Apply(_host.Settings.Theme);
 
         var vm = new MainViewModel(_host);
@@ -93,6 +105,7 @@ public partial class App : Application
         {
             try
             {
+                window.SavePlacement(); // OnClosing yolu çalışmaz; ayarlar aşağıda hemen yazılır
                 _host.Queue.BeginShutdown();
                 _host.Queue.PauseAll();
                 _host.Queue.SavePendingAsync().GetAwaiter().GetResult();
@@ -104,6 +117,13 @@ public partial class App : Application
         _pipeCts = new CancellationTokenSource();
         _ = ListenForLinksAsync(vm, _pipeCts.Token);
 
+#if DEBUG
+        if (tour)
+        {
+            _ = ScreenshotTour.RunAsync(window, vm, _host, e.Args[1]);
+            return;
+        }
+#endif
         if (e.Args.Length > 0 && e.Args[0].Length > 0) _ = vm.OpenLinkAsync(e.Args[0]);
     }
 
