@@ -9,7 +9,8 @@
         Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
         FontFamily="{StaticResource UiFont}" FontSize="13"
         TextOptions.TextFormattingMode="Display" UseLayoutRounding="True"
-        AllowDrop="True" PreviewDragEnter="Window_PreviewDragEnter" PreviewDragOver="Window_PreviewDragOver">
+        AllowDrop="True" PreviewDragEnter="Window_PreviewDragEnter" PreviewDragOver="Window_PreviewDragOver"
+        PreviewDragLeave="Window_PreviewDragLeave" PreviewDrop="Window_PreviewDrop">
   <!-- Kendi başlık çubuğumuz: içerik pencerenin en üstüne kadar uzanır, üst 36px sürüklenebilir -->
   <WindowChrome.WindowChrome>
     <WindowChrome CaptionHeight="36" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
@@ -290,7 +291,7 @@
 
     <!-- ============ Sürükle-bırak katmanı (sürükleme pencereye girince görünür) ============ -->
     <Grid x:Name="DropLayer" Grid.RowSpan="2" Grid.ColumnSpan="2" Background="#B3101115" AllowDrop="True" Visibility="Collapsed"
-          DragOver="DropLayer_DragOver" DragLeave="DropLayer_DragLeave" Drop="DropLayer_Drop">
+          DragLeave="DropLayer_DragLeave">
       <Border IsHitTestVisible="False" Width="440" Padding="30" CornerRadius="18" Background="{DynamicResource Surface}"
               HorizontalAlignment="Center" VerticalAlignment="Center">
         <Grid>
@@ -309,7 +310,8 @@
 
     <!-- ============ Komut paleti (Ctrl+K) ============ -->
     <Grid x:Name="PaletteLayer" Grid.RowSpan="2" Grid.ColumnSpan="2" Background="#73101115" DataContext="{Binding Palette}"
-          Visibility="{Binding IsOpen, Converter={StaticResource Vis}}" MouseLeftButtonDown="PaletteBackdrop_MouseDown">
+          Visibility="{Binding IsOpen, Converter={StaticResource Vis}}" MouseLeftButtonDown="PaletteBackdrop_MouseDown"
+          KeyboardNavigation.TabNavigation="Cycle">
       <Border Style="{StaticResource Card}" Width="620" VerticalAlignment="Top" HorizontalAlignment="Center"
               Margin="20,84,20,40" CornerRadius="16">
         <Border.Effect>

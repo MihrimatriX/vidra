@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private IInputElement? _focusBeforePalette;
     private ThumbButtonInfo? _thumbPause;
     private ThumbButtonInfo? _thumbResume;
+    private WindowState _lastShownState = WindowState.Normal;
 
     /// <summary>Kütüphaneden dışarı dosya sürüklenirken kendi penceremiz bırakma hedefi olmasın.</summary>
     internal static bool InternalDrag { get; set; }
@@ -37,6 +38,8 @@ public partial class MainWindow : Window
         RestorePlacement();
         SetupTaskbar();
         SourceInitialized += (_, _) => ThemeService.ApplyTitleBar(this);
+        // Simge durumuna küçültmeden önceki hâl: ekranı kaplıyorken küçültülüp kapatılırsa yine kaplı açılsın
+        StateChanged += (_, _) => { if (WindowState != WindowState.Minimized) _lastShownState = WindowState; };
         vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MainViewModel.Progress)) UpdateTaskbar(vm.Progress); };
         vm.Palette.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen)) OnPaletteToggled(vm.Palette.IsOpen); };
     }
@@ -99,11 +102,12 @@ public partial class MainWindow : Window
         if (b.Maximized) WindowState = WindowState.Maximized;
     }
 
-    private void SavePlacement()
+    /// <summary>Kapanışta ve oturum kapanırken (App.SessionEnding) çağrılır.</summary>
+    internal void SavePlacement()
     {
         var r = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
         if (r.IsEmpty || double.IsNaN(r.Width) || r.Width < 100) return;
-        var max = WindowState == WindowState.Maximized;
+        var max = WindowState == WindowState.Maximized || (WindowState == WindowState.Minimized && _lastShownState == WindowState.Maximized);
         _host.SettingsStore.Update(s => s.Window = new WindowBounds(r.Left, r.Top, r.Width, r.Height, max));
     }
 
@@ -178,7 +182,8 @@ public partial class MainWindow : Window
             // Metin kutusu dışında yapıştır: bağlantıyı hangi ekrandan olursa olsun aç
             case Key.V when !IsTextInput(Keyboard.FocusedElement):
                 e.Handled = true;
-                _ = _vm.PasteAsync();
+                // Basılı tutunca tekrar eden tuş aynı bağlantıları yeniden kuyruğa almasın
+                if (!e.IsRepeat) _ = _vm.PasteAsync();
                 break;
         }
     }
@@ -225,9 +230,15 @@ public partial class MainWindow : Window
                 Keyboard.Focus(PaletteBox);
             });
         }
-        else if (_focusBeforePalette is UIElement { IsVisible: true } prev)
+        else
         {
-            prev.Focus();
+            // Komut sayfa değiştirebilir (Run önce kapatır, sonra Go): odak yerleşimden sonra, hâlâ görünen öğeye ya da yeni sayfaya
+            var prev = _focusBeforePalette as UIElement;
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+            {
+                if (prev is { IsVisible: true } && prev.Focus()) return;
+                PageHost.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+            });
         }
     }
 
@@ -269,30 +280,62 @@ public partial class MainWindow : Window
     private void Window_PreviewDragEnter(object sender, DragEventArgs e)
     {
         if (InternalDrag || _vm.Setup.IsVisible || !LinkDrop.CanAccept(e.Data)) return;
+        // Palet açıksa katman onun altında kalır ve bırakmayı alamaz
+        _vm.Palette.Close();
         DropLayer.Visibility = Visibility.Visible;
     }
 
+    /// <summary>
+    /// Katman görünürken her şey ona gider; görünmüyorsa yalnızca metin kutuları (metin bırakma) kabul eder.
+    /// AllowDrop kalıtıldığı için aksi hâlde her öğe her sürüklemeyi "kabul ediyor" görünür ve bırakılan sessizce yutulur.
+    /// </summary>
     private void Window_PreviewDragOver(object sender, DragEventArgs e)
     {
-        if (!InternalDrag) return;
-        e.Effects = DragDropEffects.None;
-        e.Handled = true;
+        if (DropLayer.Visibility == Visibility.Visible && !InternalDrag)
+        {
+            e.Effects = DragDropEffects.Copy;
+            e.Handled = true;
+        }
+        else if (InternalDrag || !IsInTextBox(e.OriginalSource))
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+        }
     }
 
-    private void DropLayer_DragOver(object sender, DragEventArgs e)
+    /// <summary>Sürükleme pencereden çıktı (kenar şeridinden çıkışta katman DragLeave almaz).</summary>
+    private void Window_PreviewDragLeave(object sender, DragEventArgs e)
     {
-        e.Effects = DragDropEffects.Copy;
-        e.Handled = true;
+        var p = e.GetPosition(this);
+        if (p.X <= 0 || p.Y <= 0 || p.X >= ActualWidth || p.Y >= ActualHeight) DropLayer.Visibility = Visibility.Collapsed;
     }
 
     private void DropLayer_DragLeave(object sender, DragEventArgs e) => DropLayer.Visibility = Visibility.Collapsed;
 
-    private async void DropLayer_Drop(object sender, DragEventArgs e)
+    /// <summary>Bırakma nereye düşerse düşsün (katman, kenar şeridi) burada işlenir; katman her durumda kapanır.</summary>
+    private async void Window_PreviewDrop(object sender, DragEventArgs e)
     {
+        if (DropLayer.Visibility != Visibility.Visible)
+        {
+            if (InternalDrag || !IsInTextBox(e.OriginalSource))
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+            }
+            return;
+        }
         DropLayer.Visibility = Visibility.Collapsed;
+        e.Effects = DragDropEffects.Copy;
         e.Handled = true;
         var text = LinkDrop.ReadText(e.Data);
         Activate();
         if (text is null || !await _vm.OpenTextAsync(text, "Sürükle-bırak")) _vm.ShowToast("Bırakılanda YouTube bağlantısı bulunamadı");
+    }
+
+    private static bool IsInTextBox(object source)
+    {
+        for (var d = source as DependencyObject; d is not null; d = d is Visual ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+            if (d is TextBoxBase) return true;
+        return false;
     }
 }

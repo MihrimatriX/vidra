@@ -15,7 +15,11 @@ public partial class LibraryView : UserControl
     private Point _dragStart;
     private HistoryEntry? _dragItem;
 
-    public LibraryView() => InitializeComponent();
+    public LibraryView()
+    {
+        InitializeComponent();
+        PreviewMouseLeftButtonUp += (_, _) => _dragItem = null; // tıklama bitti: sürükleme adayı yok
+    }
 
     private void Cards_SizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -35,7 +39,13 @@ public partial class LibraryView : UserControl
     /// <summary>Kartı dışarı sürükle: dosya Gezgin'e, bir sohbet uygulamasına ya da düzenleyiciye kopyalanır.</summary>
     private void Card_MouseMove(object sender, MouseEventArgs e)
     {
-        if (_dragItem is not { FilePath: { } path } || e.LeftButton != MouseButtonState.Pressed) return;
+        // Basış başka kartta başladıysa ya da tuş bırakıldıysa eski aday sürüklenmesin
+        if (e.LeftButton != MouseButtonState.Pressed || !ReferenceEquals((sender as FrameworkElement)?.DataContext, _dragItem))
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) _dragItem = null;
+            return;
+        }
+        if (_dragItem is not { FilePath: { } path }) return;
         var delta = e.GetPosition(this) - _dragStart;
         if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance) return;
         _dragItem = null;
