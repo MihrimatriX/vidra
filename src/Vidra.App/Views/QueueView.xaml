@@ -297,10 +297,12 @@
                   </Border>
                   <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
-                    <TextBlock Margin="0,4,0,0" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Text2}" FontSize="12.5">
-                      <Run Text="{Binding Options, Mode=OneWay, Converter={StaticResource Desc}}" FontFamily="{StaticResource MonoFont}" /><Run
-                           Text="{Binding Source, Mode=OneWay, StringFormat='  ·  {0}'}" Foreground="{DynamicResource Muted}" />
-                    </TextBlock>
+                    <!-- Kaynak (ör. "Playlist: …") yalnızca varsa: boşken ayraç da görünmesin -->
+                    <DockPanel Margin="0,4,0,0">
+                      <TextBlock DockPanel.Dock="Left" Text="{Binding Options, Converter={StaticResource Desc}}" Style="{StaticResource Mono}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding Source, StringFormat='  ·  {0}'}" Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                 Visibility="{Binding Source, Converter={StaticResource Vis}}" />
+                    </DockPanel>
                   </StackPanel>
                 </DockPanel>
 
