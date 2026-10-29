@@ -72,7 +72,7 @@ public sealed partial class Toggle(string id, string label, string? hint, bool o
 /// </summary>
 public sealed partial class CardGrid : ObservableObject
 {
-    private const double MinCard = 230;
+    private const double MinCard = 250;
     private IReadOnlyList<object> _items = [];
 
     public System.Collections.ObjectModel.ObservableCollection<object[]> Rows { get; } = [];
@@ -90,7 +90,7 @@ public sealed partial class CardGrid : ObservableObject
     {
         if (width <= 0) return;
         var cols = Math.Max(1, (int)(width / MinCard));
-        ThumbHeight = Math.Max(60, Math.Round((width / cols - 26) * 9 / 16));
+        ThumbHeight = Math.Max(60, Math.Round((width / cols - 38) * 9 / 16)); // kart: 16 aralık + 2×10 iç boşluk + kenarlık
         if (cols == Columns && Rows.Count > 0) return;
         Columns = cols;
         Rebuild();
@@ -127,12 +127,12 @@ public static class Ui
     }
 }
 
-/// <summary>RadioButton ↔ enum için iki yönlü dönüştürücü.</summary>
+/// <summary>RadioButton ↔ enum için iki yönlü dönüştürücü. "Queue|Log": ikisinde de seçili görünür, tıklayınca ilkine geçer.</summary>
 public sealed class EnumBoolConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        string.Equals(value?.ToString(), parameter?.ToString(), StringComparison.Ordinal);
+        parameter?.ToString()?.Split('|').Contains(value?.ToString(), StringComparer.Ordinal) ?? false;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is true && parameter is string s ? Enum.Parse(targetType, s) : Binding.DoNothing;
+        value is true && parameter is string s ? Enum.Parse(targetType, s.Split('|')[0]) : Binding.DoNothing;
 }

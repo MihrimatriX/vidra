@@ -10,7 +10,7 @@
       <Setter Property="Padding" Value="10,4" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
       <Setter Property="TextElement.Foreground" Value="{DynamicResource Text2}" />
-      <Setter Property="TextElement.FontSize" Value="12" />
+      <Setter Property="TextElement.FontSize" Value="12.5" />
       <Setter Property="TextElement.FontWeight" Value="SemiBold" />
       <Style.Triggers>
         <DataTrigger Binding="{Binding Status}" Value="Running">
@@ -39,9 +39,9 @@
       </Style.Triggers>
     </Style>
     <Style x:Key="JobCard" TargetType="Border" BasedOn="{StaticResource Card}">
-      <Setter Property="CornerRadius" Value="12" />
-      <Setter Property="Padding" Value="12,9" />
-      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="16,12" />
+      <Setter Property="Margin" Value="0,0,0,10" />
       <Style.Triggers>
         <DataTrigger Binding="{Binding Status}" Value="Error">
           <Setter Property="BorderBrush" Value="{DynamicResource WarnLine}" />
@@ -73,409 +73,440 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="{DynamicResource Raised}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
-      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="Padding" Value="16,10" />
       <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Surface2}" /></Trigger>
       </Style.Triggers>
     </Style>
   </UserControl.Resources>
 
-  <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="20,14,20,24">
-      <!-- Başlık -->
-      <DockPanel Margin="0,0,0,10">
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-          <TextBlock Text="Aynı anda" FontSize="13" Foreground="{DynamicResource Text2}" VerticalAlignment="Center" Margin="0,0,8,0" />
-          <Border BorderBrush="{DynamicResource Line2}" BorderThickness="1" CornerRadius="10" Background="{DynamicResource Surface}" Margin="0,0,12,0">
-            <StackPanel Orientation="Horizontal">
-              <Button Style="{StaticResource BtnIcon}" BorderThickness="0" Background="Transparent" Content="−" Command="{Binding DecConcurrencyCommand}" ToolTip="Azalt" />
-              <TextBlock Text="{Binding Concurrency}" Width="24" TextAlignment="Center" VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" />
-              <Button Style="{StaticResource BtnIcon}" BorderThickness="0" Background="Transparent" Content="+" Command="{Binding IncConcurrencyCommand}" ToolTip="Artır" />
-            </StackPanel>
-          </Border>
-          <Button Command="{Binding PauseAllCommand}" Margin="0,0,8,0">
-            <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Pause}" Size="15" Margin="0,0,8,0" /><TextBlock Text="Tümünü duraklat" /></StackPanel>
-          </Button>
-          <Button Command="{Binding ResumeAllCommand}" Margin="0,0,8,0">
-            <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Play}" Size="15" Margin="0,0,8,0" /><TextBlock Text="Tümünü sürdür" /></StackPanel>
-          </Button>
-          <ToggleButton Style="{StaticResource Pill}" Margin="0" IsChecked="{Binding SleepWhenDone}" Content="Bitince uyut" VerticalAlignment="Center" />
-        </StackPanel>
-        <TextBlock Style="{StaticResource H1}" Text="Kuyruk" />
-      </DockPanel>
+  <!-- Kuyruk ve geçmiş ayrı sekmelerde; ikisi de pencereyi doldurur ve kendi içinde kayar (iç içe kaydırma yok) -->
+  <Grid Margin="{StaticResource PagePadFill}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
 
-      <!-- Özet -->
-      <WrapPanel Margin="0,0,0,6">
-        <WrapPanel.Resources>
-          <Style TargetType="Border" BasedOn="{StaticResource Tile}">
-            <Setter Property="Padding" Value="10,5" />
-            <Setter Property="Margin" Value="0,0,6,6" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="TextElement.FontSize" Value="12.5" />
-          </Style>
-        </WrapPanel.Resources>
-        <Border><TextBlock><Run Text="{Binding RunningCount, Mode=OneWay}" FontWeight="SemiBold" /> indiriliyor</TextBlock></Border>
-        <Border><TextBlock><Run Text="{Binding QueuedCount, Mode=OneWay}" FontWeight="SemiBold" /> sırada</TextBlock></Border>
-        <Border><TextBlock><Run Text="{Binding PausedCount, Mode=OneWay}" FontWeight="SemiBold" /> duraklatıldı</TextBlock></Border>
-        <Border Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}" TextElement.Foreground="{DynamicResource Warn}"
-                Visibility="{Binding ErrorCount, Converter={StaticResource Vis}}">
+    <!-- Başlık; sağda açık sekmenin araçları -->
+    <DockPanel Margin="0,0,0,10">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                  Visibility="{Binding IsHistory, Converter={StaticResource Vis}, ConverterParameter=!}">
+        <TextBlock Text="Aynı anda" Foreground="{DynamicResource Text2}" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <Border BorderBrush="{DynamicResource Line2}" BorderThickness="1" CornerRadius="10" Background="{DynamicResource Surface}" Margin="0,0,12,0"
+                ToolTip="Aynı anda kaç video indirilsin">
           <StackPanel Orientation="Horizontal">
-            <TextBlock VerticalAlignment="Center"><Run Text="{Binding ErrorCount, Mode=OneWay}" FontWeight="SemiBold" /> dikkat gerekiyor</TextBlock>
-            <Button Style="{StaticResource BtnSm}" MinHeight="22" Padding="8,0" Margin="10,-2,-4,-2" Content="Hepsini tekrar dene"
-                    Command="{Binding RetryFailedCommand}" ToolTip="Hata almış işlerin hepsini yeniden sıraya koy" />
+            <Button Style="{StaticResource BtnIcon}" BorderThickness="0" Background="Transparent" Content="−" Command="{Binding DecConcurrencyCommand}" ToolTip="Azalt" />
+            <TextBlock Text="{Binding Concurrency}" Width="24" TextAlignment="Center" VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" />
+            <Button Style="{StaticResource BtnIcon}" BorderThickness="0" Background="Transparent" Content="+" Command="{Binding IncConcurrencyCommand}" ToolTip="Artır" />
           </StackPanel>
         </Border>
-        <Border Visibility="{Binding RunningCount, Converter={StaticResource Vis}}">
-          <StackPanel Orientation="Horizontal" ToolTip="Kuyruğun toplam ilerlemesi ve hızı">
-            <TextBlock Text="{Binding DataContext.Progress.Percent, RelativeSource={RelativeSource AncestorType=Window}, StringFormat={}%{0}}" FontWeight="SemiBold"
-                       VerticalAlignment="Center" Margin="0,0,8,0" />
-            <TextBlock Text="{Binding Queue.TotalSpeed, Converter={StaticResource Bytes}, ConverterParameter=speed}" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <Viewbox Stretch="Fill" Width="60" Height="14" Margin="8,0,0,0">
-              <Canvas Width="120" Height="22">
-                <Polyline Points="{Binding Sparkline}" Stroke="{DynamicResource AccentStrong}" StrokeThickness="2" StrokeLineJoin="Round" />
-              </Canvas>
-            </Viewbox>
-          </StackPanel>
-        </Border>
-        <!-- Zamanlama: kuyruk duraklatılır, saat gelince kendiliğinden başlar (sonradan eklenenler de bekler) -->
-        <Border Padding="6,2" Visibility="{Binding IsScheduled, Converter={StaticResource Vis}, ConverterParameter=!}">
-          <StackPanel Orientation="Horizontal">
-            <c:Icon Data="{StaticResource I.Clock}" Size="14" Margin="4,0,6,0" VerticalAlignment="Center" />
-            <TextBlock Text="Şu saatte başlat" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <TextBox Width="76" Padding="6,0" Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" VerticalContentAlignment="Center"
-                     Margin="0,0,6,0" AutomationProperties.Name="Başlama saati" />
-            <Button Style="{StaticResource BtnSm}" MinHeight="24" Padding="8,0" Content="Zamanla" Command="{Binding SetScheduleCommand}"
-                    ToolTip="Kuyruğu şimdi duraklatır, bu saatte kendiliğinden başlatır" />
-          </StackPanel>
-        </Border>
-        <Border Padding="6,2" Background="{DynamicResource AccentSoft}" Visibility="{Binding IsScheduled, Converter={StaticResource Vis}}">
-          <StackPanel Orientation="Horizontal">
-            <c:Icon Data="{StaticResource I.Clock}" Size="14" Margin="4,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentStrong}" />
-            <TextBlock Text="{Binding ScheduleLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-            <Button Style="{StaticResource BtnSm}" MinHeight="24" Padding="8,0" Content="İptal" Command="{Binding CancelScheduleCommand}" />
-          </StackPanel>
-        </Border>
-        <TextBlock Text="{Binding ScheduleError}" Foreground="{DynamicResource Warn}" VerticalAlignment="Center" Margin="4,0,0,6"
-                   Visibility="{Binding ScheduleError, Converter={StaticResource Vis}}" />
-        <Button Style="{StaticResource BtnSm}" Margin="0,0,6,6" VerticalAlignment="Top" Command="{Binding CancelAllCommand}"
-                Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}}" ToolTip="Kuyruktaki her işi iptal et (bildirimden geri alınabilir)">
-          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.X}" Size="13" Margin="0,0,6,0" /><TextBlock Text="Kuyruğu boşalt" /></StackPanel>
+        <Button Command="{Binding PauseAllCommand}" Margin="0,0,8,0">
+          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Pause}" Size="15" Margin="0,0,8,0" /><TextBlock Text="Tümünü duraklat" /></StackPanel>
         </Button>
-      </WrapPanel>
-
-      <Grid Margin="0,0,0,24">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="14" />
-          <ColumnDefinition Width="320" />
-        </Grid.ColumnDefinitions>
-
-        <!-- İşler -->
-        <StackPanel>
-          <Border Style="{StaticResource Tile}" BorderBrush="{DynamicResource Line2}" Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}, ConverterParameter=!}">
-            <TextBlock Style="{StaticResource Body2}" Text="Kuyruk boş. İndir ekranından ya da bir playlist'ten video ekleyebilir, bağlantıyı pencereye sürükleyip bırakabilirsin." />
-          </Border>
-          <ItemsControl ItemsSource="{Binding Queue.Jobs}" Style="{StaticResource VirtualList}" MaxHeight="480">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Border Style="{StaticResource JobCard}" Tag="{Binding DataContext, ElementName=Root}">
-                  <Border.InputBindings>
-                    <MouseBinding MouseAction="LeftClick" Command="{Binding DataContext.SelectCommand, ElementName=Root}" CommandParameter="{Binding}" />
-                  </Border.InputBindings>
-                  <!-- Menü ayrı bir görsel ağaçta: komutlara kartın Tag'indeki görünüm modeli üzerinden ulaşılır -->
-                  <Border.ContextMenu>
-                    <ContextMenu>
-                      <MenuItem Header="Duraklat" Style="{StaticResource MiPause}" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.PauseCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Pause}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Devam et" Style="{StaticResource MiResume}" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.ResumeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Tekrar dene" Style="{StaticResource MiRetry}" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.RetryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Refresh}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Sıranın başına al" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.MoveToFrontCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.ArrowUp}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Sıranın sonuna al" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.MoveToEndCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.ArrowDown}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator />
-                      <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="yt-dlp komutunu kopyala" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.CopyCommandCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Copy}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator />
-                      <MenuItem Header="İptal et" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.CancelCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.X}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                    </ContextMenu>
-                  </Border.ContextMenu>
-                  <StackPanel>
-                    <DockPanel>
-                      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Style="{StaticResource StatusPill}" Margin="0,0,10,0" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Stage}" />
-                        </Border>
-                        <Button ToolTip="Duraklat" Margin="0,0,6,0"
-                                Command="{Binding DataContext.PauseCommand, ElementName=Root}" CommandParameter="{Binding}">
-                          <c:Icon Data="{StaticResource I.Pause}" Size="15" />
-                          <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource BtnIcon}">
-                              <Setter Property="Visibility" Value="Collapsed" />
-                              <Style.Triggers>
-                                <DataTrigger Binding="{Binding Status}" Value="Running"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
-                                <DataTrigger Binding="{Binding Status}" Value="Queued"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
-                              </Style.Triggers>
-                            </Style>
-                          </Button.Style>
-                        </Button>
-                        <Button ToolTip="Devam et" Margin="0,0,6,0" Command="{Binding DataContext.ResumeCommand, ElementName=Root}" CommandParameter="{Binding}">
-                          <c:Icon Data="{StaticResource I.Play}" Size="15" />
-                          <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource BtnIcon}">
-                              <Setter Property="Visibility" Value="Collapsed" />
-                              <Style.Triggers>
-                                <DataTrigger Binding="{Binding Status}" Value="Paused"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
-                              </Style.Triggers>
-                            </Style>
-                          </Button.Style>
-                        </Button>
-                        <Button Style="{StaticResource BtnIcon}" ToolTip="İptal et" Command="{Binding DataContext.CancelCommand, ElementName=Root}" CommandParameter="{Binding}">
-                          <c:Icon Data="{StaticResource I.X}" Size="15" />
-                        </Button>
-                      </StackPanel>
-                      <Border DockPanel.Dock="Left" Width="72" Height="40" CornerRadius="6" Background="{DynamicResource ThumbBg}" Margin="0,0,12,0">
-                        <Border.Clip><RectangleGeometry Rect="0,0,72,40" RadiusX="6" RadiusY="6" /></Border.Clip>
-                        <Image Source="{Binding Thumbnail, Converter={StaticResource Thumb}, ConverterParameter=192}" Stretch="UniformToFill" />
-                      </Border>
-                      <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13.5" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding Options, Converter={StaticResource Desc}}" Style="{StaticResource Mono}" Margin="0,2,0,0" />
-                      </StackPanel>
-                    </DockPanel>
-
-                    <!-- İlerleme -->
-                    <StackPanel Margin="0,8,0,0">
-                      <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                          <Style.Triggers>
-                            <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
-                          </Style.Triggers>
-                        </Style>
-                      </StackPanel.Style>
-                      <ProgressBar Style="{StaticResource JobBar}" Maximum="100" Value="{Binding Percent, Mode=OneWay}" />
-                      <WrapPanel Margin="0,4,0,0" TextElement.FontFamily="{StaticResource MonoFont}" TextElement.FontSize="12" TextElement.Foreground="{DynamicResource Text2}">
-                        <TextBlock Text="{Binding Percent, StringFormat={}%{0:0}}" Margin="0,0,16,0" />
-                        <TextBlock Margin="0,0,16,0"><Run Text="{Binding Downloaded, Mode=OneWay, Converter={StaticResource Bytes}}" /> / <Run Text="{Binding Total, Mode=OneWay, Converter={StaticResource Bytes}}" /></TextBlock>
-                        <TextBlock Text="{Binding Speed, Converter={StaticResource Bytes}, ConverterParameter=speed}" Margin="0,0,16,0" />
-                        <TextBlock Visibility="{Binding Eta, Converter={StaticResource Vis}}"><Run Text="kalan" /> <Run Text="{Binding Eta, Mode=OneWay, Converter={StaticResource Dur}}" /></TextBlock>
-                      </WrapPanel>
-                    </StackPanel>
-
-                    <!-- Hata -->
-                    <Border Style="{StaticResource Notice}" Margin="0,8,0,0" Padding="10,8" Visibility="{Binding ErrorMessage, Converter={StaticResource Vis}}">
-                      <DockPanel>
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                          <Button Style="{StaticResource BtnSm}" Content="Hesabım" Margin="0,0,8,0" Command="{Binding DataContext.OpenAccountCommand, ElementName=Root}">
-                            <Button.Visibility>
-                              <Binding Path="ErrorKind" Converter="{StaticResource EqVis}" ConverterParameter="Auth" />
-                            </Button.Visibility>
-                          </Button>
-                          <Button Style="{StaticResource BtnSm}" Content="Tekrar dene" Command="{Binding DataContext.RetryCommand, ElementName=Root}" CommandParameter="{Binding}" />
-                        </StackPanel>
-                        <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="13" Margin="0,0,12,0" />
-                      </DockPanel>
-                    </Border>
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-
-        <!-- Ayrıntı -->
-        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="18" VerticalAlignment="Top" DataContext="{Binding Selected}"
-                Visibility="{Binding Converter={StaticResource Vis}}">
-          <StackPanel>
-            <TextBlock Style="{StaticResource Eyebrow}" Text="Ayrıntı" />
-            <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" TextWrapping="Wrap" Margin="0,4,0,14" />
-            <Grid Margin="0,0,0,14" TextElement.FontSize="13">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="80" />
-                <ColumnDefinition Width="*" />
-              </Grid.ColumnDefinitions>
-              <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
-              </Grid.RowDefinitions>
-              <TextBlock Text="Durum" Foreground="{DynamicResource Muted}" Margin="0,0,0,8" />
-              <TextBlock Grid.Column="1" Text="{Binding Stage}" Margin="0,0,0,8" />
-              <TextBlock Grid.Row="1" Text="Format" Foreground="{DynamicResource Muted}" Margin="0,0,0,8" />
-              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Options, Converter={StaticResource Desc}}" FontFamily="{StaticResource MonoFont}" FontSize="12" Margin="0,0,0,8" />
-              <TextBlock Grid.Row="2" Text="Kaynak" Foreground="{DynamicResource Muted}" Margin="0,0,0,8" />
-              <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Source, TargetNullValue=Tek video}" TextWrapping="Wrap" Margin="0,0,0,8" />
-              <TextBlock Grid.Row="3" Text="Eklendi" Foreground="{DynamicResource Muted}" Margin="0,0,0,8" />
-              <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CreatedAt, Converter={StaticResource Rel}}" Margin="0,0,0,8" />
-              <TextBlock Grid.Row="4" Text="Dosya" Foreground="{DynamicResource Muted}" />
-              <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding FilePath, TargetNullValue=—}" FontFamily="{StaticResource MonoFont}" FontSize="12" TextWrapping="Wrap" />
-            </Grid>
-            <DockPanel Margin="0,0,0,6">
-              <Button DockPanel.Dock="Right" Style="{StaticResource BtnSm}" Content="Kopyala"
-                      Command="{Binding DataContext.CopyLogCommand, ElementName=Root}" CommandParameter="{Binding}" />
-              <TextBlock Style="{StaticResource Eyebrow}" Text="yt-dlp günlüğü" VerticalAlignment="Center" />
-            </DockPanel>
-            <TextBox Text="{Binding Log.Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" FontSize="11.5"
-                     Height="240" VerticalContentAlignment="Top" Padding="8" Background="{DynamicResource Surface2}" Foreground="{DynamicResource Text2}"
-                     VerticalScrollBarVisibility="Auto" TextChanged="Log_TextChanged" />
-            <WrapPanel Margin="0,12,0,0">
-              <Button Style="{StaticResource BtnSm}" Content="Komutu kopyala" Margin="0,0,8,0"
-                      Command="{Binding DataContext.CopyCommandCommand, ElementName=Root}" CommandParameter="{Binding}" />
-              <Button Style="{StaticResource BtnSm}" Content="Sıranın başına al"
-                      Command="{Binding DataContext.MoveToFrontCommand, ElementName=Root}" CommandParameter="{Binding}" />
-            </WrapPanel>
-          </StackPanel>
+        <Button Command="{Binding ResumeAllCommand}">
+          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Play}" Size="15" Margin="0,0,8,0" /><TextBlock Text="Tümünü sürdür" /></StackPanel>
+        </Button>
+      </StackPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                  Visibility="{Binding IsHistory, Converter={StaticResource Vis}}">
+        <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line2}" BorderThickness="1" CornerRadius="10" Padding="10,0,4,0"
+                Width="280" Height="36" Margin="0,0,8,0">
+          <DockPanel>
+            <c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Search}" Size="15" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+            <TextBox x:Name="SearchBox" Text="{Binding HistoryQuery, UpdateSourceTrigger=PropertyChanged, Delay=250}" BorderThickness="0" Background="Transparent"
+                     Padding="8,0" VerticalContentAlignment="Center" Tag="Başlık veya kanal  (Ctrl+F)" AutomationProperties.Name="Geçmişte ara" />
+          </DockPanel>
         </Border>
-      </Grid>
+        <Button Content="Temizle" Command="{Binding ClearHistoryCommand}" ToolTip="Geçmişi temizle (bildirimden geri alınabilir)" />
+      </StackPanel>
+      <TextBlock Style="{StaticResource H1}" Text="Kuyruk &amp; geçmiş" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+    </DockPanel>
 
-      <!-- Geçmiş -->
-      <DockPanel Margin="0,0,0,12">
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-          <ToggleButton Style="{StaticResource PillSolid}" Margin="0,0,8,0" IsChecked="{Binding HistoryFilter, Converter={StaticResource Eq}, ConverterParameter=all, Mode=OneWay}"
-                        Click="Filter_Click" Tag="all">
-            <TextBlock><Run Text="Hepsi ·" /> <Run Text="{Binding HAll, Mode=OneWay}" /></TextBlock>
-          </ToggleButton>
-          <ToggleButton Style="{StaticResource PillSolid}" Margin="0,0,8,0" IsChecked="{Binding HistoryFilter, Converter={StaticResource Eq}, ConverterParameter=video, Mode=OneWay}"
-                        Click="Filter_Click" Tag="video">
-            <TextBlock><Run Text="Video ·" /> <Run Text="{Binding HVideo, Mode=OneWay}" /></TextBlock>
-          </ToggleButton>
-          <ToggleButton Style="{StaticResource PillSolid}" Margin="0,0,8,0" IsChecked="{Binding HistoryFilter, Converter={StaticResource Eq}, ConverterParameter=audio, Mode=OneWay}"
-                        Click="Filter_Click" Tag="audio">
-            <TextBlock><Run Text="Ses ·" /> <Run Text="{Binding HAudio, Mode=OneWay}" /></TextBlock>
-          </ToggleButton>
-          <ToggleButton Style="{StaticResource PillSolid}" Margin="0,0,12,0" IsChecked="{Binding HistoryFilter, Converter={StaticResource Eq}, ConverterParameter=warn, Mode=OneWay}"
-                        Click="Filter_Click" Tag="warn">
-            <TextBlock><Run Text="Uyarılı ·" /> <Run Text="{Binding HWarn, Mode=OneWay}" /></TextBlock>
-          </ToggleButton>
-          <TextBox x:Name="SearchBox" Width="200" Text="{Binding HistoryQuery, UpdateSourceTrigger=PropertyChanged, Delay=250}" Tag="Başlık veya kanal  (Ctrl+F)" Margin="0,0,8,0"
-                   AutomationProperties.Name="Geçmişte ara" />
-          <Button Style="{StaticResource BtnSm}" Content="Temizle" Command="{Binding ClearHistoryCommand}" />
+    <!-- Sekmeler; sağda kuyruğun toplam ilerlemesi -->
+    <Border Grid.Row="1" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" ToolTip="Kuyruğun toplam ilerlemesi ve hızı">
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsHistory}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                <DataTrigger Binding="{Binding RunningCount}" Value="0"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <TextBlock Text="{Binding DataContext.Progress.Percent, RelativeSource={RelativeSource AncestorType=Window}, StringFormat={}%{0}}" FontWeight="SemiBold"
+                     VerticalAlignment="Center" Margin="0,0,10,0" />
+          <TextBlock Text="{Binding Queue.TotalSpeed, Converter={StaticResource Bytes}, ConverterParameter=speed}" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Viewbox Stretch="Fill" Width="72" Height="16" Margin="10,0,0,0">
+            <Canvas Width="120" Height="22">
+              <Polyline Points="{Binding Sparkline}" Stroke="{DynamicResource AccentStrong}" StrokeThickness="2" StrokeLineJoin="Round" />
+            </Canvas>
+          </Viewbox>
         </StackPanel>
-        <StackPanel VerticalAlignment="Center">
-          <TextBlock Style="{StaticResource H2}" Text="Geçmiş" FontSize="19" />
-          <TextBlock Style="{StaticResource Small}" Text="Çift tık: oynat · sağ tık: diğer işlemler" Margin="0,2,0,0" />
-        </StackPanel>
+        <ListBox Style="{StaticResource Tabs}" ItemsSource="{Binding Sections}" SelectedValue="{Binding Section}" AutomationProperties.Name="Kuyruk ya da geçmiş" />
       </DockPanel>
+    </Border>
 
-      <Border Style="{StaticResource Card}" CornerRadius="16">
-        <StackPanel>
-          <Border Background="{DynamicResource Surface2}" CornerRadius="16,16,0,0" Padding="12,6">
-            <Grid TextElement.FontSize="12" TextElement.Foreground="{DynamicResource Muted}">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*" /><ColumnDefinition Width="1.4*" /><ColumnDefinition Width="140" /><ColumnDefinition Width="80" />
-                <ColumnDefinition Width="70" /><ColumnDefinition Width="110" /><ColumnDefinition Width="310" />
-              </Grid.ColumnDefinitions>
-              <TextBlock Text="Başlık" /><TextBlock Grid.Column="1" Text="Kanal" /><TextBlock Grid.Column="2" Text="Format" /><TextBlock Grid.Column="3" Text="Boyut" />
-              <TextBlock Grid.Column="4" Text="Süre" /><TextBlock Grid.Column="5" Text="Tarih" /><TextBlock Grid.Column="6" Text="İşlem" TextAlignment="Right" />
-            </Grid>
-          </Border>
-          <ItemsControl ItemsSource="{Binding HistoryView}" Style="{StaticResource VirtualList}" MaxHeight="520">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Border Style="{StaticResource HistoryRow}" Tag="{Binding DataContext, ElementName=Root}">
-                  <Border.InputBindings>
-                    <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.OpenOrRevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
-                  </Border.InputBindings>
-                  <Border.ContextMenu>
-                    <ContextMenu>
-                      <MenuItem Header="Oynat" CommandParameter="{Binding}" Visibility="{Binding FilePath, Converter={StaticResource Vis}}"
-                                Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Klasörde göster" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator />
-                      <MenuItem Header="Aynı ayarlarla tekrar indir" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.RedownloadCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Download}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Farklı kalitede indir…" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.ReopenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Video}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator />
-                      <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator />
-                      <MenuItem Header="Dosyayı geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
-                                Visibility="{Binding FilePath, Converter={StaticResource Vis}}"
-                                Command="{Binding PlacementTarget.Tag.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Geçmişten kaldır" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.RemoveHistoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.X}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                    </ContextMenu>
-                  </Border.ContextMenu>
-                  <Grid>
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="3*" /><ColumnDefinition Width="1.4*" /><ColumnDefinition Width="140" /><ColumnDefinition Width="80" />
-                      <ColumnDefinition Width="70" /><ColumnDefinition Width="110" /><ColumnDefinition Width="310" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Title}" FontWeight="Medium" FontSize="13" TextTrimming="CharacterEllipsis" />
-                      <Border Style="{StaticResource ChipWarn}" HorizontalAlignment="Left" Margin="0,4,0,0" ToolTip="{Binding Warning}"
-                              Visibility="{Binding Warning, Converter={StaticResource Vis}}"><TextBlock Text="uyarı" /></Border>
-                      <Border Style="{StaticResource ChipWarn}" HorizontalAlignment="Left" Margin="0,4,0,0"
-                              Visibility="{Binding Status, Converter={StaticResource EqVis}, ConverterParameter=Canceled}"><TextBlock Text="iptal edildi" /></Border>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Style="{StaticResource Cell}" Text="{Binding Channel, TargetNullValue=—}" Foreground="{DynamicResource Text2}" />
-                    <TextBlock Grid.Column="2" Style="{StaticResource CellMono}" Text="{Binding Options, Converter={StaticResource Desc}}" />
-                    <TextBlock Grid.Column="3" Style="{StaticResource CellMono}" Foreground="{DynamicResource Text}" Text="{Binding Size, Converter={StaticResource Bytes}}" />
-                    <TextBlock Grid.Column="4" Style="{StaticResource CellMono}" Text="{Binding Duration, Converter={StaticResource Dur}}" />
-                    <TextBlock Grid.Column="5" Style="{StaticResource Cell}" FontSize="12" Foreground="{DynamicResource Text2}" Text="{Binding FinishedAt, Converter={StaticResource Rel}}" />
-                    <StackPanel Grid.Column="6" Orientation="Horizontal" HorizontalAlignment="Right">
-                      <Button Style="{StaticResource BtnSm}" Content="Oynat" Margin="0,0,6,0" Command="{Binding DataContext.OpenCommand, ElementName=Root}" CommandParameter="{Binding}"
-                              Visibility="{Binding FilePath, Converter={StaticResource Vis}}" />
-                      <Button Style="{StaticResource BtnSm}" Content="Klasör" Margin="0,0,6,0" Command="{Binding DataContext.RevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
-                      <Button Style="{StaticResource BtnSm}" Content="Tekrar" Margin="0,0,6,0" Command="{Binding DataContext.RedownloadCommand, ElementName=Root}" CommandParameter="{Binding}" ToolTip="Aynı ayarlarla tekrar indir" />
-                      <Button Style="{StaticResource BtnSm}" Content="YouTube" Margin="0,0,6,0" ToolTip="Videoyu YouTube'da aç" CommandParameter="{Binding Url}"
-                              Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
-                      <Button Style="{StaticResource BtnIcon}" Width="34" Height="34" MinHeight="34" ToolTip="Geçmişten kaldır"
-                              Command="{Binding DataContext.RemoveHistoryCommand, ElementName=Root}" CommandParameter="{Binding}">
-                        <c:Icon Data="{StaticResource I.Trash}" Size="14" />
-                      </Button>
-                    </StackPanel>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock Style="{StaticResource Body2}" Margin="16" Text="Kayıt yok." Visibility="{Binding HAll, Converter={StaticResource Vis}, ConverterParameter=!}" />
+    <!-- Durum şeridi: kuyrukta sayılar ve hatalar, geçmişte filtreler -->
+    <WrapPanel Grid.Row="2" Margin="0,14,0,8" Visibility="{Binding IsHistory, Converter={StaticResource Vis}, ConverterParameter=!}">
+      <TextBlock Foreground="{DynamicResource Text2}" VerticalAlignment="Center" Margin="2,0,16,6">
+        <Run Text="{Binding RunningCount, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text}" /><Run Text=" indiriliyor  ·  " /><Run
+             Text="{Binding QueuedCount, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text}" /><Run Text=" sırada  ·  " /><Run
+             Text="{Binding PausedCount, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text}" /><Run Text=" duraklatıldı" />
+      </TextBlock>
+      <Border Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}" BorderThickness="1" CornerRadius="10" Padding="12,4,4,4" Margin="0,0,0,6"
+              TextElement.Foreground="{DynamicResource Warn}" Visibility="{Binding ErrorCount, Converter={StaticResource Vis}}">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock VerticalAlignment="Center"><Run Text="{Binding ErrorCount, Mode=OneWay}" FontWeight="SemiBold" /> iş dikkat gerekiyor</TextBlock>
+          <Button Style="{StaticResource BtnSm}" Margin="12,0,0,0" Content="Hepsini tekrar dene"
+                  Command="{Binding RetryFailedCommand}" ToolTip="Hata almış işlerin hepsini yeniden sıraya koy" />
         </StackPanel>
       </Border>
-    </StackPanel>
-  </ScrollViewer>
+    </WrapPanel>
+    <DockPanel Grid.Row="2" Margin="0,14,0,8" Visibility="{Binding IsHistory, Converter={StaticResource Vis}}">
+      <TextBlock DockPanel.Dock="Right" Style="{StaticResource Small}" Text="Çift tık: oynat · sağ tık ya da ⋯: diğer işlemler" VerticalAlignment="Center" Margin="12,0,2,6" />
+      <WrapPanel>
+        <ToggleButton Style="{StaticResource PillSolid}" Margin="0,0,8,6" IsChecked="{Binding HistoryFilter, Converter={StaticResource Eq}, ConverterParameter=all, Mode=OneWay}"
+                      Click="Filter_Click" Tag="all">
+          <TextBlock><Run Text="Hepsi ·" /> <Run Text="{Binding HAll, Mode=OneWay}" /></TextBlock>
+        </ToggleButton>
+        <ToggleButton Style="{StaticResource PillSolid}" Margin="0,0,8,6" IsChecked="{Binding HistoryFilter, Converter={StaticResource Eq}, ConverterParameter=video, Mode=OneWay}"
+                      Click="Filter_Click" Tag="video">
+          <TextBlock><Run Text="Video ·" /> <Run Text="{Binding HVideo, Mode=OneWay}" /></TextBlock>
+        </ToggleButton>
+        <ToggleButton Style="{StaticResource PillSolid}" Margin="0,0,8,6" IsChecked="{Binding HistoryFilter, Converter={StaticResource Eq}, ConverterParameter=audio, Mode=OneWay}"
+                      Click="Filter_Click" Tag="audio">
+          <TextBlock><Run Text="Ses ·" /> <Run Text="{Binding HAudio, Mode=OneWay}" /></TextBlock>
+        </ToggleButton>
+        <ToggleButton Style="{StaticResource PillSolid}" Margin="0,0,8,6" IsChecked="{Binding HistoryFilter, Converter={StaticResource Eq}, ConverterParameter=warn, Mode=OneWay}"
+                      Click="Filter_Click" Tag="warn">
+          <TextBlock><Run Text="Uyarılı ·" /> <Run Text="{Binding HWarn, Mode=OneWay}" /></TextBlock>
+        </ToggleButton>
+      </WrapPanel>
+    </DockPanel>
+
+    <!-- ============ Kuyruk ============ -->
+    <Grid Grid.Row="3" Visibility="{Binding IsHistory, Converter={StaticResource Vis}, ConverterParameter=!}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <!-- İşler -->
+      <Border Style="{StaticResource Tile}" Padding="18" VerticalAlignment="Top" Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}, ConverterParameter=!}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Body2}" Text="Kuyruk boş. İndir ekranından ya da bir playlist'ten video ekleyebilir, bağlantıyı pencereye sürükleyip bırakabilirsin." />
+          <Button Style="{StaticResource BtnLink}" HorizontalAlignment="Left" Padding="0" Margin="0,8,0,0" Command="{Binding ShowHistoryCommand}"
+                  Visibility="{Binding HAll, Converter={StaticResource Vis}}">
+            <TextBlock><Run Text="Geçmişe bak (" /><Run Text="{Binding HAll, Mode=OneWay}" /><Run Text=")" /></TextBlock>
+          </Button>
+        </StackPanel>
+      </Border>
+      <ItemsControl ItemsSource="{Binding Queue.Jobs}" Style="{StaticResource VirtualList}" Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Style="{StaticResource JobCard}" Tag="{Binding DataContext, ElementName=Root}">
+              <Border.InputBindings>
+                <MouseBinding MouseAction="LeftClick" Command="{Binding DataContext.SelectCommand, ElementName=Root}" CommandParameter="{Binding}" />
+              </Border.InputBindings>
+              <!-- Menü ayrı bir görsel ağaçta: komutlara kartın Tag'indeki görünüm modeli üzerinden ulaşılır -->
+              <Border.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Duraklat" Style="{StaticResource MiPause}" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.PauseCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.Pause}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Devam et" Style="{StaticResource MiResume}" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.ResumeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Tekrar dene" Style="{StaticResource MiRetry}" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.RetryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.Refresh}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Sıranın başına al" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.MoveToFrontCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.ArrowUp}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Sıranın sonuna al" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.MoveToEndCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.ArrowDown}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <Separator />
+                  <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Günlüğü göster" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.ShowLogCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.Terminal}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="yt-dlp komutunu kopyala" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.CopyCommandCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.Copy}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                  <Separator />
+                  <MenuItem Header="İptal et" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                            Command="{Binding PlacementTarget.Tag.CancelCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                    <MenuItem.Icon><c:Icon Data="{StaticResource I.X}" Size="15" /></MenuItem.Icon>
+                  </MenuItem>
+                </ContextMenu>
+              </Border.ContextMenu>
+              <StackPanel>
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Style="{StaticResource StatusPill}" Margin="0,0,10,0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Stage}" />
+                    </Border>
+                    <Button ToolTip="Duraklat" Margin="0,0,6,0"
+                            Command="{Binding DataContext.PauseCommand, ElementName=Root}" CommandParameter="{Binding}">
+                      <c:Icon Data="{StaticResource I.Pause}" Size="15" />
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource BtnIcon}">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding Status}" Value="Running"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                            <DataTrigger Binding="{Binding Status}" Value="Queued"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                    <Button ToolTip="Devam et" Margin="0,0,6,0" Command="{Binding DataContext.ResumeCommand, ElementName=Root}" CommandParameter="{Binding}">
+                      <c:Icon Data="{StaticResource I.Play}" Size="15" />
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource BtnIcon}">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding Status}" Value="Paused"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                    <Button Style="{StaticResource BtnIcon}" ToolTip="İptal et" Command="{Binding DataContext.CancelCommand, ElementName=Root}" CommandParameter="{Binding}">
+                      <c:Icon Data="{StaticResource I.X}" Size="15" />
+                    </Button>
+                  </StackPanel>
+                  <Border DockPanel.Dock="Left" Width="96" Height="54" CornerRadius="8" Background="{DynamicResource ThumbBg}" Margin="0,0,14,0">
+                    <Border.Clip><RectangleGeometry Rect="0,0,96,54" RadiusX="8" RadiusY="8" /></Border.Clip>
+                    <Image Source="{Binding Thumbnail, Converter={StaticResource Thumb}, ConverterParameter=192}" Stretch="UniformToFill" />
+                  </Border>
+                  <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                    <TextBlock Text="{Binding Options, Converter={StaticResource Desc}}" Style="{StaticResource Mono}" Margin="0,4,0,0" />
+                  </StackPanel>
+                </DockPanel>
+
+                <!-- İlerleme -->
+                <StackPanel Margin="0,12,0,0">
+                  <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </StackPanel.Style>
+                  <ProgressBar Style="{StaticResource JobBar}" Maximum="100" Value="{Binding Percent, Mode=OneWay}" />
+                  <WrapPanel Margin="0,6,0,0" TextElement.FontFamily="{StaticResource MonoFont}" TextElement.FontSize="12.5" TextElement.Foreground="{DynamicResource Text2}">
+                    <TextBlock Text="{Binding Percent, StringFormat={}%{0:0}}" Margin="0,0,18,0" />
+                    <TextBlock Margin="0,0,18,0"><Run Text="{Binding Downloaded, Mode=OneWay, Converter={StaticResource Bytes}}" /> / <Run Text="{Binding Total, Mode=OneWay, Converter={StaticResource Bytes}}" /></TextBlock>
+                    <TextBlock Text="{Binding Speed, Converter={StaticResource Bytes}, ConverterParameter=speed}" Margin="0,0,18,0" />
+                    <TextBlock Visibility="{Binding Eta, Converter={StaticResource Vis}}"><Run Text="kalan" /> <Run Text="{Binding Eta, Mode=OneWay, Converter={StaticResource Dur}}" /></TextBlock>
+                  </WrapPanel>
+                </StackPanel>
+
+                <!-- Hata -->
+                <Border Style="{StaticResource Notice}" Margin="0,12,0,0" Padding="12,10" Visibility="{Binding ErrorMessage, Converter={StaticResource Vis}}">
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                      <Button Style="{StaticResource BtnSm}" Content="Hesabım" Margin="0,0,8,0" Command="{Binding DataContext.OpenAccountCommand, ElementName=Root}">
+                        <Button.Visibility>
+                          <Binding Path="ErrorKind" Converter="{StaticResource EqVis}" ConverterParameter="Auth" />
+                        </Button.Visibility>
+                      </Button>
+                      <Button Style="{StaticResource BtnSm}" Content="Günlük" Margin="0,0,8,0" ToolTip="yt-dlp'nin bu işteki çıktısı"
+                              Command="{Binding DataContext.ShowLogCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                      <Button Style="{StaticResource BtnSm}" Content="Tekrar dene" Command="{Binding DataContext.RetryCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+                  </DockPanel>
+                </Border>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- Ayrıntı: seçili iş yokken (kuyruk boş) sütun da kapanır -->
+      <Border Grid.Column="1" Style="{StaticResource Card}" Width="300" Padding="20" Margin="18,0,0,0" VerticalAlignment="Top" DataContext="{Binding Selected}"
+              Visibility="{Binding Converter={StaticResource Vis}}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Eyebrow}" Text="Ayrıntı" />
+          <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" TextWrapping="Wrap" Margin="0,6,0,16" />
+          <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="72" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Durum" Foreground="{DynamicResource Muted}" Margin="0,0,0,10" />
+            <TextBlock Grid.Column="1" Text="{Binding Stage}" TextWrapping="Wrap" Margin="0,0,0,10" />
+            <TextBlock Grid.Row="1" Text="Format" Foreground="{DynamicResource Muted}" Margin="0,0,0,10" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Options, Converter={StaticResource Desc}}" FontFamily="{StaticResource MonoFont}" FontSize="12.5"
+                       TextWrapping="Wrap" Margin="0,0,0,10" />
+            <TextBlock Grid.Row="2" Text="Kaynak" Foreground="{DynamicResource Muted}" Margin="0,0,0,10" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Source, TargetNullValue=Tek video}" TextWrapping="Wrap" Margin="0,0,0,10" />
+            <TextBlock Grid.Row="3" Text="Eklendi" Foreground="{DynamicResource Muted}" Margin="0,0,0,10" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CreatedAt, Converter={StaticResource Rel}}" Margin="0,0,0,10" />
+            <TextBlock Grid.Row="4" Text="Dosya" Foreground="{DynamicResource Muted}" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding FilePath, TargetNullValue=—}" FontFamily="{StaticResource MonoFont}" FontSize="12.5" TextWrapping="Wrap" />
+          </Grid>
+          <WrapPanel>
+            <Button Style="{StaticResource BtnSm}" Margin="0,0,8,8" ToolTip="yt-dlp'nin bu işteki ham çıktısı"
+                    Command="{Binding DataContext.ShowLogCommand, ElementName=Root}" CommandParameter="{Binding}">
+              <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Terminal}" Size="14" Margin="0,0,6,0" /><TextBlock Text="Günlük" /></StackPanel>
+            </Button>
+            <Button Style="{StaticResource BtnSm}" Content="Komutu kopyala" Margin="0,0,8,8"
+                    Command="{Binding DataContext.CopyCommandCommand, ElementName=Root}" CommandParameter="{Binding}" />
+            <Button Style="{StaticResource BtnSm}" Content="Sıranın başına al" Margin="0,0,8,8"
+                    Command="{Binding DataContext.MoveToFrontCommand, ElementName=Root}" CommandParameter="{Binding}" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <!-- ============ Geçmiş ============ -->
+    <Border Grid.Row="3" Style="{StaticResource Card}" CornerRadius="16" Visibility="{Binding IsHistory, Converter={StaticResource Vis}}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Background="{DynamicResource Surface2}" CornerRadius="16,16,0,0" Padding="16,9">
+          <Grid TextElement.FontSize="12.5" TextElement.Foreground="{DynamicResource Muted}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="3*" /><ColumnDefinition Width="1.4*" /><ColumnDefinition Width="140" /><ColumnDefinition Width="84" />
+              <ColumnDefinition Width="74" /><ColumnDefinition Width="116" /><ColumnDefinition Width="196" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Başlık" /><TextBlock Grid.Column="1" Text="Kanal" /><TextBlock Grid.Column="2" Text="Format" /><TextBlock Grid.Column="3" Text="Boyut" />
+            <TextBlock Grid.Column="4" Text="Süre" /><TextBlock Grid.Column="5" Text="Tarih" /><TextBlock Grid.Column="6" Text="İşlem" TextAlignment="Right" />
+          </Grid>
+        </Border>
+        <TextBlock DockPanel.Dock="Top" Style="{StaticResource Body2}" Margin="16" Text="Kayıt yok." Visibility="{Binding HAll, Converter={StaticResource Vis}, ConverterParameter=!}" />
+        <ItemsControl ItemsSource="{Binding HistoryView}" Style="{StaticResource VirtualList}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource HistoryRow}" Tag="{Binding DataContext, ElementName=Root}">
+                <Border.InputBindings>
+                  <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.OpenOrRevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                </Border.InputBindings>
+                <Border.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="Oynat" CommandParameter="{Binding}" Visibility="{Binding FilePath, Converter={StaticResource Vis}}"
+                              Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                      <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Klasörde göster" CommandParameter="{Binding}"
+                              Command="{Binding PlacementTarget.Tag.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                      <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="Aynı ayarlarla tekrar indir" CommandParameter="{Binding}"
+                              Command="{Binding PlacementTarget.Tag.RedownloadCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                      <MenuItem.Icon><c:Icon Data="{StaticResource I.Download}" Size="15" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Farklı kalitede indir…" CommandParameter="{Binding}"
+                              Command="{Binding PlacementTarget.Tag.ReopenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                      <MenuItem.Icon><c:Icon Data="{StaticResource I.Video}" Size="15" /></MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
+                              Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                      <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
+                              Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                      <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="Dosyayı geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                              Visibility="{Binding FilePath, Converter={StaticResource Vis}}"
+                              Command="{Binding PlacementTarget.Tag.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                      <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Geçmişten kaldır" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                              Command="{Binding PlacementTarget.Tag.RemoveHistoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                      <MenuItem.Icon><c:Icon Data="{StaticResource I.X}" Size="15" /></MenuItem.Icon>
+                    </MenuItem>
+                  </ContextMenu>
+                </Border.ContextMenu>
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*" /><ColumnDefinition Width="1.4*" /><ColumnDefinition Width="140" /><ColumnDefinition Width="84" />
+                    <ColumnDefinition Width="74" /><ColumnDefinition Width="116" /><ColumnDefinition Width="196" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Margin="0,0,14,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                    <Border Style="{StaticResource ChipWarn}" HorizontalAlignment="Left" Margin="0,5,0,0" ToolTip="{Binding Warning}"
+                            Visibility="{Binding Warning, Converter={StaticResource Vis}}"><TextBlock Text="uyarı" /></Border>
+                    <Border Style="{StaticResource ChipWarn}" HorizontalAlignment="Left" Margin="0,5,0,0"
+                            Visibility="{Binding Status, Converter={StaticResource EqVis}, ConverterParameter=Canceled}"><TextBlock Text="iptal edildi" /></Border>
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Style="{StaticResource Cell}" Text="{Binding Channel, TargetNullValue=—}" Foreground="{DynamicResource Text2}" />
+                  <TextBlock Grid.Column="2" Style="{StaticResource CellMono}" Text="{Binding Options, Converter={StaticResource Desc}}" />
+                  <TextBlock Grid.Column="3" Style="{StaticResource CellMono}" Foreground="{DynamicResource Text}" Text="{Binding Size, Converter={StaticResource Bytes}}" />
+                  <TextBlock Grid.Column="4" Style="{StaticResource CellMono}" Text="{Binding Duration, Converter={StaticResource Dur}}" />
+                  <TextBlock Grid.Column="5" Style="{StaticResource Cell}" FontSize="12.5" Foreground="{DynamicResource Text2}" Text="{Binding FinishedAt, Converter={StaticResource Rel}}" />
+                  <!-- Sık kullanılan iki işlem görünür, gerisi ⋯ (sağ tık menüsünün aynısı) -->
+                  <StackPanel Grid.Column="6" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource BtnSm}" Content="Oynat" Margin="0,0,6,0" Command="{Binding DataContext.OpenCommand, ElementName=Root}" CommandParameter="{Binding}"
+                            Visibility="{Binding FilePath, Converter={StaticResource Vis}}" />
+                    <Button Style="{StaticResource BtnSm}" Content="Klasör" Margin="0,0,6,0" Command="{Binding DataContext.RevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                    <Button Style="{StaticResource BtnGhostIcon}" Width="34" Height="30" MinHeight="30" ToolTip="Diğer işlemler" AutomationProperties.Name="Diğer işlemler"
+                            Click="More_Click">
+                      <c:Icon Data="{StaticResource I.More}" Size="18" Thickness="3" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </DockPanel>
+    </Border>
+
+    <!-- Alt şerit (kuyruk): zamanlama, bitince uyut, kuyruğu boşalt -->
+    <DockPanel Grid.Row="4" Margin="0,12,0,0" Visibility="{Binding IsHistory, Converter={StaticResource Vis}, ConverterParameter=!}">
+      <Button DockPanel.Dock="Right" Style="{StaticResource BtnSm}" VerticalAlignment="Center" Command="{Binding CancelAllCommand}"
+              Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}}" ToolTip="Kuyruktaki her işi iptal et (bildirimden geri alınabilir)">
+        <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.X}" Size="13" Margin="0,0,6,0" /><TextBlock Text="Kuyruğu boşalt" /></StackPanel>
+      </Button>
+      <WrapPanel VerticalAlignment="Center">
+        <!-- Zamanlama: kuyruk duraklatılır, saat gelince kendiliğinden başlar (sonradan eklenenler de bekler) -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,20,0" Visibility="{Binding IsScheduled, Converter={StaticResource Vis}, ConverterParameter=!}">
+          <c:Icon Data="{StaticResource I.Clock}" Size="15" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource Text2}" />
+          <TextBlock Text="Şu saatte başlat" VerticalAlignment="Center" Foreground="{DynamicResource Text2}" Margin="0,0,8,0" />
+          <TextBox Width="76" MinHeight="30" Padding="6,0" Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}"
+                   VerticalContentAlignment="Center" Margin="0,0,6,0" AutomationProperties.Name="Başlama saati" />
+          <Button Style="{StaticResource BtnSm}" Content="Zamanla" Command="{Binding SetScheduleCommand}"
+                  ToolTip="Kuyruğu şimdi duraklatır, bu saatte kendiliğinden başlatır" />
+        </StackPanel>
+        <Border Padding="10,3,4,3" Margin="0,0,20,0" CornerRadius="10" Background="{DynamicResource AccentSoft}" Visibility="{Binding IsScheduled, Converter={StaticResource Vis}}">
+          <StackPanel Orientation="Horizontal">
+            <c:Icon Data="{StaticResource I.Clock}" Size="15" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentStrong}" />
+            <TextBlock Text="{Binding ScheduleLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+            <Button Style="{StaticResource BtnSm}" Content="İptal" Command="{Binding CancelScheduleCommand}" />
+          </StackPanel>
+        </Border>
+        <TextBlock Text="{Binding ScheduleError}" Foreground="{DynamicResource Warn}" VerticalAlignment="Center" Margin="0,0,20,0"
+                   Visibility="{Binding ScheduleError, Converter={StaticResource Vis}}" />
+        <ToggleButton Style="{StaticResource Pill}" Margin="0" IsChecked="{Binding SleepWhenDone}" Content="Bitince uyut" VerticalAlignment="Center"
+                      ToolTip="Kuyruk bitince bilgisayarı uyku moduna al" />
+      </WrapPanel>
+    </DockPanel>
+  </Grid>
 </UserControl>

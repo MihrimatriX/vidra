@@ -88,7 +88,14 @@ public partial class MainWindow : Window
 
     private void RestorePlacement()
     {
-        if (_host.Settings.Window is not { } b) return;
+        if (_host.Settings.Window is not { } b)
+        {
+            // İlk açılış: geniş varsayılan (XAML'deki boyut), küçük ekranda çalışma alanına sığdırılır
+            var area = SystemParameters.WorkArea;
+            Width = Math.Max(MinWidth, Math.Min(Width, area.Width * 0.92));
+            Height = Math.Max(MinHeight, Math.Min(Height, area.Height * 0.92));
+            return;
+        }
         var r = new Rect(b.Left, b.Top, Math.Max(b.Width, MinWidth), Math.Max(b.Height, MinHeight));
         var screen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
             SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
@@ -177,7 +184,13 @@ public partial class MainWindow : Window
             // Bu sayfadaki arama kutusu; sayfada yoksa komut paleti
             case Key.F:
                 e.Handled = true;
-                if (!FocusInPage("SearchBox", "QueryBox", "UrlBox")) _vm.Palette.Open();
+                // Kuyruk sekmesinde arama yok: geçmiş sekmesine geçip onun kutusuna odaklan
+                if (_vm.Page == ViewModels.Page.Queue && !_vm.QueueVm.IsHistory)
+                {
+                    _vm.QueueVm.Section = "history";
+                    Dispatcher.BeginInvoke(DispatcherPriority.Input, () => FocusInPage("SearchBox"));
+                }
+                else if (!FocusInPage("SearchBox", "QueryBox", "UrlBox")) _vm.Palette.Open();
                 break;
             // Metin kutusu dışında yapıştır: bağlantıyı hangi ekrandan olursa olsun aç
             case Key.V when !IsTextInput(Keyboard.FocusedElement):
