@@ -8,7 +8,7 @@ namespace Vidra.App.ViewModels;
 
 /// <summary>
 /// Günlük ekranı: kuyruktaki işlerin ham yt-dlp çıktısı. Kuyruk ekranı sade kalsın diye ayrı ve kenar çubuğunda yok;
-/// iş kartının menüsünden, hata kutusundan, ayrıntı panelinden, komut paletinden ve Ayarlar'dan açılır.
+/// iş kartının sağ tık / ⋯ menüsünden, hata kutusundan, komut paletinden ve Ayarlar'dan açılır.
 /// </summary>
 public sealed partial class LogViewModel : ObservableObject
 {
