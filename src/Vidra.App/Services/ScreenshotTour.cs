@@ -127,15 +127,19 @@ internal static class ScreenshotTour
         await Save(w, $"{theme}-12-surukle-birak");
         w.DropLayer.Visibility = Visibility.Collapsed;
 
-        // Ayarlar: yeni anahtarlar, ek argümanlar; gizli mod ve güncelleme bağlantısı kenar çubuğunda
-        vm.Go(Page.Settings);
+        // Ayarlar: ek argümanlar ve yeni anahtarlar; gizli mod ve güncelleme bağlantısı kenar çubuğunda
         vm.Settings.ExtraArgs = "--limit-rate 5M --embed-chapters";
         vm.Update = new AppRelease(new Version(0, 4, 0), "v0.4.0", "https://github.com/MihrimatriX/vidra/releases", null);
         vm.Incognito = true;
+        vm.DismissToastCommand.Execute(null);
+        vm.Go(Page.Settings);
         await Settle(1200);
         if (Find(w.PageHost, "SecNet") is { } net) net.BringIntoView(new Rect(0, 0, 10, 600));
         await Settle(900);
         await Save(w, $"{theme}-13-ayarlar");
+        if (Find(w.PageHost, "SecLook") is { } look) look.BringIntoView(new Rect(0, 0, 10, 420));
+        await Settle(900);
+        await Save(w, $"{theme}-13b-ayarlar-davranis");
         vm.Incognito = false;
         vm.Update = null;
         vm.DismissToastCommand.Execute(null);
@@ -184,10 +188,10 @@ internal static class ScreenshotTour
 
         var jobs = host.Queue.Enqueue(
         [
-            new NewJob(YouTubeUrl.WatchUrl("eRsGyueVLvQ"), "Sintel - Open Movie by Blender Foundation", new DownloadOptions { Height = 1080, Container = ContainerFormat.Mp4 }, "Blender", null, 888, Source: "Playlist: Blender Open Movies"),
-            new NewJob(YouTubeUrl.WatchUrl("R6MlUcmOul8"), "Tears of Steel - Blender VFX Open Movie", new DownloadOptions { Height = 2160 }, "Blender", null, 734, Source: "Playlist: Blender Open Movies"),
-            new NewJob(YouTubeUrl.WatchUrl("WhWc3b3KhnY"), "Spring - Blender Open Movie", new DownloadOptions { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.Mp3 }, "Blender", null, 464),
-            new NewJob(YouTubeUrl.WatchUrl("UXqq0ZvbOnk"), "CHARGE - Blender Open Movie", new DownloadOptions(), "Blender", null, 245),
+            new NewJob(YouTubeUrl.WatchUrl("eRsGyueVLvQ"), "Sintel - Open Movie by Blender Foundation", new DownloadOptions { Height = 1080, Container = ContainerFormat.Mp4 }, "Blender", Thumb("eRsGyueVLvQ"), 888, Source: "Playlist: Blender Open Movies"),
+            new NewJob(YouTubeUrl.WatchUrl("R6MlUcmOul8"), "Tears of Steel - Blender VFX Open Movie", new DownloadOptions { Height = 2160 }, "Blender", Thumb("R6MlUcmOul8"), 734, Source: "Playlist: Blender Open Movies"),
+            new NewJob(YouTubeUrl.WatchUrl("WhWc3b3KhnY"), "Spring - Blender Open Movie", new DownloadOptions { Mode = DownloadMode.Audio, AudioFormat = AudioFormat.Mp3 }, "Blender", Thumb("WhWc3b3KhnY"), 464),
+            new NewJob(YouTubeUrl.WatchUrl("UXqq0ZvbOnk"), "CHARGE - Blender Open Movie", new DownloadOptions(), "Blender", Thumb("UXqq0ZvbOnk"), 245),
         ], startNow: false);
         Set(jobs[0], JobStatus.Running, 63, "Video akışı (1/2)", 2_900_000, 41);
         Set(jobs[1], JobStatus.Running, 18, "Video akışı (1/2)", 1_400_000, 260);
@@ -199,8 +203,10 @@ internal static class ScreenshotTour
         jobs[3].ErrorKind = ErrorKind.RateLimited;
         jobs[3].ErrorMessage = OutputParser.FriendlyError(ErrorKind.RateLimited, "");
 
-        vm.Basket.Add(Films.Skip(5).Select(f => new BasketItem(YouTubeUrl.WatchUrl(f.Id), f.Title, "Blender", $"https://i.ytimg.com/vi/{f.Id}/mqdefault.jpg", f.Secs, "Arama: blender")));
+        vm.Basket.Add(Films.Skip(5).Select(f => new BasketItem(YouTubeUrl.WatchUrl(f.Id), f.Title, "Blender", Thumb(f.Id), f.Secs, "Arama: blender")));
     }
+
+    private static string Thumb(string id) => $"https://i.ytimg.com/vi/{id}/mqdefault.jpg";
 
     private static void Set(DownloadJob j, JobStatus s, double percent, string stage, double speed, double eta)
     {
@@ -310,6 +316,9 @@ internal static class ScreenshotTour
             Log("menü bulunamadı: " + name);
             return;
         }
+        // Hedef ekranda değilse (ör. aşağıdaki geçmiş satırı) önce görünür kıl
+        target.BringIntoView();
+        await Settle(600);
         menu.PlacementTarget = target;
         menu.Placement = PlacementMode.Relative;
         menu.HorizontalOffset = x;

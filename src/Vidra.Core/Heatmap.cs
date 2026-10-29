@@ -6,8 +6,9 @@ namespace Vidra.Core;
 public static class Heatmap
 {
     /// <summary>
-    /// Ortalama yoğunluğu en yüksek, birbiriyle çakışmayan <paramref name="count"/> pencere (saniye, tam sayıya yuvarlı),
-    /// başlangıca göre sıralı. Pencere videodan uzunsa tüm video.
+    /// Ortalama yoğunluğu en yüksek <paramref name="count"/> pencere (saniye, tam sayıya yuvarlı), başlangıca göre sıralı.
+    /// Pencereler arasında en az pencere boyu (ve videonun %5'i) boşluk kalır: aynı tepe bitişik parçalara bölünmez,
+    /// her biri ayrı bir an olur. Pencere videodan uzunsa tüm video.
     /// </summary>
     public static IReadOnlyList<(double Start, double End)> BestWindows(IReadOnlyList<HeatPoint> points, double window, int count = 1)
     {
@@ -25,11 +26,12 @@ public static class Heatmap
             .ThenBy(c => c.Start)
             .ToList();
 
+        var gap = Math.Max(window, duration / 20);
         var chosen = new List<(double Start, double End)>();
         foreach (var c in candidates)
         {
             if (chosen.Count == count) break;
-            if (chosen.Any(x => c.Start < x.End && c.Start + window > x.Start)) continue;
+            if (chosen.Any(x => c.Start < x.End + gap && c.Start + window > x.Start - gap)) continue;
             chosen.Add((c.Start, c.Start + window));
         }
         return chosen
