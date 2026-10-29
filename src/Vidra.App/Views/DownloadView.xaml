@@ -328,7 +328,7 @@
               </StackPanel>
 
               <!-- Klip -->
-              <StackPanel Margin="0,16,0,0" Visibility="{Binding ClipEnabled, Converter={StaticResource Vis}}">
+              <StackPanel x:Name="ClipPanel" Margin="0,16,0,0" Visibility="{Binding ClipEnabled, Converter={StaticResource Vis}}">
                 <TextBlock Style="{StaticResource Eyebrow}" Text="Klip" Margin="0,0,0,8" />
                 <WrapPanel>
                   <HeaderedContentControl Style="{StaticResource Field}" Header="Başlangıç">

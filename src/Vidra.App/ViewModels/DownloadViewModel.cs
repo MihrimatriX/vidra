@@ -312,6 +312,16 @@ public sealed partial class DownloadViewModel : ObservableObject
         }
     }
 
+#if DEBUG
+    /// <summary>Ekran görüntüsü turu: boş ekran (son indirilenler).</summary>
+    internal void ShowEmptyForTour()
+    {
+        Info = null;
+        Url = "";
+        Error = null;
+    }
+#endif
+
     public void ShowVideo(VideoInfo v)
     {
         Error = null;
