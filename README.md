@@ -34,6 +34,19 @@
 - **Uyumayı engelle:** indirme sürerken ve zamanlanmış başlangıç beklenirken bilgisayar uykuya geçmez
 - **Ek yt-dlp argümanları** (ileri düzey) ve **güncelleme denetimi** (yeni Vidra sürümü çıkınca haber verir)
 
+<table>
+<tr>
+<td><img src="docs/screenshots/dark-04-komut-paleti.png" alt="Komut paleti"><br><sub>Komut paleti (Ctrl+K)</sub></td>
+<td><img src="docs/screenshots/dark-02-klip-heatmap.png" alt="Klip ve en çok izlenen grafiği"><br><sub>En çok izlenen kısım ve çoklu kesim</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/dark-06-kuyruk.png" alt="Kuyruk"><br><sub>Kuyruk: toplam ilerleme, toplu işlemler</sub></td>
+<td><img src="docs/screenshots/light-10-kutuphane.png" alt="Kütüphane"><br><sub>Kütüphane: sıralama, sürükle-bırak</sub></td>
+</tr>
+</table>
+
+Tüm ekran görüntüleri (açık/koyu): [`docs/screenshots/`](docs/screenshots/)
+
 Windows 10 1809+ / 11 (x64). Kurulum yönetici izni istemez; yt-dlp, ffmpeg ve Deno ilk açılışta otomatik indirilir.
 Uygulama imzalı olmadığı için SmartScreen uyarısında **Ek bilgi → Yine de çalıştır** demen gerekebilir.
 
