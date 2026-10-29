@@ -22,7 +22,7 @@ public sealed partial class DownloadJob : ObservableObject
     /// <summary>Ayarlardaki şablonu ezer (playlist işleri).</summary>
     public string? OutputTemplate { get; init; }
 
-    /// <summary>"Playlist: X", "Takip: Y" gibi; ayrıntı panelinde gösterilir.</summary>
+    /// <summary>"Playlist: X", "Takip: Y" gibi; kuyruk kartında ve geçmişte gösterilir.</summary>
     public string? Source { get; init; }
 
     [ObservableProperty] private JobStatus _status = JobStatus.Queued;
