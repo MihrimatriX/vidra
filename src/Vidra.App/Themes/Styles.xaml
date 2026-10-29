@@ -563,6 +563,13 @@
     </Setter>
   </Style>
 
+  <!-- Stil verilmemiş listeler (komut paleti, playlist satırları): varsayılan şablonun siyah yazısı koyu temada okunmaz -->
+  <Style TargetType="ListBox">
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
   <!-- Bölümlü kontrol: ListBox + Choice öğeleri (DisplayMemberPath=Label, SelectedValuePath=Value) -->
   <Style x:Key="SegmentItem" TargetType="ListBoxItem">
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
