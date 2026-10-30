@@ -10,7 +10,7 @@
   <a href="https://mihrimatrix.github.io/vidra/">Web sitesi</a>
 </p>
 
-![Vidra](docs/shot-light.png)
+![Vidra](docs/screenshots/light-01-indir.png)
 
 - **Orijinal kalite:** YouTube'daki akışlar dönüştürülmeden kaydedilir; bir seçim yeniden kodlamaya yol açıyorsa (MP3, kesin kesim) ekranda yazar
 - **Tek video, Shorts, canlı yayın:** kalite, biçim, kodek, altyazı, klip kesme, SponsorBlock
