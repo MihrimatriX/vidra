@@ -8,7 +8,7 @@
 <link rel="icon" href="icon.png">
 <meta property="og:title" content="Vidra — video ve müzik indirici">
 <meta property="og:description" content="Video, playlist, kanal ve müzik indirmek için sade bir Windows uygulaması.">
-<meta property="og:image" content="https://mihrimatrix.github.io/vidra/shot-light.png">
+<meta property="og:image" content="https://mihrimatrix.github.io/vidra/screenshots/light-01-indir.png">
 <style>
   :root {
     --bg: #f5f5f7; --surface: #ffffff; --line: #e6e6ea; --text: #15161a; --text2: #5b5e66; --muted: #8a8d95;
@@ -81,11 +81,16 @@
   ol.steps b { color: var(--text); display: block; }
   .note { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px; font-size: 14px; color: var(--text2); }
 
+  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .gallery figure { margin: 0; }
+  .gallery img { width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .gallery figcaption { font-size: 13px; color: var(--text2); margin-top: 8px; }
+
   footer { padding: 48px 0 40px; color: var(--muted); font-size: 13px; text-align: center; }
   footer a { color: var(--text2); }
 
   @media (max-width: 760px) {
-    .split { grid-template-columns: 1fr; }
+    .split, .gallery { grid-template-columns: 1fr; }
     .hero { padding-top: 28px; }
     .btn { width: 100%; justify-content: center; }
   }
@@ -114,8 +119,8 @@
 
     <div class="shot">
       <picture>
-        <source srcset="shot-dark.png" media="(prefers-color-scheme: dark)">
-        <img src="shot-light.png" width="1220" height="780" alt="Vidra ana ekranı: bağlantı kutusu ve Getir düğmesi">
+        <source srcset="screenshots/dark-01-indir.png" media="(prefers-color-scheme: dark)">
+        <img src="screenshots/light-01-indir.png" width="1305" height="985" alt="Vidra İndir ekranı: video bilgisi, kalite kartları ve ses dili seçimi">
       </picture>
     </div>
   </div>
@@ -126,17 +131,17 @@
       <div class="card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/></svg></div>
         <h3>Tek video, Shorts, canlı yayın</h3>
-        <p>4K ve HDR'ye kadar kalite, kodek seçimi, altyazı ve istediğin aralığı kesip indirme.</p>
+        <p>4K ve HDR'ye kadar kalite, kodek ve ses dili (dublaj) seçimi, altyazı. Başlamamış yayını başlayınca indirir.</p>
       </div>
       <div class="card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 12h12M4 18h7M16 15v6l5-3z"/></svg></div>
-        <h3>Playlist ve kanal</h3>
-        <p>Listeyi aç, istediğin videoları seç, tek tıkla indir. Daha önce indirdiklerin otomatik atlanır.</p>
+        <h3>Playlist, kanal ve kurslar</h3>
+        <p>Videolar, Shorts, Canlı, Playlistler, Kurslar ve Üyeler sekmeleri. Liste kartlarında video sayısı görünür; seç, tek tıkla indir. İndirdiklerin atlanır.</p>
       </div>
       <div class="card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg></div>
         <h3>Üyelere özel içerik</h3>
-        <p>Üye olduğun kanalların üyelere özel videoları ve playlistleri de listelenir.</p>
+        <p>Üye olduğun kanalların üyelere özel videoları listelenir; playlist kartları kaç videonun üyelere özel olduğunu gösterir.</p>
       </div>
       <div class="card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></div>
@@ -151,7 +156,17 @@
       <div class="card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
         <h3>Kuyruk ve geçmiş</h3>
-        <p>Aynı anda birden çok indirme, duraklat/sürdür, bitince bilgisayarı uyut, istatistikler.</p>
+        <p>Aynı anda birden çok indirme, duraklat/sürdür, zamanlanmış başlangıç, bitince uyut; geçmiş ve istatistikler.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/></svg></div>
+        <h3>En çok izlenen kısım</h3>
+        <p>YouTube'un izlenme grafiğinden en çok izlenen 30 sn, 1 dk ya da en iyi 3 an tek tıkla klip olur.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg></div>
+        <h3>Komut paleti</h3>
+        <p><b>Ctrl+K</b> ile sayfa, eylem ve geçmişte ara; bağlantı yapıştırırsan açar. Bağlantıyı pencereye sürükleyip bırakmak da yeter.</p>
       </div>
     </div>
   </section>
@@ -167,7 +182,52 @@
         </ol>
         <div class="note">Uygulama imzalı olmadığı için Windows ilk çalıştırmada "Windows kişisel bilgisayarınızı korudu" diyebilir: <b>Ek bilgi → Yine de çalıştır</b>.</div>
       </div>
-      <img src="shot-playlist.png" width="1220" height="780" loading="lazy" alt="Playlist ve kanal ekranı: bağlantı kutusu ve hesap akışları">
+      <picture>
+        <source srcset="screenshots/dark-15-kanal-kurslar.png" media="(prefers-color-scheme: dark)">
+        <img src="screenshots/light-15-kanal-kurslar.png" width="1305" height="985" loading="lazy" alt="Kanal ekranı, Kurslar sekmesi: kurs kartlarında video sayısı ve üyelere özel rozeti">
+      </picture>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ekranlar</h2>
+    <div class="gallery">
+      <figure>
+        <a href="screenshots/light-06-kuyruk.png">
+          <picture>
+            <source srcset="screenshots/dark-06-kuyruk.png" media="(prefers-color-scheme: dark)">
+            <img src="screenshots/light-06-kuyruk.png" width="1305" height="985" loading="lazy" alt="Kuyruk: toplam ilerleme ve iş kartları">
+          </picture>
+        </a>
+        <figcaption>Kuyruk: toplam ilerleme, duraklat/sürdür, zamanlanmış başlangıç</figcaption>
+      </figure>
+      <figure>
+        <a href="screenshots/light-06b-gecmis.png">
+          <picture>
+            <source srcset="screenshots/dark-06b-gecmis.png" media="(prefers-color-scheme: dark)">
+            <img src="screenshots/light-06b-gecmis.png" width="1305" height="985" loading="lazy" alt="Geçmiş: filtreler ve indirilen dosyalar">
+          </picture>
+        </a>
+        <figcaption>Geçmiş: filtrele, ara, oynat ya da farklı kalitede yeniden indir</figcaption>
+      </figure>
+      <figure>
+        <a href="screenshots/light-02-klip-heatmap.png">
+          <picture>
+            <source srcset="screenshots/dark-02-klip-heatmap.png" media="(prefers-color-scheme: dark)">
+            <img src="screenshots/light-02-klip-heatmap.png" width="1305" height="985" loading="lazy" alt="Klip: en çok izlenen kısım grafiği">
+          </picture>
+        </a>
+        <figcaption>Klip: en çok izlenen kısım ve çoklu kesim</figcaption>
+      </figure>
+      <figure>
+        <a href="screenshots/light-10-kutuphane.png">
+          <picture>
+            <source srcset="screenshots/dark-10-kutuphane.png" media="(prefers-color-scheme: dark)">
+            <img src="screenshots/light-10-kutuphane.png" width="1305" height="985" loading="lazy" alt="Kütüphane: indirilen dosyalar kart ızgarasında">
+          </picture>
+        </a>
+        <figcaption>Kütüphane: diskteki dosyalar, sürükle-bırak</figcaption>
+      </figure>
     </div>
   </section>
 
