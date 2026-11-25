@@ -101,6 +101,8 @@ public sealed record ListStats(int Videos, int Members, int Done, double Seconds
 {
     public bool AllMembers => Videos > 0 && Members == Videos;
     public int New => Videos - Done;
+    public double Progress => Videos > 0 ? Math.Clamp((double)Done / Videos, 0, 1) : 0;
+    public bool Complete => Videos > 0 && Done >= Videos;
 
     public static ListStats Of(IEnumerable<PlaylistEntry> entries, IReadOnlySet<string> done)
     {

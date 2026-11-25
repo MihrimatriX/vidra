@@ -328,8 +328,11 @@ public sealed partial class DownloadViewModel : ObservableObject
         Load(v);
     }
 
+    private bool _alreadyArchived;
+
     private void Load(VideoInfo v)
     {
+        _alreadyArchived = new Vidra.Core.Storage.ArchiveStore(_host.Paths.ArchiveFile).ReadIds().Contains(v.Id);
         Info = v;
         var top = v.Qualities.FirstOrDefault();
         MetaHighest = top is null ? "—" : $"{top.Height}p{(top.MaxFps is > 30 ? top.MaxFps.Value.ToString("0") : "")}{(top.Hdr ? " HDR" : "")}";
@@ -561,6 +564,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         MusicMode = MusicMode,
         Transcript = Transcript,
         Comments = Comments,
+        SkipArchive = _alreadyArchived,
     };
 
     private void Recalculate()

@@ -333,7 +333,7 @@ public sealed partial class QueueViewModel : ObservableObject
     private void Redownload(object? p)
     {
         if (p is not HistoryEntry h) return;
-        _host.Queue.Enqueue([new NewJob(h.Url, h.Title, h.Options, h.Channel, h.Thumbnail, h.Duration, Source: h.Source)]);
+        _host.Queue.Enqueue([new NewJob(h.Url, h.Title, h.Options with { SkipArchive = true }, h.Channel, h.Thumbnail, h.Duration, Source: h.Source)]);
         _main.ShowToast("Aynı ayarlarla kuyruğa eklendi");
     }
 

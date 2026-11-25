@@ -10,123 +10,357 @@
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <StackPanel>
-      <TextBlock Style="{StaticResource H1}" Text="Kütüphane" />
-      <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,4,0,12"
-                 Text="İndirdiğin ve hâlâ diskte duran dosyalar. Çift tıkla oynat, sağ tıkla diğer işlemler; kartı bir klasöre ya da uygulamaya sürükleyip bırakabilirsin." />
-    </StackPanel>
+    <!-- Üst başlık + Dosyalar / Kurslar & Listeler sekmesi (kurs detayı açıkken gizli) -->
+    <DockPanel Margin="0,0,0,12" Visibility="{Binding ShowCourseDetail, Converter={StaticResource Vis}, ConverterParameter=!}">
+      <ListBox DockPanel.Dock="Right" Style="{StaticResource Segmented}" ItemsSource="{Binding Sections}" SelectedValue="{Binding Section}"
+               VerticalAlignment="Center" AutomationProperties.Name="Kütüphane görünümü" />
+      <StackPanel Margin="0,0,16,0">
+        <TextBlock Style="{StaticResource H1}" Text="Kütüphane" />
+        <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,4,0,0"
+                   Text="İndirdiğin ve hâlâ diskte duran dosyalar. Kurslar &amp; Listeler sekmesinde ders sırasını ve izlenme durumunu takip edebilirsin." />
+      </StackPanel>
+    </DockPanel>
 
-    <WrapPanel Grid.Row="1" Margin="0,0,0,12">
+    <!-- Araç çubuğu (Dosyalar ve Kurs listesi için) -->
+    <WrapPanel Grid.Row="1" Margin="0,0,0,12" Visibility="{Binding ShowCourseDetail, Converter={StaticResource Vis}, ConverterParameter=!}">
       <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="10,0,4,0" Width="280" Height="36" Margin="0,0,10,8">
         <DockPanel>
           <c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Search}" Size="15" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
           <TextBox x:Name="SearchBox" Text="{Binding Query, UpdateSourceTrigger=PropertyChanged, Delay=250}" BorderThickness="0" Background="Transparent" Padding="8,0"
-                   VerticalContentAlignment="Center" Tag="Başlık veya kanal  (Ctrl+F)" AutomationProperties.Name="Kütüphanede ara" />
+                   VerticalContentAlignment="Center" Tag="Başlık, kurs veya kanal  (Ctrl+F)" AutomationProperties.Name="Kütüphanede ara" />
         </DockPanel>
       </Border>
-      <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Filters}" SelectedValue="{Binding Filter}" Margin="0,0,10,8" VerticalAlignment="Center" />
+      <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Filters}" SelectedValue="{Binding Filter}" Margin="0,0,10,8" VerticalAlignment="Center"
+               Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}" />
       <ComboBox Width="150" ItemsSource="{Binding Sorts}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Sort}" Margin="0,0,12,8"
-                ToolTip="Sıralama" AutomationProperties.Name="Sıralama" />
-      <TextBlock Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,0,8">
+                Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}" ToolTip="Sıralama" AutomationProperties.Name="Sıralama" />
+      <TextBlock Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,0,8" Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}">
         <Run Text="{Binding Count, Mode=OneWay}" /> dosya · <Run Text="{Binding TotalSize, Mode=OneWay, Converter={StaticResource Bytes}}" />
+      </TextBlock>
+      <TextBlock Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,0,8" Visibility="{Binding ShowCourseGrid, Converter={StaticResource Vis}}">
+        <Run Text="{Binding CourseCount, Mode=OneWay}" /> kurs / liste
       </TextBlock>
     </WrapPanel>
 
-    <ItemsControl Grid.Row="2" ItemsSource="{Binding Cards.Rows}" Style="{StaticResource VirtualList}" SizeChanged="Cards_SizeChanged">
-      <ItemsControl.ItemTemplate>
-        <DataTemplate>
-          <ItemsControl ItemsSource="{Binding}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><UniformGrid Rows="1" Columns="{Binding DataContext.Cards.Columns, ElementName=Root}" /></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Border Margin="0,0,16,16" Padding="10" CornerRadius="14" BorderThickness="1" Background="{DynamicResource Surface}"
-                        Tag="{Binding DataContext.Actions, ElementName=Root}"
-                        PreviewMouseLeftButtonDown="Card_PreviewMouseLeftButtonDown" MouseMove="Card_MouseMove">
-                  <Border.Style>
-                    <Style TargetType="Border">
-                      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
-                      <Style.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Line2}" /></Trigger>
-                      </Style.Triggers>
-                    </Style>
-                  </Border.Style>
-                  <Border.InputBindings>
-                    <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.Actions.OpenOrRevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
-                  </Border.InputBindings>
-                  <!-- Menü ayrı bir görsel ağaçta: komutlara kartın Tag'indeki (Kuyruk ekranı) görünüm modeli üzerinden ulaşılır -->
-                  <Border.ContextMenu>
-                    <ContextMenu>
-                      <MenuItem Header="Oynat" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Klasörde göster" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator />
-                      <MenuItem Header="Farklı kalitede indir…" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.ReopenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Video}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                      <Separator />
-                      <MenuItem Header="Geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
-                                Command="{Binding PlacementTarget.Tag.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                        <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
-                      </MenuItem>
-                    </ContextMenu>
-                  </Border.ContextMenu>
-                  <StackPanel>
-                    <Grid Height="{Binding DataContext.Cards.ThumbHeight, ElementName=Root}">
-                      <Border x:Name="Mask" CornerRadius="8" Background="{DynamicResource ThumbBg}" />
-                      <Image Source="{Binding ThumbUrl, Converter={StaticResource Thumb}, ConverterParameter=320}" Stretch="UniformToFill">
-                        <Image.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Image.OpacityMask>
-                      </Image>
-                      <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,2"
-                              Visibility="{Binding Duration, Converter={StaticResource Vis}}">
-                        <TextBlock Text="{Binding Duration, Converter={StaticResource Dur}}" Foreground="White" FontFamily="{StaticResource MonoFont}" FontSize="12" FontWeight="SemiBold" />
-                      </Border>
-                      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,3"
-                              Visibility="{Binding Options.Mode, Converter={StaticResource EqVis}, ConverterParameter=Audio}">
-                        <c:Icon Data="{StaticResource I.Music}" Size="14" Foreground="White" />
-                      </Border>
-                    </Grid>
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="32"
-                               LineHeight="16" LineStackingStrategy="BlockLineHeight" Margin="2,8,2,0" ToolTip="{Binding Title}" />
-                    <TextBlock Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" Margin="2,2,2,0">
-                      <Run Text="{Binding Channel, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Size, Mode=OneWay, Converter={StaticResource Bytes}}" />
-                    </TextBlock>
-                    <TextBlock Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" Margin="2,2,2,0">
-                      <Run Text="{Binding Options, Mode=OneWay, Converter={StaticResource Desc}}" /><Run Text=" · " /><Run Text="{Binding FinishedAt, Mode=OneWay, Converter={StaticResource Rel}}" />
-                    </TextBlock>
-                    <WrapPanel Margin="0,8,0,0">
-                      <Button Style="{StaticResource BtnSm}" Content="Oynat" Margin="0,0,6,0" CommandParameter="{Binding}"
-                              Command="{Binding DataContext.Actions.OpenCommand, ElementName=Root}" />
-                      <Button Style="{StaticResource BtnSm}" Content="Klasör" Margin="0,0,6,0" CommandParameter="{Binding}"
-                              Command="{Binding DataContext.Actions.RevealCommand, ElementName=Root}" />
-                      <Button Style="{StaticResource BtnSm}" Content="YouTube" CommandParameter="{Binding Url}"
-                              Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
-                    </WrapPanel>
-                  </StackPanel>
+    <!-- ============ 1. Dosyalar ızgarası ============ -->
+    <Grid Grid.Row="2" Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}">
+      <ItemsControl ItemsSource="{Binding Cards.Rows}" Style="{StaticResource VirtualList}" SizeChanged="Cards_SizeChanged">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ItemsControl ItemsSource="{Binding}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><UniformGrid Rows="1" Columns="{Binding DataContext.Cards.Columns, ElementName=Root}" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Margin="0,0,16,16" Padding="10" CornerRadius="14" BorderThickness="1" Background="{DynamicResource Surface}"
+                          Tag="{Binding DataContext.Actions, ElementName=Root}"
+                          PreviewMouseLeftButtonDown="Card_PreviewMouseLeftButtonDown" MouseMove="Card_MouseMove">
+                    <Border.Style>
+                      <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+                        <Style.Triggers>
+                          <Trigger Property="IsMouseOver" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Line2}" /></Trigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Border.Style>
+                    <Border.InputBindings>
+                      <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.Actions.OpenOrRevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                    </Border.InputBindings>
+                    <!-- Menü ayrı bir görsel ağaçta: komutlara kartın Tag'indeki (Kuyruk ekranı) görünüm modeli üzerinden ulaşılır -->
+                    <Border.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Oynat" CommandParameter="{Binding}"
+                                  Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Klasörde göster" CommandParameter="{Binding}"
+                                  Command="{Binding PlacementTarget.Tag.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="Farklı kalitede indir…" CommandParameter="{Binding}"
+                                  Command="{Binding PlacementTarget.Tag.ReopenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Video}" Size="15" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
+                                  Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
+                                  Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                          <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="Geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                                  Command="{Binding PlacementTarget.Tag.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
+                        </MenuItem>
+                      </ContextMenu>
+                    </Border.ContextMenu>
+                    <StackPanel>
+                      <Grid Height="{Binding DataContext.Cards.ThumbHeight, ElementName=Root}">
+                        <Border x:Name="Mask" CornerRadius="8" Background="{DynamicResource ThumbBg}" />
+                        <Image Source="{Binding ThumbUrl, Converter={StaticResource Thumb}, ConverterParameter=320}" Stretch="UniformToFill">
+                          <Image.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Image.OpacityMask>
+                        </Image>
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,2"
+                                Visibility="{Binding Duration, Converter={StaticResource Vis}}">
+                          <TextBlock Text="{Binding Duration, Converter={StaticResource Dur}}" Foreground="White" FontFamily="{StaticResource MonoFont}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" Background="#D914171C" CornerRadius="6" Padding="6,3"
+                                Visibility="{Binding Options.Mode, Converter={StaticResource EqVis}, ConverterParameter=Audio}">
+                          <c:Icon Data="{StaticResource I.Music}" Size="14" Foreground="White" />
+                        </Border>
+                      </Grid>
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="32"
+                                 LineHeight="16" LineStackingStrategy="BlockLineHeight" Margin="2,8,2,0" ToolTip="{Binding Title}" />
+                      <TextBlock Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" Margin="2,2,2,0">
+                        <Run Text="{Binding Channel, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Size, Mode=OneWay, Converter={StaticResource Bytes}}" />
+                      </TextBlock>
+                      <TextBlock Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" Margin="2,2,2,0">
+                        <Run Text="{Binding Options, Mode=OneWay, Converter={StaticResource Desc}}" /><Run Text=" · " /><Run Text="{Binding FinishedAt, Mode=OneWay, Converter={StaticResource Rel}}" />
+                      </TextBlock>
+                      <WrapPanel Margin="0,8,0,0">
+                        <Button Style="{StaticResource BtnSm}" Content="Oynat" Margin="0,0,6,0" CommandParameter="{Binding}"
+                                Command="{Binding DataContext.Actions.OpenCommand, ElementName=Root}" />
+                        <Button Style="{StaticResource BtnSm}" Content="Klasör" Margin="0,0,6,0" CommandParameter="{Binding}"
+                                Command="{Binding DataContext.Actions.RevealCommand, ElementName=Root}" />
+                        <Button Style="{StaticResource BtnSm}" Content="YouTube" CommandParameter="{Binding Url}"
+                                Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                      </WrapPanel>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Style="{StaticResource Body2}" Margin="4" VerticalAlignment="Top"
+                 Text="Burada gösterilecek dosya yok. İndirdiğin videolar diskte durdukça burada görünür."
+                 Visibility="{Binding Count, Converter={StaticResource Vis}, ConverterParameter=!}" />
+    </Grid>
+
+    <!-- ============ 2. Kurslar & Listeler kartları ============ -->
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                  Visibility="{Binding ShowCourseGrid, Converter={StaticResource Vis}}">
+      <Grid>
+        <ItemsControl ItemsSource="{Binding Courses}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><c:UniformWrapPanel MinItemWidth="290" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource Tile}" Margin="0,0,14,14" Padding="12">
+                <Border.InputBindings>
+                  <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.OpenCourseCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                </Border.InputBindings>
+                <StackPanel>
+                  <Grid Height="128">
+                    <Border x:Name="Mask" CornerRadius="8" Background="{DynamicResource ThumbBg}" />
+                    <Image Source="{Binding Cover, Converter={StaticResource Thumb}, ConverterParameter=480}" Stretch="UniformToFill">
+                      <Image.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Image.OpacityMask>
+                    </Image>
+                    <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}"
+                                 Foreground="{DynamicResource Ok}" Background="#6614171C" Margin="0" />
+                    <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6,6,6,8" Background="#D914171C" CornerRadius="6" Padding="7,3">
+                      <StackPanel Orientation="Horizontal">
+                        <c:Icon Data="{StaticResource I.Course}" Size="14" Foreground="White" />
+                        <TextBlock Foreground="White" FontSize="12" FontWeight="SemiBold" Margin="5,0,0,0" VerticalAlignment="Center">
+                          <Run Text="{Binding TotalCount, Mode=OneWay}" /> ders
+                        </TextBlock>
+                      </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource ChipOk}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
+                            Visibility="{Binding AllWatched, Converter={StaticResource Vis}}">
+                      <TextBlock Text="Tamamlandı" />
+                    </Border>
+                  </Grid>
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14.5" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                             Height="38" Margin="2,10,2,2" ToolTip="{Binding Title}" />
+                  <TextBlock Text="{Binding SummaryLine}" Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" Margin="2,0,2,2" />
+                  <TextBlock Text="{Binding ProgressText}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource Ok}" Margin="2,0,2,10" />
+                  <WrapPanel>
+                    <Button Style="{StaticResource BtnPrimary}" MinHeight="30" Padding="11,0" FontSize="12.5" Margin="0,0,6,0"
+                            Command="{Binding DataContext.PlayNextLessonCommand, ElementName=Root}" CommandParameter="{Binding}"
+                            ToolTip="İzlenmemiş ilk dersi oynat">
+                      <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Play}" Size="13" Margin="0,0,6,0" /><TextBlock Text="Devam et" /></StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource BtnSm}" Content="Dersler" Margin="0,0,6,0"
+                            Command="{Binding DataContext.OpenCourseCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                    <Button Style="{StaticResource BtnSm}" Content="Klasör"
+                            Command="{Binding DataContext.OpenCourseFolderCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Style="{StaticResource Body2}" Margin="4" VerticalAlignment="Top"
+                   Text="Henüz indirilmiş kurs veya playlist yok. Playlist &amp; kanal ekranından indirdiğin kurslar burada ders sırasıyla görünür."
+                   Visibility="{Binding CourseCount, Converter={StaticResource Vis}, ConverterParameter=!}" />
+      </Grid>
+    </ScrollViewer>
+
+    <!-- ============ 3. Kurs detay görünümü: ders listesi + izlenme takibi ============ -->
+    <Grid Grid.Row="0" Grid.RowSpan="3" Visibility="{Binding ShowCourseDetail, Converter={StaticResource Vis}}">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+
+      <!-- Başlık -->
+      <DockPanel Margin="0,0,0,14">
+        <Button DockPanel.Dock="Left" Style="{StaticResource BtnGhostIcon}" Width="36" Height="36" MinHeight="36" VerticalAlignment="Center" Margin="-8,0,8,0"
+                Command="{Binding CloseCourseCommand}" ToolTip="Kurslara dön" AutomationProperties.Name="Geri">
+          <c:Icon Data="{StaticResource I.ArrowRight}" Size="18" RenderTransformOrigin="0.5,0.5">
+            <c:Icon.RenderTransform><ScaleTransform ScaleX="-1" /></c:Icon.RenderTransform>
+          </c:Icon>
+        </Button>
+        <Border DockPanel.Dock="Left" Width="96" Height="54" CornerRadius="8" Background="{DynamicResource ThumbBg}" Margin="0,0,14,0">
+          <Border.Clip><RectangleGeometry Rect="0,0,96,54" RadiusX="8" RadiusY="8" /></Border.Clip>
+          <Image Source="{Binding SelectedCourse.Cover, Converter={StaticResource Thumb}, ConverterParameter=320}" Stretch="UniformToFill" />
+        </Border>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Style="{StaticResource BtnPrimary}" Margin="0,0,8,0" Command="{Binding PlayNextLessonCommand}" CommandParameter="{Binding SelectedCourse}"
+                  ToolTip="İzlenmemiş sıradaki dersi oynat">
+            <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Play}" Size="14" Margin="0,0,7,0" /><TextBlock Text="Sonraki dersi oynat" /></StackPanel>
+          </Button>
+          <Button Style="{StaticResource BtnSm}" Content="Yeni ders kontrol et" Margin="0,0,6,0"
+                  Visibility="{Binding SelectedCourse.PlaylistUrl, Converter={StaticResource Vis}}"
+                  Command="{Binding CheckCourseUpdatesCommand}" CommandParameter="{Binding SelectedCourse}"
+                  ToolTip="Bu kursu Playlist &amp; kanal ekranında açıp yeni eklenen dersleri kontrol et" />
+          <Button Style="{StaticResource BtnSm}" Content=".m3u8 oluştur" Margin="0,0,6,0"
+                  Command="{Binding ExportCourseM3uCommand}" CommandParameter="{Binding SelectedCourse}"
+                  ToolTip="Klasörde VLC/MPV için sıralı .m3u8 oynatma listesi oluştur" />
+          <Button Style="{StaticResource BtnSm}" Content="Klasör" Command="{Binding OpenCourseFolderCommand}" CommandParameter="{Binding SelectedCourse}" />
+        </StackPanel>
+        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+          <TextBlock Style="{StaticResource Eyebrow}" Text="Kurs / Playlist" />
+          <TextBlock Text="{Binding SelectedCourse.Title}" FontSize="21" FontWeight="SemiBold" FontFamily="{StaticResource DisplayFont}" TextTrimming="CharacterEllipsis" Margin="0,2,0,3" />
+          <TextBlock Text="{Binding SelectedCourse.SummaryLine}" Style="{StaticResource Small}" />
+        </StackPanel>
+      </DockPanel>
+
+      <!-- İlerleme şeridi + toplu izlendi düğmeleri -->
+      <DockPanel Grid.Row="1" Margin="0,0,0,14">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+          <Button Style="{StaticResource BtnSm}" Content="Tümünü izlendi yap" Margin="0,0,6,0" Command="{Binding MarkAllWatchedCommand}" />
+          <Button Style="{StaticResource BtnSm}" Content="Sıfırla" Command="{Binding MarkAllUnwatchedCommand}" ToolTip="İzlendi işaretlerini temizle" />
+        </StackPanel>
+        <StackPanel VerticalAlignment="Center">
+          <DockPanel Margin="0,0,0,5">
+            <TextBlock DockPanel.Dock="Right" Text="{Binding SelectedCourse.ProgressText}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Ok}" />
+            <TextBlock Text="İzlenme ilerlemesi" Style="{StaticResource Small}" />
+          </DockPanel>
+          <ProgressBar Height="6" Minimum="0" Maximum="1" Value="{Binding SelectedCourse.Progress, Mode=OneWay}" Foreground="{DynamicResource Ok}" />
+        </StackPanel>
+      </DockPanel>
+
+      <!-- Ders satırları -->
+      <Border Grid.Row="2" Style="{StaticResource Card}" CornerRadius="14" ClipToBounds="True">
+        <ListBox ItemsSource="{Binding SelectedCourse.Lessons}" BorderThickness="0" Background="Transparent"
+                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd" Background="Transparent" BorderBrush="{DynamicResource Raised}" BorderThickness="0,0,0,1" Padding="14,8"
+                            Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                      <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.PlayLessonCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                      </Border.InputBindings>
+                      <Border.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Oynat" CommandParameter="{Binding}"
+                                    Command="{Binding PlacementTarget.Tag.PlayLessonCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="İzlendi / izlenmedi değiştir" CommandParameter="{Binding}"
+                                    Command="{Binding PlacementTarget.Tag.ToggleWatchedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon><c:Icon Data="{StaticResource I.CheckCircle}" Size="15" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="Klasörde göster" CommandParameter="{Binding Entry}"
+                                    Command="{Binding PlacementTarget.Tag.Actions.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="YouTube'da aç" CommandParameter="{Binding Entry}"
+                                    Command="{Binding PlacementTarget.Tag.Actions.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
+                          </MenuItem>
+                          <Separator />
+                          <MenuItem Header="Geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding Entry}"
+                                    Command="{Binding PlacementTarget.Tag.Actions.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                            <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
+                          </MenuItem>
+                        </ContextMenu>
+                      </Border.ContextMenu>
+                      <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface2}" /></Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </ListBox.ItemContainerStyle>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="36" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox IsChecked="{Binding Watched, Mode=OneWay}" Command="{Binding DataContext.ToggleWatchedCommand, ElementName=Root}" CommandParameter="{Binding}"
+                          VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="İzlendi olarak işaretle / kaldır" />
+                <TextBlock Grid.Column="1" Text="{Binding IndexText}" Style="{StaticResource CellMono}" FontSize="12.5" Foreground="{DynamicResource Muted}" />
+                <Border Grid.Column="2" Width="72" Height="40" CornerRadius="6" Background="{DynamicResource ThumbBg}" Margin="0,0,12,0">
+                  <Border.Clip><RectangleGeometry Rect="0,0,72,40" RadiusX="6" RadiusY="6" /></Border.Clip>
+                  <Image Source="{Binding Entry.ThumbUrl, Converter={StaticResource Thumb}, ConverterParameter=160}" Stretch="UniformToFill" />
                 </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
-    <TextBlock Grid.Row="2" Style="{StaticResource Body2}" Margin="4" VerticalAlignment="Top"
-               Text="Burada gösterilecek dosya yok. İndirdiğin videolar diskte durdukça burada görünür."
-               Visibility="{Binding Count, Converter={StaticResource Vis}, ConverterParameter=!}" />
+                <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="0,0,12,0">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Entry.Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" ToolTip="{Binding Entry.Title}">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Foreground" Value="{DynamicResource Text}" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding Watched}" Value="True">
+                              <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                    <Border Style="{StaticResource ChipOk}" Margin="8,0,0,0" Visibility="{Binding Watched, Converter={StaticResource Vis}}">
+                      <TextBlock Text="İzlendi" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Style="{StaticResource Small}" Margin="0,2,0,0">
+                    <Run Text="{Binding Entry.Options, Mode=OneWay, Converter={StaticResource Desc}}" /> · <Run Text="{Binding Entry.Size, Mode=OneWay, Converter={StaticResource Bytes}}" />
+                  </TextBlock>
+                </StackPanel>
+                <TextBlock Grid.Column="4" Text="{Binding Entry.Duration, Converter={StaticResource Dur}}" Style="{StaticResource CellMono}" Margin="0,0,12,0" />
+                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
+                  <Button Style="{StaticResource BtnSm}" Content="Oynat" Margin="0,0,6,0"
+                          Command="{Binding DataContext.PlayLessonCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                  <Button Style="{StaticResource BtnGhostIcon}" Width="30" Height="30" MinHeight="30" ToolTip="Klasörde göster"
+                          Command="{Binding DataContext.Actions.RevealCommand, ElementName=Root}" CommandParameter="{Binding Entry}">
+                    <c:Icon Data="{StaticResource I.Folder}" Size="14" />
+                  </Button>
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>

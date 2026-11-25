@@ -149,6 +149,7 @@ public static class YtDlpArgs
             if (subs && o.Mode == DownloadMode.Video) a.Add("--embed-subs");
         }
         if (o.Comments) a.AddRange(["--write-info-json", "--write-comments"]);
+        if (o.WriteDescription) a.Add("--write-description");
         if (o.EmbedThumbnail) a.Add("--embed-thumbnail");
         if (o.EmbedMetadata)
         {
@@ -246,14 +247,15 @@ public static class YtDlpArgs
             // Asıl indirme başarısız olursa yt-dlp yine 0 dışı kodla çıkar.
             "--ignore-errors",
             "--no-mtime",
-            "-P", s.OutputDir,
+            "-P", !string.IsNullOrWhiteSpace(o.OutputDir) ? o.OutputDir : s.OutputDir,
             "-o", AllClips(o).Count > 1 ? WithSectionSuffix(outputTemplate ?? s.OutputTemplate) : outputTemplate ?? s.OutputTemplate,
             "-N", Math.Max(1, s.Fragments).ToString(CultureInfo.InvariantCulture),
             "-R", s.Retries.ToString(CultureInfo.InvariantCulture),
         ]);
         if (!string.IsNullOrWhiteSpace(s.RateLimit)) a.AddRange(["-r", s.RateLimit!]);
         // Klip tam video değildir: arşive girerse sonraki tam indirme atlanır (ya da tersi). Gizli mod iz bırakmaz.
-        if (s.UseArchive && !o.Incognito && AllClips(o).Count == 0) a.AddRange(["--download-archive", t.ArchiveFile]);
+        // SkipArchive: kullanıcı zaten indirilmiş bir videoyu elle tekrar/farklı kalitede indiriyor.
+        if (s.UseArchive && !o.Incognito && !o.SkipArchive && AllClips(o).Count == 0) a.AddRange(["--download-archive", t.ArchiveFile]);
         a.AddRange(Format(o));
         a.AddRange(Extras(o, s));
         // Ayarlardaki ek argümanlar en sonda: aynı bayrağı tekrar verirse yt-dlp sonrakini kullanır (ör. -f)

@@ -26,6 +26,8 @@ public sealed class AppHost : IAsyncDisposable
     public DownloadQueue Queue { get; }
     public FollowService Follow { get; }
     public AccountService Account { get; }
+    public ListCacheStore ListCache { get; }
+    public WatchProgressStore WatchProgress { get; }
     public ClipboardWatcher Clipboard { get; } = new();
     public TrayService? Tray { get; set; }
 
@@ -42,6 +44,8 @@ public sealed class AppHost : IAsyncDisposable
         Queue = new DownloadQueue(Runner, Tools, () => SettingsStore.Current, Paths, Dispatch);
         Follow = new FollowService(YtDlp, Queue, Paths, () => SettingsStore.Current, Dispatch);
         Account = new AccountService(Paths, SettingsStore);
+        ListCache = new ListCacheStore(Paths.ListCacheFile);
+        WatchProgress = new WatchProgressStore(Paths.WatchProgressFile);
     }
 
     /// <summary>Koleksiyon değişiklikleri UI thread'inde ve senkron yapılmalı (kuyruk anlık görüntüleri için).</summary>
@@ -58,6 +62,8 @@ public sealed class AppHost : IAsyncDisposable
         Queue.PauseAll(); // .part dosyaları kalır; bir sonraki açılışta duraklatılmış olarak geri gelir
         await Queue.SavePendingAsync();
         await Follow.DisposeAsync();
+        await ListCache.SaveNowAsync();
+        await WatchProgress.SaveNowAsync();
         await SettingsStore.SaveNowAsync();
         Clipboard.Dispose();
         Tray?.Dispose();

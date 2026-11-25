@@ -6,8 +6,8 @@ namespace Vidra.Core.Models;
 /// </summary>
 public sealed record Clip(string Start, string End, bool Precise = false);
 
-/// <summary>İşin geldiği playlist ve videonun listedeki sırası (1 tabanlı) — albüm/parça etiketi için.</summary>
-public sealed record PlaylistRef(string Title, int Index);
+/// <summary>İşin geldiği playlist/kurs, sırası (1 tabanlı) ve isteğe bağlı adresi/kanalı — etiket ve kütüphane gruplaması için.</summary>
+public sealed record PlaylistRef(string Title, int Index, string? Url = null, string? Channel = null);
 
 /// <summary>Adlandırılmış biçim seçimi. Hazır profiller koddadır; kullanıcınınkiler AppSettings.Profiles'ta.</summary>
 public sealed record DownloadProfile(string Name, DownloadOptions Options, bool BuiltIn = false)
@@ -82,6 +82,18 @@ public sealed record DownloadOptions
 
     /// <summary>Yorumlar .info.json dosyasına yazılır.</summary>
     public bool Comments { get; init; }
+
+    /// <summary>Video açıklaması (.description) dosyasını indirir — kurslardaki kaynak bağlantıları ve notlar için.</summary>
+    public bool WriteDescription { get; init; }
+
+    /// <summary>İndirme arşivini yoksay: daha önce indirilmiş videoyu elle tekrar indirirken atlanmasın.</summary>
+    public bool SkipArchive { get; init; }
+
+    /// <summary>Playlist/kurs indirmesi bitince klasörde sıralı .m3u8 oynatma listesi oluşturur/günceller.</summary>
+    public bool WriteM3u { get; init; }
+
+    /// <summary>Bu indirmeye özel klasör; boşsa ayarlardaki varsayılan indirme klasörü kullanılır.</summary>
+    public string? OutputDir { get; init; }
 
     /// <summary>Playlist'ten kuyruğa alınan işlerde dolu; tek video indirmesinde null.</summary>
     public PlaylistRef? Playlist { get; init; }

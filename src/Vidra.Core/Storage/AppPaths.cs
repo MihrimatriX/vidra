@@ -38,6 +38,8 @@ public sealed class AppPaths
     public string FollowsFile => Path.Combine(DataDir, "follows.json");
     public string ArchiveFile => Path.Combine(DataDir, "archive.txt");
     public string BasketFile => Path.Combine(DataDir, "basket.json");
+    public string WatchProgressFile => Path.Combine(DataDir, "watched.json");
+    public string ListCacheFile => Path.Combine(LocalDir, "list-cache.json");
     public string LogFile => Path.Combine(LocalDir, "vidra.log");
 
     public static string DefaultOutputDir() =>

@@ -9,6 +9,9 @@ public static partial class Templates
     [GeneratedRegex(@"%\(playlist(?:_title)?\)s")]
     private static partial Regex PlaylistField();
 
+    [GeneratedRegex(@"%\(playlist_(?:channel|uploader)\)s")]
+    private static partial Regex PlaylistChannelField();
+
     [GeneratedRegex(@"%\(playlist_index\)(0?\d*)d")]
     private static partial Regex PlaylistIndexD();
 
@@ -17,6 +20,14 @@ public static partial class Templates
 
     [GeneratedRegex(@"[<>:""/\\|?*\x00-\x1f]")]
     private static partial Regex InvalidChars();
+
+    /// <summary>Ayarlar ekranında tek tıkla seçilebilen playlist/kurs klasör şablonları.</summary>
+    public static readonly IReadOnlyList<(string Label, string Template)> PlaylistPresets =
+    [
+        ("Liste / 001 - Başlık (varsayılan)", "%(playlist)s/%(playlist_index)03d - %(title)s.%(ext)s"),
+        ("Kanal / Liste / 001 - Başlık", "%(playlist_channel)s/%(playlist)s/%(playlist_index)03d - %(title)s.%(ext)s"),
+        ("Kanal / Liste / 001 - Başlık [id]", "%(playlist_channel)s/%(playlist)s/%(playlist_index)03d - %(title)s [%(id)s].%(ext)s"),
+    ];
 
     /// <summary>Windows dosya adında geçersiz karakterleri temizler.</summary>
     public static string SanitizeName(string s)
@@ -28,12 +39,14 @@ public static partial class Templates
     private static string Escape(string s) => s.Replace("%", "%%");
 
     /// <summary>
-    /// Playlist videoları tek tek indirildiği için yt-dlp %(playlist)s bilgisini bilmez;
+    /// Playlist videoları tek tek indirildiği için yt-dlp %(playlist)s ve %(playlist_channel)s bilgilerini bilmez;
     /// bu alanları kuyruğa eklerken gerçek değerlerle doldururuz.
     /// </summary>
-    public static string ResolvePlaylist(string template, string playlistTitle, int index)
+    public static string ResolvePlaylist(string template, string playlistTitle, int index, string? channel = null)
     {
         var t = PlaylistField().Replace(template, Escape(SanitizeName(playlistTitle)));
+        var ch = !string.IsNullOrWhiteSpace(channel) ? Escape(SanitizeName(channel)) : "%(channel,uploader)s";
+        t = PlaylistChannelField().Replace(t, ch);
         t = PlaylistIndexD().Replace(t, m => index.ToString(CultureInfo.InvariantCulture).PadLeft(ParsePad(m.Groups[1].Value), '0'));
         return t.Replace("%(playlist_index)s", index.ToString(CultureInfo.InvariantCulture));
     }

@@ -215,13 +215,36 @@ public sealed partial class AccountViewModel : ObservableObject
         finally { Busy = false; }
     }
 
+    [RelayCommand]
+    private async Task CheckAllFollows()
+    {
+        if (Follows.Count == 0) return;
+        Busy = true;
+        try
+        {
+            var (checkedCount, totalNew, errors) = await _host.Follow.CheckAllAsync();
+            var msg = totalNew > 0
+                ? $"{checkedCount} kaynak kontrol edildi: {totalNew} yeni video kuyruğa eklendi."
+                : $"{checkedCount} kaynak kontrol edildi: yeni video yok.";
+            if (errors > 0) msg += $" ({errors} kaynakta hata oluştu.)";
+            Notice = msg;
+        }
+        catch (Exception e) { Notice = e.Message; }
+        finally { Busy = false; }
+    }
+
     [RelayCommand] private Task Unfollow(object? p) => p is FollowedSource f ? _host.Follow.UnfollowAsync(f) : Task.CompletedTask;
 
     [RelayCommand]
     private async Task OpenFollowed(object? p)
     {
         if (p is not FollowedSource f) return;
-        _main.Go(Page.Playlist);
-        await _main.Playlist.LoadAsync(f.Url);
+        if (YouTubeUrl.Classify(f.Url) == LinkKind.Channel)
+            await _main.OpenChannelTabAsync(f.Url, f.Tab);
+        else
+        {
+            _main.Go(Page.Playlist);
+            await _main.Playlist.LoadAsync(f.Url);
+        }
     }
 }

@@ -54,6 +54,24 @@ public static class Choices
 
     public static readonly IReadOnlyList<Choice> DurationBuckets =
         [new("all", "Hepsi"), new("short", "< 4 dk"), new("mid", "4–20 dk"), new("long", "> 20 dk")];
+
+    public static readonly IReadOnlyList<Choice> VideoSorts =
+    [
+        new("list", "Liste sırası"),
+        new("reverse", "Ters sıra (eskiden yeniye)"),
+        new("newest", "En yeni tarih"),
+        new("longest", "En uzun süre"),
+        new("views", "En çok izlenen"),
+    ];
+
+    public static readonly IReadOnlyList<Choice> ListSorts =
+    [
+        new("default", "Varsayılan sıra"),
+        new("members", "Üyelere özel önce"),
+        new("missing", "Eksik videosu olanlar önce"),
+        new("count", "En çok video"),
+        new("name", "Ada göre"),
+    ];
 }
 
 /// <summary>Seçilebilir etiket (altyazı dili, SponsorBlock kategorisi).</summary>
