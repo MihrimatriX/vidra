@@ -407,13 +407,14 @@
                     <StackPanel>
                       <Grid>
                         <Border x:Name="Mask" Height="96" CornerRadius="8" Background="{DynamicResource ThumbBg}" />
-                        <Image Height="96" Source="{Binding Entry.Thumbnail, Converter={StaticResource Thumb}, ConverterParameter=480}" Stretch="UniformToFill">
-                          <Image.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Image.OpacityMask>
-                        </Image>
-                        <!-- İndirilme ilerleme çubuğu: kursun ne kadarı indirilmiş -->
-                        <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}"
-                                     Foreground="{DynamicResource Ok}" Background="#6614171C" Margin="0"
-                                     Visibility="{Binding ShowProgress, Converter={StaticResource Vis}}" />
+                        <Grid Height="96">
+                          <Grid.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Grid.OpacityMask>
+                          <Image Source="{Binding Entry.Thumbnail, Converter={StaticResource Thumb}, ConverterParameter=480}" Stretch="UniformToFill" />
+                          <!-- İndirilme ilerleme çubuğu: kursun ne kadarı indirilmiş -->
+                          <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}"
+                                       Foreground="{DynamicResource Ok}" Background="#6614171C" Margin="0"
+                                       Visibility="{Binding ShowProgress, Converter={StaticResource Vis}}" />
+                        </Grid>
                         <!-- Video sayısı ve üyelere özel etiketi -->
                         <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6,6,6,8" Background="#D914171C" CornerRadius="6" Padding="6,3">
                           <StackPanel Orientation="Horizontal">
@@ -678,30 +679,30 @@
           </Border>
 
           <DockPanel>
-            <Button DockPanel.Dock="Right" Style="{StaticResource BtnPrimary}" Command="{Binding EnqueueSelectedCommand}" IsEnabled="{Binding CanEnqueue}" MinWidth="120">
+            <Button DockPanel.Dock="Right" Style="{StaticResource BtnPrimary}" Command="{Binding EnqueueSelectedCommand}" IsEnabled="{Binding CanEnqueue}" MinWidth="112" VerticalAlignment="Center">
               <StackPanel Orientation="Horizontal">
                 <c:Icon Data="{StaticResource I.Download}" Size="16" Thickness="2.4" Margin="0,0,8,0" />
                 <TextBlock Text="İndir" />
               </StackPanel>
             </Button>
-            <Button DockPanel.Dock="Right" Command="{Binding AddToBasketCommand}" IsEnabled="{Binding CanEnqueue}" Margin="0,0,8,0"
+            <Button DockPanel.Dock="Right" Command="{Binding AddToBasketCommand}" IsEnabled="{Binding CanEnqueue}" Margin="0,0,8,0" VerticalAlignment="Center"
                     ToolTip="Seçilenleri sepete ekle: başka playlist ve kanallardan da topla, hepsini birlikte indir">
               <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Basket}" Size="16" Margin="0,0,8,0" /><TextBlock Text="Sepete ekle" /></StackPanel>
             </Button>
-            <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="150">
+            <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,14,0" MinWidth="136">
               <TextBlock Text="{Binding SelectedLabel}" FontWeight="SemiBold" FontSize="15" />
               <TextBlock Text="{Binding SelectedSummary}" Style="{StaticResource Small}" Visibility="{Binding Toast, Converter={StaticResource Vis}, ConverterParameter=!}" />
               <TextBlock Text="{Binding Toast}" Style="{StaticResource Small}" Foreground="{DynamicResource Ok}" Visibility="{Binding Toast, Converter={StaticResource Vis}}" />
             </StackPanel>
             <WrapPanel VerticalAlignment="Center">
-              <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Modes}" SelectedValue="{Binding Mode}" Margin="0,0,10,0" VerticalAlignment="Center" />
-              <ComboBox Width="106" ItemsSource="{Binding Heights}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Height}" Margin="0,0,10,0"
+              <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Modes}" SelectedValue="{Binding Mode}" Margin="0,0,8,0" VerticalAlignment="Center" />
+              <ComboBox Width="96" ItemsSource="{Binding Heights}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Height}" Margin="0,0,8,0"
                         ToolTip="Kalite" Visibility="{Binding Mode, Converter={StaticResource EqVis}, ConverterParameter=Video}" />
-              <ComboBox Width="96" ItemsSource="{Binding AudioFormats}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding AudioFormat}" Margin="0,0,10,0"
+              <ComboBox Width="92" ItemsSource="{Binding AudioFormats}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding AudioFormat}" Margin="0,0,8,0"
                         ToolTip="Ses biçimi" Visibility="{Binding Mode, Converter={StaticResource EqVis}, ConverterParameter=Audio}" />
-              <CheckBox Content="Müzik modu" IsChecked="{Binding MusicMode}" VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="Kare kapak, ses eşitleme, sanatçı/albüm/parça etiketi"
+              <CheckBox Content="Müzik modu" IsChecked="{Binding MusicMode}" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Kare kapak, ses eşitleme, sanatçı/albüm/parça etiketi"
                         Visibility="{Binding Mode, Converter={StaticResource EqVis}, ConverterParameter=Audio}" />
-              <ToggleButton Style="{StaticResource Pill}" Content="{Binding OptionsLabel}" IsChecked="{Binding ShowOptions}" VerticalAlignment="Center"
+              <ToggleButton Style="{StaticResource Pill}" Content="{Binding OptionsLabel}" IsChecked="{Binding ShowOptions}" VerticalAlignment="Center" Margin="0"
                             ToolTip="Kurs ve playlist indirme seçenekleri: altyazı, metin döküm, açıklama, .m3u8, ters sıra, özel klasör" />
             </WrapPanel>
           </DockPanel>

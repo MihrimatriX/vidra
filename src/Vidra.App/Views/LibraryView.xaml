@@ -157,11 +157,12 @@
                 <StackPanel>
                   <Grid Height="128">
                     <Border x:Name="Mask" CornerRadius="8" Background="{DynamicResource ThumbBg}" />
-                    <Image Source="{Binding Cover, Converter={StaticResource Thumb}, ConverterParameter=480}" Stretch="UniformToFill">
-                      <Image.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Image.OpacityMask>
-                    </Image>
-                    <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}"
-                                 Foreground="{DynamicResource Ok}" Background="#6614171C" Margin="0" />
+                    <Grid>
+                      <Grid.OpacityMask><VisualBrush Visual="{Binding ElementName=Mask}" /></Grid.OpacityMask>
+                      <Image Source="{Binding Cover, Converter={StaticResource Thumb}, ConverterParameter=480}" Stretch="UniformToFill" />
+                      <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}"
+                                   Foreground="{DynamicResource Ok}" Background="#6614171C" Margin="0" />
+                    </Grid>
                     <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6,6,6,8" Background="#D914171C" CornerRadius="6" Padding="7,3">
                       <StackPanel Orientation="Horizontal">
                         <c:Icon Data="{StaticResource I.Course}" Size="14" Foreground="White" />
