@@ -190,7 +190,7 @@ public partial class MainWindow : Window
                     _vm.QueueVm.Section = "history";
                     Dispatcher.BeginInvoke(DispatcherPriority.Input, () => FocusInPage("SearchBox"));
                 }
-                else if (!FocusInPage("SearchBox", "QueryBox", "UrlBox")) _vm.Palette.Open();
+                else if (!FocusInPage("SearchBox", "ListSearchBox", "QueryBox", "UrlBox")) _vm.Palette.Open();
                 break;
             // Metin kutusu dışında yapıştır: bağlantıyı hangi ekrandan olursa olsun aç
             case Key.V when !IsTextInput(Keyboard.FocusedElement):

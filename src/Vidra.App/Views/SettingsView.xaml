@@ -97,14 +97,45 @@
             <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,14">
               <TextBlock Text="{Binding OutputPreview}" Style="{StaticResource Mono}" TextWrapping="Wrap" />
             </Border>
-            <HeaderedContentControl Style="{StaticResource Field}" Header="Playlist dosya adı" Margin="0,0,0,8">
+            <HeaderedContentControl Style="{StaticResource Field}" Header="Playlist &amp; kurs dosya adı" Margin="0,0,0,8">
               <TextBox Style="{StaticResource InputMono}" Text="{Binding PlaylistTemplate, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
             </HeaderedContentControl>
+            <WrapPanel Margin="0,0,0,6">
+              <TextBlock Text="Hazır:" Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <ItemsControl ItemsSource="{Binding PlaylistPresets}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Button Style="{StaticResource BtnSm}" Margin="0,0,6,6" Content="{Binding Label}"
+                            Command="{Binding DataContext.ApplyPlaylistPresetCommand, ElementName=Root}" CommandParameter="{Binding Value}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </WrapPanel>
+            <WrapPanel Margin="0,0,0,8">
+              <TextBlock Text="Ekle:" Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="kanal" Command="{Binding InsertPlaylistTokenCommand}" CommandParameter="%(playlist_channel)s" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="liste" Command="{Binding InsertPlaylistTokenCommand}" CommandParameter="%(playlist)s" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="sıra" Command="{Binding InsertPlaylistTokenCommand}" CommandParameter="%(playlist_index)03d" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="başlık" Command="{Binding InsertPlaylistTokenCommand}" CommandParameter="%(title)s" />
+              <Button Style="{StaticResource BtnSm}" FontFamily="{StaticResource MonoFont}" Margin="0,0,6,6" Content="id" Command="{Binding InsertPlaylistTokenCommand}" CommandParameter="[%(id)s]" />
+            </WrapPanel>
             <Border Background="{DynamicResource Surface2}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,14">
               <TextBlock Text="{Binding PlaylistPreview}" Style="{StaticResource Mono}" TextWrapping="Wrap" />
             </Border>
-            <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="460" Margin="0" IsChecked="{Binding UseArchive}"
-                      Content="İndirme arşivi" Tag="İndirilen video kimlikleri kaydedilir; aynı video ikinci kez inmez" />
+            <WrapPanel>
+              <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="420" Margin="0,0,12,8" IsChecked="{Binding UseArchive}"
+                        Content="İndirme arşivi" Tag="İndirilen video kimlikleri kaydedilir; aynı video ikinci kez inmez" />
+              <Border Style="{StaticResource Tile}" Background="{DynamicResource Surface2}" Padding="14,10" Margin="0,0,0,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                  <StackPanel Margin="0,0,14,0">
+                    <TextBlock Text="Kurs &amp; playlist önbelleği" FontWeight="SemiBold" FontSize="13.5" />
+                    <TextBlock Text="{Binding ListCacheInfo}" Style="{StaticResource Small}" Margin="0,2,0,0" />
+                  </StackPanel>
+                  <Button Style="{StaticResource BtnSm}" Content="Temizle" Command="{Binding ClearListCacheCommand}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
+            </WrapPanel>
           </StackPanel>
         </Border>
 

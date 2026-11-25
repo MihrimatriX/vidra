@@ -61,6 +61,37 @@ public static partial class YouTubeUrl
         return $"{u.Scheme}://{u.Host}/{m.Groups[1].Value}/{tab.Path()}";
     }
 
+    /// <summary>Kanal bağlantısını sekmesiz/sorgusuz kök adresine indirger (…/@kanal/courses?si=x → https://www.youtube.com/@kanal).</summary>
+    public static string ChannelRootUrl(string raw)
+    {
+        if (!Uri.TryCreate(raw.Trim(), UriKind.Absolute, out var u)) return raw.Trim();
+        var m = ChannelPath().Match(u.AbsolutePath);
+        if (!m.Success) return raw.Trim();
+        return $"{u.Scheme}://{u.Host}/{m.Groups[1].Value}";
+    }
+
+    /// <summary>/channel/UC… adresinden kanal kimliğini çıkarır; @tutamaçta null.</summary>
+    public static string? ChannelId(string raw)
+    {
+        if (!Uri.TryCreate(raw.Trim(), UriKind.Absolute, out var u)) return null;
+        var m = ChannelPath().Match(u.AbsolutePath);
+        if (!m.Success) return null;
+        var seg = m.Groups[1].Value;
+        return seg.StartsWith("channel/UC", StringComparison.Ordinal) ? seg["channel/".Length..] : null;
+    }
+
+    /// <summary>Sabitleme, son açılanlar ve takip karşılaştırması için standart kaynak adresi.</summary>
+    public static string CanonicalSourceUrl(string raw)
+    {
+        var s = raw.Trim();
+        return Classify(s) switch
+        {
+            LinkKind.Channel => ChannelRootUrl(s),
+            LinkKind.Playlist when PlaylistId(s) is { } id => $"https://www.youtube.com/playlist?list={id}",
+            _ => s,
+        };
+    }
+
     /// <summary>Kanal bağlantısındaki sekme (…/@kanal/playlists → Playlists); sekmesiz ya da tanınmayan yolda null.</summary>
     public static ChannelTab? TabOf(string raw)
     {

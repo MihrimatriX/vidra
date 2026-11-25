@@ -40,4 +40,7 @@
   <Geometry x:Key="I.Terminal">M4,17 L10,11 L4,5 M12,19 H20</Geometry>
   <Geometry x:Key="I.More">M5,12 L5.01,12 M12,12 L12.01,12 M19,12 L19.01,12</Geometry>
   <Geometry x:Key="I.Star">M12,3 L14.6,9 L21,9.5 L16.1,13.7 L17.6,20 L12,16.6 L6.4,20 L7.9,13.7 L3,9.5 L9.4,9 Z</Geometry>
+  <Geometry x:Key="I.Course">M2,9 L12,4 L22,9 L12,14 Z M6,11.5 V16.5 C6,18 9,19.5 12,19.5 C15,19.5 18,18 18,16.5 V11.5 M22,9 V15</Geometry>
+  <Geometry x:Key="I.CheckCircle">M12,3 A9,9 0 1 1 11.99,3 Z M8.5,12.2 L10.8,14.5 L15.8,9.5</Geometry>
+  <Geometry x:Key="I.Sliders">M4,6 H20 M4,12 H20 M4,18 H20 M8,4 V8 M16,10 V14 M11,16 V20</Geometry>
 </ResourceDictionary>

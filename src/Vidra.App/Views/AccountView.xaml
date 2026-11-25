@@ -178,6 +178,9 @@
       <!-- ===== Takip edilenler ===== -->
       <DockPanel Margin="0,0,0,10">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button Style="{StaticResource BtnSm}" Content="Hepsini şimdi kontrol et" Margin="0,0,12,0"
+                  Command="{Binding CheckAllFollowsCommand}" IsEnabled="{Binding Busy, Converter={StaticResource Not}}"
+                  Visibility="{Binding Follows.Count, Converter={StaticResource Vis}}" />
           <TextBlock Text="Kontrol aralığı" FontSize="14" Foreground="{DynamicResource Text2}" VerticalAlignment="Center" Margin="0,0,8,0" />
           <ComboBox Width="160" ItemsSource="{Binding FollowIntervals}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding FollowInterval}" />
         </StackPanel>
@@ -186,7 +189,7 @@
       <Border Style="{StaticResource Card}" CornerRadius="16">
         <StackPanel>
           <TextBlock Style="{StaticResource Body2}" Margin="18" Visibility="{Binding Follows.Count, Converter={StaticResource Vis}, ConverterParameter=!}"
-                     Text="Henüz takip edilen liste yok. Bir playlist ya da kanal açıp &quot;Takip et&quot;e bastığında yeni videolar otomatik olarak kuyruğa eklenir." />
+                     Text="Henüz takip edilen liste yok. Bir playlist, kurs ya da kanal sekmesi (Üyeler dahil) açıp &quot;Takip et&quot;e bastığında yeni videolar otomatik olarak kuyruğa eklenir." />
           <ItemsControl ItemsSource="{Binding Follows}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
@@ -198,7 +201,12 @@
                       <Button Style="{StaticResource BtnSm}" Content="Bırak" Command="{Binding DataContext.UnfollowCommand, ElementName=Root}" CommandParameter="{Binding}" />
                     </StackPanel>
                     <StackPanel VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <Border Style="{StaticResource ChipGold}" Margin="8,0,0,0" Visibility="{Binding Tab, Converter={StaticResource EqVis}, ConverterParameter=Membership}">
+                          <TextBlock Text="ÜYELER" />
+                        </Border>
+                      </StackPanel>
                       <TextBlock Style="{StaticResource Small}">
                         <Run Text="{Binding Options, Mode=OneWay, Converter={StaticResource Desc}}" /> <Run Text="· son kontrol" />
                         <Run Text="{Binding LastChecked, Mode=OneWay, Converter={StaticResource Rel}}" /> <Run Text="·" />

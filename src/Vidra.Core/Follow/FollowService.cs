@@ -58,9 +58,22 @@ public sealed class FollowService : IAsyncDisposable
         });
     }
 
-    public async Task<FollowedSource> FollowAsync(string url, string title, DownloadOptions options, IEnumerable<string> existingIds)
+    public async Task<FollowedSource> FollowAsync(string url, string title, DownloadOptions options, IEnumerable<string> existingIds,
+        ChannelTab tab = ChannelTab.Videos, string? playlistTitle = null, string? channel = null)
     {
-        var f = new FollowedSource { Url = url, Title = title, Options = options, LastChecked = DateTimeOffset.Now };
+        var canonical = YouTubeUrl.CanonicalSourceUrl(url);
+        var kind = YouTubeUrl.Classify(canonical);
+        var effectiveTab = kind == LinkKind.Channel ? tab : ChannelTab.Videos;
+        var f = new FollowedSource
+        {
+            Url = canonical,
+            Title = title,
+            Tab = effectiveTab,
+            PlaylistTitle = kind == LinkKind.Playlist ? (playlistTitle ?? title) : null,
+            Channel = channel,
+            Options = options,
+            LastChecked = DateTimeOffset.Now,
+        };
         lock (_seen) foreach (var id in existingIds) _seen.Add(id);
         _dispatch(() => Items.Add(f));
         await SaveAsync().ConfigureAwait(false);
@@ -73,7 +86,35 @@ public sealed class FollowService : IAsyncDisposable
         await SaveAsync().ConfigureAwait(false);
     }
 
-    public bool IsFollowed(string url) => Items.Any(i => string.Equals(i.Url, url, StringComparison.OrdinalIgnoreCase));
+    public FollowedSource? Find(string url, ChannelTab tab = ChannelTab.Videos)
+    {
+        var canonical = YouTubeUrl.CanonicalSourceUrl(url);
+        var isChannel = YouTubeUrl.Classify(canonical) == LinkKind.Channel;
+        return Items.FirstOrDefault(i =>
+            string.Equals(YouTubeUrl.CanonicalSourceUrl(i.Url), canonical, StringComparison.OrdinalIgnoreCase) &&
+            (!isChannel || i.Tab == tab));
+    }
+
+    public bool IsFollowed(string url, ChannelTab tab = ChannelTab.Videos) => Find(url, tab) is not null;
+
+    /// <summary>Etkin takip kaynaklarının hepsini sırayla kontrol eder.</summary>
+    public async Task<(int CheckedCount, int TotalNew, int ErrorCount)> CheckAllAsync(CancellationToken ct = default)
+    {
+        List<FollowedSource> all = [];
+        _dispatch(() => all = Items.Where(i => i.Enabled).ToList());
+        int checkedCount = 0, totalNew = 0, errors = 0;
+        foreach (var f in all)
+        {
+            try
+            {
+                totalNew += await CheckAsync(f, ct).ConfigureAwait(false);
+                checkedCount++;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { errors++; }
+        }
+        return (checkedCount, totalNew, errors);
+    }
 
     private async Task CheckDueAsync(TimeSpan interval, CancellationToken ct)
     {
@@ -93,27 +134,46 @@ public sealed class FollowService : IAsyncDisposable
         await _checkGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            // Yeni videolar listenin başında olur; son 50 öğe yeterli ve hızlı
-            var result = await _ytdlp.ProbeAsync(f.Url, ChannelTab.Videos, limit: 50, ct).ConfigureAwait(false);
+            var kind = YouTubeUrl.Classify(f.Url);
+            // Kurs/playlistlerde yeni dersler genellikle listenin SONUNA eklenir: 50 sınırı koyma.
+            // Kanal sekmeleri ve hesap akışlarında yeniler baştadır; ilk 50 hızlı ve yeterli.
+            int? limit = kind == LinkKind.Playlist ? null : 50;
+            var result = await _ytdlp.ProbeAsync(f.Url, f.Tab, limit: limit, ct).ConfigureAwait(false);
             if (result is not PlaylistInfo pl) return 0;
 
             var archived = _archive.ReadIds();
             HashSet<string> queued = [];
             _dispatch(() => queued = _queue.Jobs.Select(j => j.VideoId).OfType<string>().ToHashSet());
 
-            List<PlaylistEntry> fresh;
+            List<(PlaylistEntry Entry, int Index)> fresh;
             lock (_seen)
             {
-                fresh = pl.Entries.Where(e => !e.Unavailable && !archived.Contains(e.Id) && !queued.Contains(e.Id) && !_seen.Contains(e.Id)).ToList();
-                foreach (var e in fresh) _seen.Add(e.Id);
+                fresh = pl.Entries
+                    .Select((e, i) => (Entry: e, Index: i + 1))
+                    .Where(x => !x.Entry.IsList && !x.Entry.Unavailable && !archived.Contains(x.Entry.Id) && !queued.Contains(x.Entry.Id) && !_seen.Contains(x.Entry.Id))
+                    .ToList();
+                foreach (var x in fresh) _seen.Add(x.Entry.Id);
             }
 
             if (fresh.Count > 0)
             {
-                // En eskiden yeniye indir
-                _queue.Enqueue(fresh.AsEnumerable().Reverse().Select(e => new NewJob(
-                    e.Url, e.Title, f.Options, pl.Channel, e.Thumbnail, e.Duration,
-                    Source: $"Takip: {f.Title}")));
+                var s = _settings();
+                var listTitle = kind == LinkKind.Playlist
+                    ? (!string.IsNullOrWhiteSpace(f.PlaylistTitle) ? f.PlaylistTitle! : !string.IsNullOrWhiteSpace(pl.Title) ? pl.Title : f.Title)
+                    : null;
+                var channelName = !string.IsNullOrWhiteSpace(pl.Channel) ? pl.Channel : f.Channel;
+                // Playlist/kurslarda sıra zaten eskiden yeniye (1..N); kanal/üyeler sekmesinde yeniler başta olduğu için ters çevir
+                IEnumerable<(PlaylistEntry Entry, int Index)> ordered = kind == LinkKind.Playlist ? fresh : fresh.AsEnumerable().Reverse();
+                _queue.Enqueue(ordered.Select(x =>
+                {
+                    if (listTitle is not null)
+                    {
+                        var opts = f.Options with { Playlist = new PlaylistRef(listTitle, x.Index, f.Url, channelName) };
+                        var tpl = Templates.ResolvePlaylist(s.PlaylistTemplate, listTitle, x.Index, channelName);
+                        return new NewJob(x.Entry.Url, x.Entry.Title, opts, x.Entry.Channel ?? channelName, x.Entry.Thumbnail, x.Entry.Duration, tpl, $"Takip: {f.Title}");
+                    }
+                    return new NewJob(x.Entry.Url, x.Entry.Title, f.Options, x.Entry.Channel ?? channelName, x.Entry.Thumbnail, x.Entry.Duration, Source: $"Takip: {f.Title}");
+                }));
             }
 
             f.LastChecked = DateTimeOffset.Now;

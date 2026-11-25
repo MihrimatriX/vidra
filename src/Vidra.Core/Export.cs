@@ -84,4 +84,52 @@ public static partial class Export
         }
         return n;
     }
+
+    /// <summary>
+    /// VLC, MPV, PotPlayer gibi oynatıcıların açabildiği M3U8 oynatma listesi.
+    /// baseDir verilirse aynı kökteki yollar göreli yazılır (kurs klasörü taşınsa da çalışır).
+    /// </summary>
+    public static string CourseM3u(string playlistTitle, IEnumerable<(int Index, string Title, double? Duration, string FilePath)> items, string? baseDir = null)
+    {
+        var sb = new StringBuilder();
+        sb.Append("#EXTM3U\n");
+        var cleanPlaylist = playlistTitle.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (cleanPlaylist.Length > 0) sb.Append("#PLAYLIST:").Append(cleanPlaylist).Append('\n');
+        var ordered = items
+            .Where(x => !string.IsNullOrWhiteSpace(x.FilePath))
+            .DistinctBy(x => x.FilePath, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x.Index > 0 ? x.Index : int.MaxValue)
+            .ThenBy(x => x.FilePath, StringComparer.OrdinalIgnoreCase);
+        foreach (var (_, title, duration, path) in ordered)
+        {
+            var secs = duration is { } d && d > 0 && !double.IsNaN(d) ? (long)Math.Round(d) : -1;
+            var cleanTitle = title.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            sb.Append("#EXTINF:").Append(secs.ToString(CultureInfo.InvariantCulture)).Append(',').Append(cleanTitle).Append('\n');
+            var rel = baseDir is { Length: > 0 } ? SafeRelativePath(baseDir, path) : path;
+            sb.Append(rel).Append('\n');
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Kurs klasörüne &lt;KursAdı&gt;.m3u8 dosyası yazar; yazılan dosya yolunu döndürür.</summary>
+    public static string? WriteCourseM3u(string folderPath, string playlistTitle, IEnumerable<(int Index, string Title, double? Duration, string FilePath)> items)
+    {
+        var list = items.Where(x => !string.IsNullOrWhiteSpace(x.FilePath)).ToList();
+        if (list.Count == 0 || !Directory.Exists(folderPath)) return null;
+        var name = YtDlp.Templates.SanitizeName(string.IsNullOrWhiteSpace(playlistTitle) ? "playlist" : playlistTitle);
+        var path = Path.Combine(folderPath, name + ".m3u8");
+        File.WriteAllText(path, CourseM3u(playlistTitle, list, folderPath), new UTF8Encoding(false));
+        return path;
+    }
+
+    private static string SafeRelativePath(string baseDir, string targetPath)
+    {
+        try
+        {
+            var rel = Path.GetRelativePath(baseDir, targetPath);
+            // Farklı sürücüde GetRelativePath tam yolu döndürür; aynı klasör/alt klasörde göreli yol gelir
+            return rel.Replace('\\', '/');
+        }
+        catch (ArgumentException) { return targetPath; }
+    }
 }

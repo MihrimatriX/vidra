@@ -22,9 +22,14 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
         var url = kind == LinkKind.Channel ? YouTubeUrl.ChannelTabUrl(rawUrl, tab) : rawUrl.Trim();
         if (kind == LinkKind.Channel && tab == ChannelTab.Membership)
         {
-            // @tutamaçtan kanal kimliği çıkmaz; sekme sorgusunun kök "id" alanı kimliğin kendisidir
-            using var head = await RunJsonAsync(YtDlpArgs.Probe(YouTubeUrl.ChannelTabUrl(rawUrl, ChannelTab.Videos), kind, settings(), tools.Paths, 1), ct).ConfigureAwait(false);
-            var id = head.RootElement.TryGetProperty("id", out var v) ? v.GetString() : null;
+            // URL zaten /channel/UC… içeriyorsa ek sorguya gerek yok
+            var id = YouTubeUrl.ChannelId(rawUrl);
+            if (id is null)
+            {
+                // @tutamaçtan kanal kimliği çıkmaz; sekme sorgusunun kök "id" (veya "channel_id") alanı kimliğin kendisidir.
+                // Herkese açık videosu olmayan kanallarda /videos yerine kanal köküne düş.
+                id = await ResolveChannelIdAsync(rawUrl, ct).ConfigureAwait(false);
+            }
             if (id is not { Length: > 2 } || !id.StartsWith("UC", StringComparison.Ordinal))
                 throw new ProbeException("Kanal kimliği alınamadı.", ErrorKind.Unknown);
             url = YouTubeUrl.MembersPlaylistUrl(id);
@@ -34,6 +39,26 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
         var root = doc.RootElement;
         if (kind == LinkKind.Video || !ProbeParser.IsPlaylist(root)) return ProbeParser.ParseVideo(root);
         return ProbeParser.ParsePlaylist(root, kind);
+    }
+
+    private async Task<string?> ResolveChannelIdAsync(string rawUrl, CancellationToken ct)
+    {
+        foreach (var probeUrl in new[] { YouTubeUrl.ChannelTabUrl(rawUrl, ChannelTab.Videos), YouTubeUrl.ChannelRootUrl(rawUrl) }.Distinct(StringComparer.Ordinal))
+        {
+            try
+            {
+                using var head = await RunJsonAsync(YtDlpArgs.Probe(probeUrl, LinkKind.Channel, settings(), tools.Paths, 1), ct).ConfigureAwait(false);
+                var root = head.RootElement;
+                foreach (var prop in new[] { "id", "channel_id" })
+                {
+                    if (root.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String &&
+                        v.GetString() is { Length: > 2 } cid && cid.StartsWith("UC", StringComparison.Ordinal))
+                        return cid;
+                }
+            }
+            catch (ProbeException e) when (e.Kind == ErrorKind.Unavailable) { /* sekme yoksa kök adresle dene */ }
+        }
+        return null;
     }
 
     /// <summary>YouTube'da arama; sonuçlar düz liste (format bilgisi yok, indirmeden önce ayrıca analiz edilir).</summary>

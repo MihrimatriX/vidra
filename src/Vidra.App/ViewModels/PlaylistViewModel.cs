@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 using Vidra.Core;
 using Vidra.Core.Models;
 using Vidra.Core.Queue;
@@ -29,15 +30,27 @@ public sealed partial class PlaylistRow(PlaylistEntry entry, int index, bool don
     // İndirilmiş videolar seçili gelmez; istenirse elle seçilip yeniden indirilebilir
     [ObservableProperty] private bool _isSelected = !entry.Unavailable && !entry.IsList && !done;
 
-    // Alt liste kartı: içerik arka planda okunur (bkz. PlaylistViewModel.LoadListStatsAsync)
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CountText), nameof(MembersText), nameof(MembersHint), nameof(StatsText))] private ListStats? _stats;
+    // Alt liste kartı: içerik önbellekten ya da arka planda okunur (bkz. PlaylistViewModel.LoadListStatsAsync)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CountText), nameof(MembersText), nameof(MembersHint), nameof(StatsText),
+        nameof(Progress), nameof(ShowProgress), nameof(Complete), nameof(HasMembers))]
+    private ListStats? _stats;
+
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(StatsText))] private string? _statsError;
+    [ObservableProperty] private bool _isListFollowed;
+    [ObservableProperty] private bool _isListPinned;
+
     public string? CountText => Stats is { } s ? $"{s.Videos} video" : null;
     public string? MembersText => Stats switch { { AllMembers: true } => "ÜYELERE ÖZEL", { Members: > 0 } s => $"{s.Members} ÜYE", _ => null };
     public string? MembersHint => Stats is { Members: > 0 } s ? $"Üyelere özel: {s.Members} / {s.Videos} video" : null;
+    public double Progress => Stats?.Progress ?? 0;
+    public bool ShowProgress => Stats is { Done: > 0 };
+    public bool Complete => Stats?.Complete ?? false;
+    public bool HasMembers => Stats is { Members: > 0 };
     public string StatsText => StatsError is not null ? "Okunamadı"
         : Stats is not { } s ? (Selectable ? "Okunuyor…" : "")
-        : string.Join(" · ", new[] { s.Seconds > 0 ? TimeText.Format(s.Seconds) : "", s.Done > 0 ? $"{s.Done} indirildi" : "" }.Where(x => x.Length > 0));
+        : s.Complete ? string.Join(" · ", new[] { s.Seconds > 0 ? TimeText.Format(s.Seconds) : "", "Tümü indirildi" }.Where(x => x.Length > 0))
+        : string.Join(" · ", new[] { s.Seconds > 0 ? TimeText.Format(s.Seconds) : "", s.Done > 0 ? $"{s.Done}/{s.Videos} indirildi" : "" }.Where(x => x.Length > 0));
 }
 
 public sealed partial class PlaylistViewModel : ObservableObject
@@ -48,25 +61,41 @@ public sealed partial class PlaylistViewModel : ObservableObject
         [0] = 9000, [2160] = 18000, [1440] = 9000, [1080] = 4300, [720] = 2500, [480] = 1200, [360] = 700,
     };
 
+    private sealed record CollectItem(PlaylistEntry Entry, string List, int Index, string? ListUrl, string? Channel, bool WasDone);
+
     private readonly AppHost _host;
     private readonly MainViewModel _main;
     private readonly Stack<string> _back = new();
+    private readonly Action _coalescedFilter;
     private List<PlaylistRow> _all = [];
+    private PlaylistRow? _anchorRow;
     private bool _bulk;
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _statsCts;
-    /// <summary>Okunmuş alt listeler: kart özeti için okunan liste açılırken ya da indirilirken yeniden okunmaz.</summary>
-    private readonly Dictionary<string, PlaylistInfo> _lists = new(StringComparer.Ordinal);
+    /// <summary>Oturum içi okunmuş alt listeler; kalıcı kopya AppHost.ListCache'tedir.</summary>
+    private readonly Dictionary<string, PlaylistInfo> _lists = new(StringComparer.OrdinalIgnoreCase);
 
     public PlaylistViewModel(AppHost host, MainViewModel main)
     {
         _host = host;
         _main = main;
+        _coalescedFilter = Ui.Coalesce(ApplyFilter);
         var d = host.Settings.Defaults;
         _mode = d.Mode;
         _height = d.Height ?? 0;
+        _container = d.Container;
         _audioFormat = d.AudioFormat == AudioFormat.Opus ? AudioFormat.Original : d.AudioFormat;
         _musicMode = d.MusicMode;
+        _subtitles = d.Subtitles;
+        _transcript = d.Transcript;
+        _sponsorBlock = d.SponsorBlock;
+
+        host.SettingsStore.Changed += (_, _) => AppHost.Dispatch(RefreshBookmarks);
+        main.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.CookieActive)) OnPropertyChanged(nameof(ShowMemberLoginHint));
+        };
+        RefreshBookmarks();
     }
 
     /// <summary>Boş ekrandaki kutu: playlist/kanal/akış bağlantısını burada da açabilmek için.</summary>
@@ -75,28 +104,45 @@ public sealed partial class PlaylistViewModel : ObservableObject
     public IReadOnlyList<Choice> ChannelTabs => Choices.ChannelTabs;
     public IReadOnlyList<Choice> Modes => Choices.Modes;
     public IReadOnlyList<Choice> Heights => Choices.Heights;
+    public IReadOnlyList<Choice> Containers => Choices.Containers;
     public IReadOnlyList<Choice> AudioFormats => Choices.AudioFormats;
     public IReadOnlyList<Choice> Buckets => Choices.DurationBuckets;
+    public IReadOnlyList<Choice> VideoSorts => Choices.VideoSorts;
+    public IReadOnlyList<Choice> ListSorts => Choices.ListSorts;
+    public IReadOnlyList<DownloadProfile> Profiles => DownloadProfile.BuiltIns.Concat(_host.Settings.Profiles).ToList();
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasInfo), nameof(HasVideos), nameof(IsChannel), nameof(KindLabel))] private PlaylistInfo? _info;
+    // Sabitlenen kanallar (özellikle Katıl/üye kanalları) ve son açılanlar
+    public ObservableCollection<PinnedSource> Pinned { get; } = [];
+    public ObservableCollection<RecentSource> Recents { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasInfo), nameof(HasVideos), nameof(IsChannel), nameof(KindLabel), nameof(CanPin), nameof(ShowMemberLoginHint), nameof(ShowPinMemberToggle))]
+    private PlaylistInfo? _info;
     public bool HasInfo => Info is not null;
     public bool IsChannel => Info?.Kind == LinkKind.Channel;
+    public bool CanPin => Info is { Kind: LinkKind.Channel or LinkKind.Playlist };
+    public bool ShowPinMemberToggle => IsPinned && IsChannel;
     public string KindLabel => Info?.Kind switch { LinkKind.Channel => "Kanal", LinkKind.Feed => "Hesap akışı", _ => "Playlist" };
 
-    /// <summary>"Playlistlerim" gibi yalnızca listelerden oluşan sayfa: video tablosu yerine liste kartları.</summary>
+    /// <summary>"Playlistlerim", "Playlistler", "Kurslar" gibi yalnızca listelerden oluşan sayfa: liste kartları.</summary>
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasVideos))] private bool _isListOfLists;
     public bool HasVideos => HasInfo && !IsListOfLists;
 
     [ObservableProperty] private string _sourceUrl = "";
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string? _error;
-    [ObservableProperty] private ChannelTab _channelTab = ChannelTab.Videos;
+    [ObservableProperty] private bool _errorIsAuth;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowMemberLoginHint))] private ChannelTab _channelTab = ChannelTab.Videos;
     [ObservableProperty] private string? _cover;
     [ObservableProperty] private string _metaLine = "";
     /// <summary>Hesap akışlarında yt-dlp'nin İngilizce adı ("Liked videos", "playlists") yerine menüdeki Türkçe ad.</summary>
     [ObservableProperty] private string _title = "";
 
-    // Filtreler: arama + "indirilmemiş" her zaman görünür, gerisi "Daha fazla" altında
+    // Sabitleme durumu (açık kaynak için)
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowPinMemberToggle))] private bool _isPinned;
+    [ObservableProperty] private bool _isPinnedMember;
+
+    // Filtreler ve sıralama
     [ObservableProperty] private bool _moreFilters;
     [ObservableProperty] private string _range = "";
     [ObservableProperty] private string _dateFrom = "";
@@ -105,6 +151,8 @@ public sealed partial class PlaylistViewModel : ObservableObject
     [ObservableProperty] private string _query = "";
     [ObservableProperty] private bool _onlyNew;
     [ObservableProperty] private bool _onlyMembers;
+    [ObservableProperty] private string _videoSort = "list";
+    [ObservableProperty] private string _listSort = "default";
 
     public ObservableCollection<PlaylistRow> Rows { get; } = [];
     public CardGrid Cards { get; } = new();
@@ -121,9 +169,14 @@ public sealed partial class PlaylistViewModel : ObservableObject
     [ObservableProperty] private string? _toast;
     [ObservableProperty] private string _selectedLabel = "";
 
-    [ObservableProperty] private int _membersCount;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowMemberLoginHint))] private int _membersCount;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowMemberLoginHint))] private bool _hasAnyListMembers;
     [ObservableProperty] private int _doneCount;
     [ObservableProperty] private int _unavailableCount;
+    [ObservableProperty] private int _fromCacheCount;
+
+    /// <summary>Oturum yokken üyelere özel içerik açıldığında üstte Hesabım'a yönlendiren bilgi şeridi.</summary>
+    public bool ShowMemberLoginHint => HasInfo && !_main.CookieActive && (ChannelTab == ChannelTab.Membership || MembersCount > 0 || HasAnyListMembers);
 
     // Seçim çubuğu
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanEnqueue))] private int _selectedCount;
@@ -131,12 +184,41 @@ public sealed partial class PlaylistViewModel : ObservableObject
     [ObservableProperty] private string _selectedSummary = "";
     [ObservableProperty] private bool _allSelected;
 
-    // İndirme seçenekleri
+    // İndirme seçenekleri (alt çubuk + açılır kurs seçenekleri)
     [ObservableProperty] private DownloadMode _mode;
     [ObservableProperty] private int _height;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OptionsLabel))] private ContainerFormat _container;
     [ObservableProperty] private AudioFormat _audioFormat;
     [ObservableProperty] private bool _musicMode;
     [ObservableProperty] private bool _isFollowed;
+
+    [ObservableProperty] private bool _showOptions;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OptionsLabel))] private bool _subtitles;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OptionsLabel))] private bool _transcript;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OptionsLabel))] private bool _writeDescription;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OptionsLabel))] private bool _sponsorBlock;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OptionsLabel))] private bool _writeM3u;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OptionsLabel))] private bool _reverseOrder;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasCustomOutputDir), nameof(CustomOutputLabel), nameof(OptionsLabel))] private string _customOutputDir = "";
+
+    public bool HasCustomOutputDir => !string.IsNullOrWhiteSpace(CustomOutputDir);
+    public string CustomOutputLabel => HasCustomOutputDir ? Path.GetFileName(CustomOutputDir.TrimEnd('\\', '/')) is { Length: > 0 } n ? n : CustomOutputDir : "Varsayılan klasör";
+
+    public string OptionsLabel
+    {
+        get
+        {
+            var n = 0;
+            if (Transcript) n++;
+            if (WriteDescription) n++;
+            if (WriteM3u) n++;
+            if (ReverseOrder) n++;
+            if (SponsorBlock) n++;
+            if (HasCustomOutputDir) n++;
+            if (Mode == DownloadMode.Video && Container != _host.Settings.Defaults.Container) n++;
+            return n > 0 ? $"Seçenekler · {n}" : "Seçenekler";
+        }
+    }
 
     partial void OnRangeChanged(string value) => ApplyFilter();
     partial void OnDateFromChanged(string value) => ApplyFilter();
@@ -145,7 +227,9 @@ public sealed partial class PlaylistViewModel : ObservableObject
     partial void OnQueryChanged(string value) => ApplyFilter();
     partial void OnOnlyNewChanged(bool value) => ApplyFilter();
     partial void OnOnlyMembersChanged(bool value) => ApplyFilter();
-    partial void OnModeChanged(DownloadMode value) => UpdateSelection();
+    partial void OnVideoSortChanged(string value) => ApplyFilter();
+    partial void OnListSortChanged(string value) => ApplyFilter();
+    partial void OnModeChanged(DownloadMode value) { UpdateSelection(); OnPropertyChanged(nameof(OptionsLabel)); }
     partial void OnHeightChanged(int value) => UpdateSelection();
     partial void OnAudioFormatChanged(AudioFormat value) => UpdateSelection();
 
@@ -156,6 +240,10 @@ public sealed partial class PlaylistViewModel : ObservableObject
 
     private bool _tabFromUrl;
 
+    /// <summary>Kanalı doğrudan seçilen sekmede açar (sabitlenen kanallar, takip ve komut paleti için).</summary>
+    public Task LoadTabAsync(string url, ChannelTab tab) =>
+        LoadAsync(YouTubeUrl.Classify(url) == LinkKind.Channel ? YouTubeUrl.ChannelTabUrl(url, tab) : url);
+
     /// <param name="keepHistory">Alt listeye girerken/geri dönerken "Geri" geçmişi korunur; dışarıdan açılışta sıfırlanır.</param>
     public async Task LoadAsync(string url, bool keepHistory = false)
     {
@@ -163,7 +251,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
         _statsCts?.Cancel();
         var cts = _cts = new CancellationTokenSource();
         SourceUrl = url;
-        // Yeni açılan kanal bağlantısının sekmesi (…/playlists) seçilir; sekmesizse Videolar
+        // Yeni açılan kanal bağlantısının sekmesi (…/playlists, …/courses, …/membership) seçilir; sekmesizse Videolar
         if (!keepHistory && YouTubeUrl.Classify(url) == LinkKind.Channel)
         {
             _tabFromUrl = true;
@@ -172,17 +260,26 @@ public sealed partial class PlaylistViewModel : ObservableObject
         }
         IsLoading = true;
         Error = null;
+        ErrorIsAuth = false;
         try
         {
             var r = await _host.YtDlp.ProbeAsync(url, ChannelTab, ct: cts.Token);
             if (cts.IsCancellationRequested) return;
-            if (r is PlaylistInfo p) Show(p, url, keepHistory);
+            if (r is PlaylistInfo p)
+            {
+                if (p.Kind == LinkKind.Playlist) _host.ListCache.Put(url, p);
+                Show(p, url, keepHistory);
+            }
             // Video döndüyse tekrar analiz ettirme (OpenLinkAsync ↔ LoadAsync döngüsü): bilgiyi doğrudan göster
             else if (r is VideoInfo v) { _main.Download.Url = url; _main.Download.ShowVideo(v); _main.Go(Page.Download); }
         }
-        catch (ProbeException e) { Error = e.Message; }
+        catch (ProbeException e)
+        {
+            Error = e.Message;
+            ErrorIsAuth = e.Kind is ErrorKind.Auth or ErrorKind.BotCheck;
+        }
         catch (OperationCanceledException) { }
-        catch (Exception e) { Error = e.Message; }
+        catch (Exception e) { Error = e.Message; ErrorIsAuth = false; }
         finally
         {
             if (_cts == cts) IsLoading = false;
@@ -197,8 +294,21 @@ public sealed partial class PlaylistViewModel : ObservableObject
             _lists.Clear();
         }
         SourceUrl = url;
+        Error = null;
+        ErrorIsAuth = false;
+        _anchorRow = null;
         var archived = ArchivedIds();
-        _all = p.Entries.Select((e, i) => new PlaylistRow(e, i + 1, archived.Contains(e.Id))).ToList();
+        var pinnedSet = _host.Settings.PinnedSources.Select(x => YouTubeUrl.CanonicalSourceUrl(x.Url)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _all = p.Entries.Select((e, i) =>
+        {
+            var row = new PlaylistRow(e, i + 1, archived.Contains(e.Id));
+            if (e.IsList)
+            {
+                row.IsListFollowed = _host.Follow.IsFollowed(e.Url);
+                row.IsListPinned = pinnedSet.Contains(YouTubeUrl.CanonicalSourceUrl(e.Url));
+            }
+            return row;
+        }).ToList();
         foreach (var r in _all) r.PropertyChanged += (_, a) => { if (a.PropertyName == nameof(PlaylistRow.IsSelected)) UpdateSelection(); };
         IsListOfLists = _all.Count > 0 && _all.All(r => r.Entry.IsList);
         // Kanal sekmeleri "Ad - Videos" / "Members-only videos" gibi İngilizce başlık taşır; sekme zaten seçili göründüğü için kanal adı yeter
@@ -207,6 +317,8 @@ public sealed partial class PlaylistViewModel : ObservableObject
         Info = p;
         Cover = p.Entries.FirstOrDefault(e => e.Thumbnail is not null)?.Thumbnail;
         MembersCount = _all.Count(r => r.Entry.MembersOnly);
+        HasAnyListMembers = false;
+        FromCacheCount = 0;
         DoneCount = _all.Count(r => r.Done);
         UnavailableCount = _all.Count(r => r.Entry.Unavailable);
         var secs = _all.Sum(r => r.Entry.Duration ?? 0);
@@ -216,23 +328,48 @@ public sealed partial class PlaylistViewModel : ObservableObject
             IsListOfLists ? $"{_all.Count} liste" : $"{_all.Count} video",
             secs > 0 ? TimeText.Format(secs) : "",
         }.Where(s => s.Length > 0));
-        IsFollowed = _host.Follow.IsFollowed(url);
+        IsFollowed = _host.Follow.IsFollowed(url, ChannelTab);
         MoreFilters = false;
+        // Yeni sayfada eski arama/filtre kalmasın (kullanıcı başka sekmeye/listeye geçti)
+        _suppressFilter = true;
+        try { Query = ""; OnlyNew = false; OnlyMembers = false; }
+        finally { _suppressFilter = false; }
+        RefreshPinState();
+        RecordRecent(p, url);
         ApplyFilter();
         _ = LoadListStatsAsync(IsListOfLists ? _all.Where(r => r.Selectable).ToList() : [], archived);
     }
 
     /// <summary>
-    /// Liste kartlarındaki video sayısı ve üyelere özel videolar: YouTube bunları liste ızgarasında (Playlistler, Kurslar)
-    /// vermez, her liste ayrıca okunur. Çok listeli kanalda YouTube'u boğmamak için aynı anda iki liste; başka sayfaya geçince durur.
+    /// Liste kartlarındaki video sayısı ve üyelere özel videolar: önce kalıcı önbelleğe bakılır (anında),
+    /// olmayanlar YouTube'u boğmamak için arka planda ikişer ikişer okunup önbelleğe yazılır.
+    /// İndirilmiş sayısı her seferinde güncel arşivden hesaplanır.
     /// </summary>
     private async Task LoadListStatsAsync(IReadOnlyList<PlaylistRow> lists, HashSet<string> archived)
     {
         _statsCts?.Cancel();
         if (lists.Count == 0) return;
         var cts = _statsCts = new CancellationTokenSource();
+
+        var toProbe = new List<PlaylistRow>();
+        var cachedCount = 0;
+        foreach (var r in lists)
+        {
+            var cached = _lists.GetValueOrDefault(r.Entry.Url) ?? _host.ListCache.TryGet(r.Entry.Url);
+            if (cached is not null)
+            {
+                _lists[r.Entry.Url] = cached;
+                r.Stats = ListStats.Of(cached.Entries, archived);
+                cachedCount++;
+            }
+            else toProbe.Add(r);
+        }
+        FromCacheCount = cachedCount;
+        if (cachedCount > 0) OnListStatsUpdated();
+        if (toProbe.Count == 0) return;
+
         using var gate = new SemaphoreSlim(2);
-        await Task.WhenAll(lists.Select(async r =>
+        await Task.WhenAll(toProbe.Select(async r =>
         {
             try
             {
@@ -243,8 +380,10 @@ public sealed partial class PlaylistViewModel : ObservableObject
                     {
                         if (await _host.YtDlp.ProbeAsync(r.Entry.Url, ct: cts.Token) is not PlaylistInfo q) { r.StatsError = "Liste okunamadı."; return; }
                         _lists[r.Entry.Url] = p = q;
+                        _host.ListCache.Put(r.Entry.Url, q);
                     }
                     r.Stats = ListStats.Of(p.Entries, archived);
+                    OnListStatsUpdated();
                     if (r.IsSelected) UpdateSelection(keepToast: true);
                 }
                 finally { gate.Release(); }
@@ -254,33 +393,104 @@ public sealed partial class PlaylistViewModel : ObservableObject
         }));
     }
 
+    private void OnListStatsUpdated()
+    {
+        HasAnyListMembers = _all.Any(r => r.Stats is { Members: > 0 });
+        if (OnlyNew || OnlyMembers || ListSort is "members" or "missing" or "count")
+            _coalescedFilter();
+    }
+
     private double Kbps => Mode == DownloadMode.Audio
         ? AudioFormat switch { AudioFormat.Mp3 => 245, AudioFormat.Flac => 900, AudioFormat.Wav => 1411, _ => 150 }
         : (TypicalKbps.TryGetValue(Height, out var k) ? k : 4300) + 130;
 
     private string EstimateFor(double seconds) => seconds > 0 ? Fmt.Bytes(seconds * Kbps * 1000 / 8) : "—";
 
+    private bool _suppressFilter;
+
     private void ApplyFilter()
     {
-        var set = ParseRange(Range, _all.Count);
-        var from = DateFrom.Replace("-", "").Trim();
-        var to = DateTo.Replace("-", "").Trim();
+        if (_suppressFilter) return;
+        _anchorRow = null;
         var q = Query.Trim();
-        (double Min, double Max) b = Bucket switch { "short" => (0, 240), "mid" => (240, 1200), "long" => (1200, double.MaxValue), _ => (0, double.MaxValue) };
+        var tr = StringComparer.Create(Fmt.Tr, ignoreCase: true);
+        IEnumerable<PlaylistRow> visible;
 
-        var visible = _all.Where(r =>
-            (set is null || set.Contains(r.Index)) &&
-            (from.Length != 8 || r.Entry.UploadDate is null || string.CompareOrdinal(r.Entry.UploadDate, from) >= 0) &&
-            (to.Length != 8 || r.Entry.UploadDate is null || string.CompareOrdinal(r.Entry.UploadDate, to) <= 0) &&
-            (Bucket == "all" || (r.Entry.Duration is { } d && d >= b.Min && d < b.Max)) &&
-            (q.Length == 0 || r.Entry.Title.Contains(q, StringComparison.CurrentCultureIgnoreCase)) &&
-            (!OnlyNew || !r.Done) &&
-            (!OnlyMembers || r.Entry.MembersOnly));
+        if (IsListOfLists)
+        {
+            visible = _all.Where(r =>
+                (q.Length == 0 || r.Entry.Title.Contains(q, StringComparison.CurrentCultureIgnoreCase)
+                               || (r.Entry.Channel?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false)) &&
+                (!OnlyNew || r.Stats is null || r.Stats.New > 0) &&
+                (!OnlyMembers || r.Stats is { Members: > 0 }));
+
+            visible = ListSort switch
+            {
+                "members" => visible.OrderByDescending(r => r.Stats?.Members ?? -1).ThenBy(r => r.Index),
+                "missing" => visible.OrderByDescending(r => r.Stats?.New ?? -1).ThenBy(r => r.Index),
+                "count" => visible.OrderByDescending(r => r.Stats?.Videos ?? -1).ThenBy(r => r.Index),
+                "name" => visible.OrderBy(r => r.Entry.Title, tr),
+                _ => visible.OrderBy(r => r.Index),
+            };
+        }
+        else
+        {
+            var set = ParseRange(Range, _all.Count);
+            var from = DateFrom.Replace("-", "").Trim();
+            var to = DateTo.Replace("-", "").Trim();
+            (double Min, double Max) b = Bucket switch { "short" => (0, 240), "mid" => (240, 1200), "long" => (1200, double.MaxValue), _ => (0, double.MaxValue) };
+
+            visible = _all.Where(r =>
+                (set is null || set.Contains(r.Index)) &&
+                (from.Length != 8 || r.Entry.UploadDate is null || string.CompareOrdinal(r.Entry.UploadDate, from) >= 0) &&
+                (to.Length != 8 || r.Entry.UploadDate is null || string.CompareOrdinal(r.Entry.UploadDate, to) <= 0) &&
+                (Bucket == "all" || (r.Entry.Duration is { } d && d >= b.Min && d < b.Max)) &&
+                (q.Length == 0 || r.Entry.Title.Contains(q, StringComparison.CurrentCultureIgnoreCase)) &&
+                (!OnlyNew || !r.Done) &&
+                (!OnlyMembers || r.Entry.MembersOnly));
+
+            visible = VideoSort switch
+            {
+                "reverse" => visible.OrderByDescending(r => r.Index),
+                "newest" => visible.OrderByDescending(r => r.Entry.UploadDate ?? "").ThenBy(r => r.Index),
+                "longest" => visible.OrderByDescending(r => r.Entry.Duration ?? 0).ThenBy(r => r.Index),
+                "views" => visible.OrderByDescending(r => r.Entry.Views ?? 0).ThenBy(r => r.Index),
+                _ => visible.OrderBy(r => r.Index),
+            };
+        }
 
         Rows.Clear();
         foreach (var r in visible) Rows.Add(r);
         Cards.SetItems(Rows);
         UpdateSelection();
+    }
+
+    /// <summary>Satır tıklaması: Shift basılıysa son tıklanan satırla arası toplu seçilir/bırakılır.</summary>
+    public void ToggleRow(PlaylistRow row, bool shift)
+    {
+        if (!row.Selectable) return;
+        if (shift && _anchorRow is not null)
+        {
+            var a = Rows.IndexOf(_anchorRow);
+            var b = Rows.IndexOf(row);
+            if (a >= 0 && b >= 0)
+            {
+                var target = _anchorRow.IsSelected;
+                var lo = Math.Min(a, b);
+                var hi = Math.Max(a, b);
+                _bulk = true;
+                try
+                {
+                    for (var i = lo; i <= hi; i++)
+                        if (Rows[i].Selectable) Rows[i].IsSelected = target;
+                }
+                finally { _bulk = false; }
+                UpdateSelection();
+                return;
+            }
+        }
+        row.IsSelected = !row.IsSelected;
+        _anchorRow = row;
     }
 
     private HashSet<string> ArchivedIds()
@@ -316,17 +526,27 @@ public sealed partial class PlaylistViewModel : ObservableObject
             : stats.Any(s => s is null) ? "Listelerin videoları indirirken okunur, indirilmişler atlanır"
             : count == 0 ? "Seçili listelerde indirilmemiş video yok"
             : $"{count} video · {TimeText.Format(secs)} · ≈ {EstimateFor(secs)}";
-        var candidates = Rows.Where(r => r.Selectable && !r.Done).ToList();
+        var candidates = IsListOfLists
+            ? Rows.Where(r => r.Selectable && (r.Stats is null || r.Stats.New > 0)).ToList()
+            : Rows.Where(r => r.Selectable && !r.Done).ToList();
         AllSelected = candidates.Count > 0 && candidates.All(r => r.IsSelected);
     }
 
-    /// <summary>"Tümü": indirilmemişleri seçer; tekrar basınca indirilmişler dahil hepsini bırakır.</summary>
+    /// <summary>"Tümü": indirilmemiş videoları (ya da eksik videosu olan listeleri) seçer; tekrar basınca hepsini bırakır.</summary>
     [RelayCommand]
     private void ToggleAll()
     {
         var target = !AllSelected;
         _bulk = true;
-        try { foreach (var r in Rows.Where(r => r.Selectable && (!target || !r.Done))) r.IsSelected = target; }
+        try
+        {
+            foreach (var r in Rows.Where(r => r.Selectable))
+            {
+                if (!target) { r.IsSelected = false; continue; }
+                var eligible = IsListOfLists ? (r.Stats is null || r.Stats.New > 0) : !r.Done;
+                if (eligible) r.IsSelected = true;
+            }
+        }
         finally { _bulk = false; }
         UpdateSelection();
     }
@@ -335,10 +555,12 @@ public sealed partial class PlaylistViewModel : ObservableObject
     private async Task Reload()
     {
         _lists.Clear();
+        _host.ListCache.Remove(SourceUrl);
+        _host.ListCache.RemoveMany(_all.Where(r => r.Entry.IsList).Select(r => r.Entry.Url));
         if (SourceUrl.Length > 0) await LoadAsync(SourceUrl, keepHistory: true);
     }
 
-    /// <summary>Alt listeden üst listeye; geçmiş yoksa başlangıç ekranına (bağlantı kutusu + hesap akışları).</summary>
+    /// <summary>Alt listeden üst listeye; geçmiş yoksa başlangıç ekranına (bağlantı kutusu + sabitlenenler + hesap akışları).</summary>
     [RelayCommand]
     private async Task Back()
     {
@@ -350,21 +572,180 @@ public sealed partial class PlaylistViewModel : ObservableObject
         _all = [];
         SourceUrl = "";
         Error = null;
+        ErrorIsAuth = false;
     }
+
+    [RelayCommand] private void OpenAccount() => _main.Go(Page.Account);
+
+    // ================= Sabitlenen kanallar & son açılanlar =================
+
+    private void RefreshBookmarks()
+    {
+        Pinned.Clear();
+        // Katıl/Üye kanalları en başta görünür
+        foreach (var p in _host.Settings.PinnedSources.OrderByDescending(x => x.IsMember)) Pinned.Add(p);
+        Recents.Clear();
+        foreach (var r in _host.Settings.RecentSources) Recents.Add(r);
+        RefreshPinState();
+        var pinnedSet = _host.Settings.PinnedSources.Select(x => YouTubeUrl.CanonicalSourceUrl(x.Url)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in _all.Where(r => r.Entry.IsList))
+            row.IsListPinned = pinnedSet.Contains(YouTubeUrl.CanonicalSourceUrl(row.Entry.Url));
+    }
+
+    private void RefreshPinState()
+    {
+        if (Info is null || string.IsNullOrWhiteSpace(SourceUrl))
+        {
+            IsPinned = false;
+            IsPinnedMember = false;
+            return;
+        }
+        var canonical = YouTubeUrl.CanonicalSourceUrl(SourceUrl);
+        var match = _host.Settings.PinnedSources.FirstOrDefault(x => string.Equals(YouTubeUrl.CanonicalSourceUrl(x.Url), canonical, StringComparison.OrdinalIgnoreCase));
+        IsPinned = match is not null;
+        IsPinnedMember = match?.IsMember ?? false;
+    }
+
+    private void RecordRecent(PlaylistInfo p, string url)
+    {
+        if (p.Kind is not (LinkKind.Channel or LinkKind.Playlist) || string.IsNullOrWhiteSpace(Title)) return;
+        var canonical = YouTubeUrl.CanonicalSourceUrl(url);
+        var entry = new RecentSource(canonical, Title, p.Kind, Cover, string.IsNullOrWhiteSpace(p.Channel) ? null : p.Channel,
+            p.Kind == LinkKind.Channel ? ChannelTab : null, DateTimeOffset.Now);
+        _host.SettingsStore.Update(s =>
+        {
+            var next = s.RecentSources
+                .Where(x => !string.Equals(YouTubeUrl.CanonicalSourceUrl(x.Url), canonical, StringComparison.OrdinalIgnoreCase))
+                .Prepend(entry)
+                .Take(8)
+                .ToList();
+            s.RecentSources = next;
+        });
+    }
+
+    [RelayCommand]
+    private void TogglePin()
+    {
+        if (Info is not { Kind: LinkKind.Channel or LinkKind.Playlist } p) return;
+        var canonical = YouTubeUrl.CanonicalSourceUrl(SourceUrl);
+        var existing = _host.Settings.PinnedSources.FirstOrDefault(x => string.Equals(YouTubeUrl.CanonicalSourceUrl(x.Url), canonical, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            _host.SettingsStore.Update(s => s.PinnedSources = s.PinnedSources.Where(x => x != existing).ToList());
+            _main.ShowToast($"“{existing.Title}” sabitlenenlerden kaldırıldı", "Geri al",
+                () => _host.SettingsStore.Update(s => s.PinnedSources = [.. s.PinnedSources, existing]));
+        }
+        else
+        {
+            var isMember = p.Kind == LinkKind.Channel && (ChannelTab == ChannelTab.Membership || MembersCount > 0 || HasAnyListMembers);
+            var defTab = ChannelTab is ChannelTab.Courses or ChannelTab.Playlists or ChannelTab.Membership ? ChannelTab : ChannelTab.Courses;
+            var item = new PinnedSource(canonical, Title, p.Kind, Cover, string.IsNullOrWhiteSpace(p.Channel) ? null : p.Channel, isMember, defTab);
+            _host.SettingsStore.Update(s => s.PinnedSources = [.. s.PinnedSources, item]);
+            _main.ShowToast(isMember ? $"“{Title}” Katıl (üye) kanalı olarak sabitlendi" : $"“{Title}” sabitlendi");
+        }
+    }
+
+    [RelayCommand]
+    private void TogglePinMember()
+    {
+        if (Info is null || !IsPinned) return;
+        var canonical = YouTubeUrl.CanonicalSourceUrl(SourceUrl);
+        _host.SettingsStore.Update(s => s.PinnedSources = s.PinnedSources
+            .Select(x => string.Equals(YouTubeUrl.CanonicalSourceUrl(x.Url), canonical, StringComparison.OrdinalIgnoreCase) ? x with { IsMember = !x.IsMember } : x)
+            .ToList());
+    }
+
+    [RelayCommand]
+    private Task OpenPinned(PinnedSource? p) => p is null ? Task.CompletedTask
+        : p.Kind == LinkKind.Channel ? LoadTabAsync(p.Url, p.DefaultTab) : LoadAsync(p.Url);
+
+    [RelayCommand] private Task OpenPinnedCourses(PinnedSource? p) => p is null ? Task.CompletedTask : LoadTabAsync(p.Url, ChannelTab.Courses);
+    [RelayCommand] private Task OpenPinnedPlaylists(PinnedSource? p) => p is null ? Task.CompletedTask : LoadTabAsync(p.Url, ChannelTab.Playlists);
+    [RelayCommand] private Task OpenPinnedMembers(PinnedSource? p) => p is null ? Task.CompletedTask : LoadTabAsync(p.Url, ChannelTab.Membership);
+    [RelayCommand] private Task OpenPinnedVideos(PinnedSource? p) => p is null ? Task.CompletedTask : LoadTabAsync(p.Url, ChannelTab.Videos);
+
+    [RelayCommand]
+    private void TogglePinnedMemberItem(PinnedSource? p)
+    {
+        if (p is null) return;
+        _host.SettingsStore.Update(s => s.PinnedSources = s.PinnedSources.Select(x => x == p ? x with { IsMember = !x.IsMember } : x).ToList());
+    }
+
+    [RelayCommand]
+    private void UnpinSource(PinnedSource? p)
+    {
+        if (p is null) return;
+        _host.SettingsStore.Update(s => s.PinnedSources = s.PinnedSources.Where(x => x != p).ToList());
+        _main.ShowToast($"“{p.Title}” sabitlenenlerden kaldırıldı", "Geri al",
+            () => _host.SettingsStore.Update(s => s.PinnedSources = [.. s.PinnedSources, p]));
+    }
+
+    [RelayCommand]
+    private Task OpenRecent(RecentSource? r) => r is null ? Task.CompletedTask
+        : r.Kind == LinkKind.Channel && r.Tab is { } t ? LoadTabAsync(r.Url, t) : LoadAsync(r.Url);
+
+    [RelayCommand]
+    private void ClearRecents()
+    {
+        var prev = _host.Settings.RecentSources.ToList();
+        if (prev.Count == 0) return;
+        _host.SettingsStore.Update(s => s.RecentSources = []);
+        _main.ShowToast("Son açılanlar temizlendi", "Geri al", () => _host.SettingsStore.Update(s => s.RecentSources = prev));
+    }
+
+    // ================= Kurs indirme seçenekleri =================
 
     private DownloadOptions Options() => _host.Settings.Defaults with
     {
         Mode = Mode,
         Height = Height == 0 ? null : Height,
+        Container = Container,
         AudioFormat = AudioFormat,
         MusicMode = MusicMode,
+        Subtitles = Subtitles,
+        Transcript = Transcript,
+        WriteDescription = WriteDescription,
+        SponsorBlock = SponsorBlock,
+        WriteM3u = WriteM3u,
+        OutputDir = HasCustomOutputDir ? CustomOutputDir.Trim() : null,
     };
 
-    /// <summary>Seçili videolar + seçili alt listelerin videoları. Listeler tek tek okunur; indirilmişler ve erişilemeyenler atlanır.</summary>
-    private async Task<List<(PlaylistEntry Entry, string List, int Index)>> CollectAsync()
+    [RelayCommand]
+    private void ApplyProfile(DownloadProfile? p)
+    {
+        if (p is null) return;
+        var o = p.Options;
+        Mode = o.Mode;
+        Height = o.Height ?? 0;
+        Container = o.Container;
+        AudioFormat = o.AudioFormat == AudioFormat.Opus ? AudioFormat.Original : o.AudioFormat;
+        MusicMode = o.MusicMode;
+        Toast = $"Profil uygulandı: {p.Name}";
+    }
+
+    [RelayCommand]
+    private void PickCustomFolder()
+    {
+        var dlg = new OpenFolderDialog
+        {
+            InitialDirectory = HasCustomOutputDir ? CustomOutputDir : _host.Settings.OutputDir,
+            Title = "Bu kurs/playlist için indirme klasörü seç",
+        };
+        if (dlg.ShowDialog() == true) CustomOutputDir = dlg.FolderName;
+    }
+
+    [RelayCommand] private void ClearCustomFolder() => CustomOutputDir = "";
+
+    // ================= Toplama & kuyruğa ekleme =================
+
+    /// <summary>Seçili videolar + seçili alt listelerin videoları. Listeler önbellekten ya da tek tek okunur; indirilmişler ve erişilemeyenler atlanır.</summary>
+    private async Task<List<CollectItem>> CollectAsync()
     {
         var picked = Selected.ToList();
-        var result = picked.Where(r => !r.Entry.IsList).Select(r => (r.Entry, Title, r.Index)).ToList();
+        var curListUrl = Info?.Kind == LinkKind.Playlist ? YouTubeUrl.CanonicalSourceUrl(SourceUrl) : null;
+        var result = picked.Where(r => !r.Entry.IsList)
+            .Select(r => new CollectItem(r.Entry, Title, r.Index, curListUrl, r.Entry.Channel ?? Info?.Channel, r.Done))
+            .ToList();
         var lists = picked.Where(r => r.Entry.IsList).ToList();
         if (lists.Count == 0) return result;
 
@@ -379,9 +760,14 @@ public sealed partial class PlaylistViewModel : ObservableObject
                 BusyText = $"Listeler okunuyor {i + 1}/{lists.Count}: {list.Title}";
                 try
                 {
-                    if ((_lists.GetValueOrDefault(list.Url) ?? await _host.YtDlp.ProbeAsync(list.Url)) is PlaylistInfo p)
-                        result.AddRange(p.Entries.Select((e, n) => (Entry: e, List: list.Title, Index: n + 1))
+                    var p = await ResolveSubListAsync(list.Url);
+                    if (p is not null)
+                    {
+                        var ch = !string.IsNullOrWhiteSpace(p.Channel) ? p.Channel : list.Channel ?? Info?.Channel;
+                        var lUrl = YouTubeUrl.CanonicalSourceUrl(list.Url);
+                        result.AddRange(p.Entries.Select((e, n) => new CollectItem(e, list.Title, n + 1, lUrl, ch, false))
                             .Where(x => !x.Entry.IsList && !x.Entry.Unavailable && !archived.Contains(x.Entry.Id)));
+                    }
                 }
                 catch (Exception e) { errors.Add($"{list.Title}: {e.Message}"); }
             }
@@ -395,18 +781,56 @@ public sealed partial class PlaylistViewModel : ObservableObject
         return result;
     }
 
+    private async Task<PlaylistInfo?> ResolveSubListAsync(string url)
+    {
+        if (_lists.TryGetValue(url, out var cached)) return cached;
+        if (_host.ListCache.TryGet(url) is { } disk)
+        {
+            _lists[url] = disk;
+            return disk;
+        }
+        if (await _host.YtDlp.ProbeAsync(url) is not PlaylistInfo p) return null;
+        _lists[url] = p;
+        _host.ListCache.Put(url, p);
+        return p;
+    }
+
+    private void EnqueueItems(IReadOnlyList<CollectItem> items, string source)
+    {
+        var o = Options();
+        // Ters sıra açıksa her liste kendi içinde ters çevrilip 1..N yeniden numaralandırılır (Üyeler sekmesi / ters kurslar için)
+        IEnumerable<(CollectItem Item, int Index)> prepared;
+        if (ReverseOrder)
+        {
+            var list = new List<(CollectItem, int)>();
+            foreach (var g in items.GroupBy(x => (x.List, x.ListUrl)))
+            {
+                var rev = g.OrderByDescending(x => x.Index).ToList();
+                for (var i = 0; i < rev.Count; i++) list.Add((rev[i], i + 1));
+            }
+            prepared = list;
+        }
+        else prepared = items.Select(x => (x, x.Index));
+
+        _host.Queue.Enqueue(prepared.Select(x => new NewJob(
+            x.Item.Entry.Url,
+            x.Item.Entry.Title,
+            o with { Playlist = new PlaylistRef(x.Item.List, x.Index, x.Item.ListUrl, x.Item.Channel), SkipArchive = x.Item.WasDone },
+            x.Item.Entry.Channel ?? x.Item.Channel ?? Info?.Channel,
+            x.Item.Entry.Thumbnail,
+            x.Item.Entry.Duration,
+            Templates.ResolvePlaylist(_host.Settings.PlaylistTemplate, x.Item.List, x.Index, x.Item.Channel ?? Info?.Channel),
+            source)).ToList());
+        _main.Go(Page.Queue);
+    }
+
     [RelayCommand]
     private async Task EnqueueSelected()
     {
-        if (Info is not { } p) return;
+        if (Info is null) return;
         var items = await CollectAsync();
         if (items.Count == 0) { Toast = "İndirilecek yeni video yok"; return; }
-        var o = Options();
-        var source = $"{KindLabel}: {Title}";
-        _host.Queue.Enqueue(items.Select(x => new NewJob(
-            x.Entry.Url, x.Entry.Title, o with { Playlist = new PlaylistRef(x.List, x.Index) }, x.Entry.Channel ?? p.Channel, x.Entry.Thumbnail, x.Entry.Duration,
-            Templates.ResolvePlaylist(_host.Settings.PlaylistTemplate, x.List, x.Index), source)).ToList());
-        _main.Go(Page.Queue);
+        EnqueueItems(items, $"{KindLabel}: {Title}");
     }
 
     [RelayCommand]
@@ -414,9 +838,135 @@ public sealed partial class PlaylistViewModel : ObservableObject
     {
         var items = await CollectAsync();
         var source = $"{KindLabel}: {Title}";
-        var n = _main.Basket.Add(items.Select(x => new BasketItem(x.Entry.Url, x.Entry.Title, x.Entry.Channel ?? Info?.Channel, x.Entry.Thumbnail,
-            x.Entry.Duration, source, x.List, x.Index)));
+        var n = _main.Basket.Add(items.Select(x => new BasketItem(x.Entry.Url, x.Entry.Title, x.Entry.Channel ?? x.Channel ?? Info?.Channel, x.Entry.Thumbnail,
+            x.Entry.Duration, source, x.List, x.Index, x.ListUrl)));
         Toast = n > 0 ? $"{n} video sepete eklendi" : "Seçilenler zaten sepette";
+    }
+
+    // ================= Satır / alt liste sağ tık eylemleri =================
+
+    [RelayCommand]
+    private Task AnalyzeEntry(object? p) => p is PlaylistRow { Entry.IsList: false } r ? _main.OpenLinkAsync(r.Entry.Url) : Task.CompletedTask;
+
+    [RelayCommand]
+    private void AddSingleToBasket(object? p)
+    {
+        if (p is not PlaylistRow { Entry.IsList: false } r) return;
+        var curListUrl = Info?.Kind == LinkKind.Playlist ? YouTubeUrl.CanonicalSourceUrl(SourceUrl) : null;
+        var n = _main.Basket.Add([new BasketItem(r.Entry.Url, r.Entry.Title, r.Entry.Channel ?? Info?.Channel, r.Entry.Thumbnail,
+            r.Entry.Duration, $"{KindLabel}: {Title}", Title, r.Index, curListUrl)]);
+        _main.ShowToast(n > 0 ? "Sepete eklendi" : "Zaten sepette");
+    }
+
+    [RelayCommand]
+    private void CopyEntryLink(object? p)
+    {
+        if (p is not PlaylistRow r) return;
+        _host.Clipboard.Ignore(r.Entry.Url);
+        try { System.Windows.Clipboard.SetDataObject(r.Entry.Url, copy: true); } catch { }
+        _main.ShowToast("Bağlantı kopyalandı");
+    }
+
+    [RelayCommand]
+    private void OpenEntryInBrowser(object? p)
+    {
+        if (p is PlaylistRow r) _main.OpenInBrowserCommand.Execute(r.Entry.Url);
+    }
+
+    [RelayCommand]
+    private Task OpenEntryChannel(object? p) =>
+        p is PlaylistRow { Entry.ChannelUrl: { } u } ? _main.OpenChannelCommand.ExecuteAsync(u) : Task.CompletedTask;
+
+    [RelayCommand] private Task QuickDownloadSubList(object? p) => DownloadSingleSubListAsync(p as PlaylistRow, onlyMembers: false);
+    [RelayCommand] private Task QuickDownloadSubListMembers(object? p) => DownloadSingleSubListAsync(p as PlaylistRow, onlyMembers: true);
+
+    private async Task DownloadSingleSubListAsync(PlaylistRow? row, bool onlyMembers)
+    {
+        if (row is not { Entry.IsList: true }) return;
+        IsLoading = true;
+        BusyText = $"Liste okunuyor: {row.Entry.Title}";
+        try
+        {
+            var pl = await ResolveSubListAsync(row.Entry.Url);
+            if (pl is null) { _main.ShowToast("Liste okunamadı"); return; }
+            var archived = ArchivedIds();
+            var ch = !string.IsNullOrWhiteSpace(pl.Channel) ? pl.Channel : row.Entry.Channel ?? Info?.Channel;
+            var lUrl = YouTubeUrl.CanonicalSourceUrl(row.Entry.Url);
+            var items = pl.Entries
+                .Select((e, n) => new CollectItem(e, row.Entry.Title, n + 1, lUrl, ch, false))
+                .Where(x => !x.Entry.IsList && !x.Entry.Unavailable && !archived.Contains(x.Entry.Id) && (!onlyMembers || x.Entry.MembersOnly))
+                .ToList();
+            if (items.Count == 0)
+            {
+                _main.ShowToast(onlyMembers ? "Bu listede indirilecek yeni üye videosu yok" : "Bu listedeki tüm videolar zaten indirilmiş");
+                return;
+            }
+            EnqueueItems(items, $"Liste: {row.Entry.Title}");
+        }
+        catch (Exception e) { Error = e.Message; }
+        finally { IsLoading = false; BusyText = null; }
+    }
+
+    [RelayCommand]
+    private async Task AddSubListToBasket(object? p)
+    {
+        if (p is not PlaylistRow { Entry.IsList: true } row) return;
+        IsLoading = true;
+        BusyText = $"Liste okunuyor: {row.Entry.Title}";
+        try
+        {
+            var pl = await ResolveSubListAsync(row.Entry.Url);
+            if (pl is null) return;
+            var archived = ArchivedIds();
+            var ch = !string.IsNullOrWhiteSpace(pl.Channel) ? pl.Channel : row.Entry.Channel ?? Info?.Channel;
+            var lUrl = YouTubeUrl.CanonicalSourceUrl(row.Entry.Url);
+            var n = _main.Basket.Add(pl.Entries
+                .Select((e, i) => (e, i: i + 1))
+                .Where(x => !x.e.IsList && !x.e.Unavailable && !archived.Contains(x.e.Id))
+                .Select(x => new BasketItem(x.e.Url, x.e.Title, x.e.Channel ?? ch, x.e.Thumbnail, x.e.Duration, $"Liste: {row.Entry.Title}", row.Entry.Title, x.i, lUrl)));
+            _main.ShowToast(n > 0 ? $"{n} video sepete eklendi" : "Yeni video yok ya da zaten sepette");
+        }
+        catch (Exception e) { Error = e.Message; }
+        finally { IsLoading = false; BusyText = null; }
+    }
+
+    [RelayCommand]
+    private async Task ToggleSubListFollow(object? p)
+    {
+        if (p is not PlaylistRow { Entry.IsList: true } row) return;
+        var existing = _host.Follow.Find(row.Entry.Url);
+        if (existing is not null)
+        {
+            await _host.Follow.UnfollowAsync(existing);
+            row.IsListFollowed = false;
+            _main.ShowToast($"“{row.Entry.Title}” takipten çıkarıldı");
+            return;
+        }
+        var pl = await ResolveSubListAsync(row.Entry.Url);
+        var ids = pl?.Entries.Select(e => e.Id) ?? [];
+        var ch = !string.IsNullOrWhiteSpace(pl?.Channel) ? pl!.Channel : row.Entry.Channel ?? Info?.Channel;
+        await _host.Follow.FollowAsync(row.Entry.Url, row.Entry.Title, Options(), ids, ChannelTab.Videos, row.Entry.Title, ch);
+        row.IsListFollowed = true;
+        _main.ShowToast($"“{row.Entry.Title}” takip ediliyor — yeni dersler kurs klasörüne iner");
+    }
+
+    [RelayCommand]
+    private void ToggleSubListPin(object? p)
+    {
+        if (p is not PlaylistRow { Entry.IsList: true } row) return;
+        var canonical = YouTubeUrl.CanonicalSourceUrl(row.Entry.Url);
+        var existing = _host.Settings.PinnedSources.FirstOrDefault(x => string.Equals(YouTubeUrl.CanonicalSourceUrl(x.Url), canonical, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            _host.SettingsStore.Update(s => s.PinnedSources = s.PinnedSources.Where(x => x != existing).ToList());
+            _main.ShowToast($"“{row.Entry.Title}” sabitlenenlerden kaldırıldı");
+        }
+        else
+        {
+            var item = new PinnedSource(canonical, row.Entry.Title, LinkKind.Playlist, row.Entry.Thumbnail, row.Entry.Channel ?? Info?.Channel, row.HasMembers);
+            _host.SettingsStore.Update(s => s.PinnedSources = [.. s.PinnedSources, item]);
+            _main.ShowToast($"“{row.Entry.Title}” sabitlendi");
+        }
     }
 
     /// <summary>Görünen (filtrelenmiş) satırları CSV'ye yazar; ayırıcı bölgesel ayardan (Türkçe Windows'ta ';').</summary>
@@ -424,7 +974,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
     private void ExportCsv()
     {
         if (Info is null || Rows.Count == 0) return;
-        var dlg = new Microsoft.Win32.SaveFileDialog
+        var dlg = new SaveFileDialog
         {
             Filter = "CSV (*.csv)|*.csv",
             FileName = string.Concat(Title.Split(Path.GetInvalidFileNameChars())) + ".csv",
@@ -440,23 +990,30 @@ public sealed partial class PlaylistViewModel : ObservableObject
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Error = e.Message; }
     }
 
-    /// <summary>Takip: mevcut videolar "görüldü" sayılır, yalnızca bundan sonra gelenler otomatik iner.</summary>
+    /// <summary>Takip: kanal sekmelerinde o sekme (Üyeler dahil), kurs/playlistte tüm liste takip edilir.</summary>
     [RelayCommand]
     private async Task ToggleFollow()
     {
         if (Info is not { } p) return;
-        var existing = _host.Follow.Items.FirstOrDefault(f => string.Equals(f.Url, SourceUrl, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null) await _host.Follow.UnfollowAsync(existing);
-        else await _host.Follow.FollowAsync(SourceUrl, Title, Options(), p.Entries.Select(e => e.Id));
-        IsFollowed = existing is null;
+        var existing = _host.Follow.Find(SourceUrl, ChannelTab);
+        if (existing is not null)
+        {
+            await _host.Follow.UnfollowAsync(existing);
+            IsFollowed = false;
+            return;
+        }
+        var label = p.Kind == LinkKind.Channel && ChannelTab != ChannelTab.Videos ? $"{Title} · {ChannelTab.Label()}" : Title;
+        await _host.Follow.FollowAsync(SourceUrl, label, Options(), p.Entries.Select(e => e.Id), ChannelTab, Title, p.Channel);
+        IsFollowed = true;
+        _main.ShowToast($"“{label}” takip ediliyor");
     }
 
-    /// <summary>Alt liste (ör. Playlistlerim içindeki bir playlist): o listeyi aç, "Geri" ile dönülebilsin.</summary>
+    /// <summary>Alt liste (ör. Playlistlerim ya da Kurslar içindeki bir playlist): o listeyi aç, "Geri" ile dönülebilsin.</summary>
     [RelayCommand]
     private async Task OpenSubList(object? p)
     {
         if (p is not PlaylistRow r) return;
-        _back.Push(SourceUrl);
+        _back.Push(IsChannel ? YouTubeUrl.ChannelTabUrl(SourceUrl, ChannelTab) : SourceUrl);
         await LoadAsync(r.Entry.Url, keepHistory: true);
     }
 

@@ -81,15 +81,41 @@ public sealed class AppSettings
     /// <summary>Son pencere konumu ve boyutu (DIP). Kayıtlı ekran artık yoksa yok sayılır.</summary>
     public WindowBounds? Window { get; set; }
 
+    /// <summary>Sabitlenen kanallar (özellikle Katıl/üye kanalları) ve kurs/playlist kısayolları.</summary>
+    public List<PinnedSource> PinnedSources { get; set; } = [];
+
+    /// <summary>Son açılan kanal ve playlistler (en yeni başta, en fazla 10 kayıt).</summary>
+    public List<RecentSource> RecentSources { get; set; } = [];
+
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 }
 
 public sealed record WindowBounds(double Left, double Top, double Width, double Height, bool Maximized);
 
+/// <summary>Sabitlenen kanal veya kurs/playlist; kanallarda doğrudan Kurslar/Playlistler/Üyeler sekmesine atlanır.</summary>
+public sealed record PinnedSource(
+    string Url,
+    string Title,
+    LinkKind Kind,
+    string? Cover = null,
+    string? Channel = null,
+    bool IsMember = false,
+    ChannelTab DefaultTab = ChannelTab.Courses);
+
+/// <summary>Son açılan kanal veya playlist kaydı.</summary>
+public sealed record RecentSource(
+    string Url,
+    string Title,
+    LinkKind Kind,
+    string? Cover = null,
+    string? Channel = null,
+    ChannelTab? Tab = null,
+    DateTimeOffset OpenedAt = default);
+
 /// <summary>Kayıtlı hesap. Dosyaları AppPaths.AccountCookiesFile/AccountProfileDir(Id) altında.</summary>
 public sealed record SavedAccount(string Id, string Name, DateTimeOffset ExportedAt, DateTimeOffset? ExpiresAt);
 
-/// <summary>Sepetteki video: biçim indirme anında seçilir. Playlist'ten geldiyse klasör şablonu için liste adı ve sırası.</summary>
+/// <summary>Sepetteki video: biçim indirme anında seçilir. Playlist'ten geldiyse klasör şablonu için liste adı, sırası ve adresi.</summary>
 public sealed record BasketItem(
     string Url,
     string Title,
@@ -98,7 +124,8 @@ public sealed record BasketItem(
     double? Duration,
     string? Source,
     string? PlaylistTitle = null,
-    int PlaylistIndex = 0);
+    int PlaylistIndex = 0,
+    string? PlaylistUrl = null);
 
 /// <summary>Takip edilen playlist/kanal/akış — yeni videolar otomatik kuyruğa alınır.</summary>
 public sealed partial class FollowedSource : ObservableObject
@@ -106,6 +133,11 @@ public sealed partial class FollowedSource : ObservableObject
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Url { get; set; } = "";
     public string Title { get; set; } = "";
+    /// <summary>Kanal takibinde hangi sekmenin izlendiği (Videolar, Shorts, Canlı, Üyeler).</summary>
+    public ChannelTab Tab { get; set; } = ChannelTab.Videos;
+    /// <summary>Playlist/kurs takibinde yeni derslerin doğru klasöre ve sıraya inmesi için.</summary>
+    public string? PlaylistTitle { get; set; }
+    public string? Channel { get; set; }
     public DownloadOptions Options { get; set; } = new();
     [ObservableProperty] private DateTimeOffset? _lastChecked;
     [ObservableProperty] private int _lastNewCount;

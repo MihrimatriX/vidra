@@ -151,8 +151,32 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     public string OutputPreview => "Önizleme → " + Templates.Preview(S.OutputTemplate, Sample);
-    public string PlaylistPreview => "Önizleme → " + Templates.Preview(Templates.ResolvePlaylist(S.PlaylistTemplate, "Playlist adı", 7), Sample);
+    public string PlaylistPreview => "Önizleme → " + Templates.Preview(Templates.ResolvePlaylist(S.PlaylistTemplate, "Kurs adı", 7, "Kanal adı"), Sample);
     public bool UseArchive { get => S.UseArchive; set => Set(s => s.UseArchive = value); }
+    public IReadOnlyList<Choice> PlaylistPresets { get; } = Templates.PlaylistPresets.Select(p => new Choice(p.Template, p.Label)).ToList();
+    public string ListCacheInfo => $"{_host.ListCache.Count} liste önbellekte";
+
+    [RelayCommand]
+    private void ApplyPlaylistPreset(string? template)
+    {
+        if (!string.IsNullOrWhiteSpace(template)) PlaylistTemplate = template;
+    }
+
+    [RelayCommand]
+    private void InsertPlaylistToken(string token)
+    {
+        var t = S.PlaylistTemplate;
+        var i = t.LastIndexOf(".%(ext)s", StringComparison.Ordinal);
+        PlaylistTemplate = i >= 0 ? t[..i] + " " + token + t[i..] : t + " " + token;
+    }
+
+    [RelayCommand]
+    private void ClearListCache()
+    {
+        _host.ListCache.Clear();
+        OnPropertyChanged(nameof(ListCacheInfo));
+        Notice = "Playlist/kurs önbelleği temizlendi.";
+    }
 
     [RelayCommand]
     private void InsertToken(string token)
@@ -229,6 +253,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public async Task RefreshToolsAsync()
     {
+        OnPropertyChanged(nameof(ListCacheInfo));
         var st = await _host.Tools.StatusAsync();
         Tools.Clear();
         foreach (var t in st) Tools.Add(t);

@@ -110,6 +110,8 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
         yield return Go(Page.Basket, "Sepet", "I.Basket", "4", "toplu");
         yield return Go(Page.Queue, "Kuyruk & geçmiş", "I.Clock", "5", "indirmeler history");
         yield return Go(Page.Library, "Kütüphane", "I.Library", "6", "dosyalar indirilenler");
+        yield return new("Kütüphane · Kurslarım", "İndirdiğin kurs ve playlistler, izlenme takibi", "I.Course", "Sayfa", null,
+            Sync(() => { main.Library.Section = "courses"; main.Go(Page.Library); }), "kurslar playlist ders izlendi");
         yield return Go(Page.Stats, "İstatistik", "I.Chart", "7", "grafik");
         yield return Go(Page.Account, "Hesabım", "I.User", "8", "giriş oturum çerez eklenti takip");
         yield return Go(Page.Settings, "Ayarlar", "I.Settings", "9", "tercihler klasör tema");
@@ -128,6 +130,8 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
             yield return new("Kuyruktakilerin hepsini iptal et", "Geri alınabilir", "I.X", "Kuyruk", null, Sync(() => main.QueueVm.CancelAllCommand.Execute(null)), "temizle durdur");
         yield return new(main.QueueVm.SleepWhenDone ? "Bitince uyutmayı kapat" : "Kuyruk bitince bilgisayarı uyut", null, "I.Clock", "Kuyruk", null,
             Sync(() => main.QueueVm.SleepWhenDone = !main.QueueVm.SleepWhenDone), "uyku kapat");
+        if (host.Follow.Items.Count > 0)
+            yield return new("Takip edilenleri şimdi kontrol et", $"{host.Follow.Items.Count} kaynak", "I.Bell", "Eylem", null, CheckAllFollowsAsync, "takip yenile kontrol");
         yield return new("İndirme klasörünü aç", host.Settings.OutputDir, "I.Folder", "Eylem", null, Sync(OpenOutputDir), "dosyalar explorer");
         yield return new(main.Incognito ? "Gizli modu kapat" : "Gizli modu aç", "Yeni indirmeler geçmişe ve arşive yazılmaz", "I.Lock", "Eylem", null,
             Sync(() => main.ToggleIncognitoCommand.Execute(null)), "incognito iz bırakma özel");
@@ -135,6 +139,27 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
         yield return new("Açık / koyu tema", null, "I.Sun", "Eylem", null, Sync(() => main.ToggleThemeCommand.Execute(null)), "karanlık aydınlık görünüm");
         yield return new("yt-dlp'yi güncelle", "Ayarlar › Bileşenler", "I.Refresh", "Eylem", null, UpdateYtDlpAsync, "bileşen sürüm");
         yield return new("Veri klasörünü aç", "Ayarlar, geçmiş, günlük", "I.Folder", "Eylem", null, Sync(() => main.Settings.OpenDataDirCommand.Execute(null)), "log günlük");
+
+        foreach (var p in host.Settings.PinnedSources)
+        {
+            var tag = p.IsMember ? "Katıl · Üye" : p.Kind == LinkKind.Channel ? "Kanal" : "Playlist";
+            if (p.Kind == LinkKind.Channel)
+            {
+                yield return new(p.Title, $"{tag} · {p.DefaultTab.Label()}", "I.Star", "Sabit", null,
+                    () => main.OpenChannelTabAsync(p.Url, p.DefaultTab), $"kanal sabit {(p.IsMember ? "üye katıl" : "")} {p.DefaultTab.Label()}");
+                if (p.DefaultTab != ChannelTab.Courses)
+                    yield return new($"{p.Title} · Kurslar", tag, "I.Course", "Sabit", null,
+                        () => main.OpenChannelTabAsync(p.Url, ChannelTab.Courses), $"kurs courses {(p.IsMember ? "üye katıl" : "")}");
+                if (p.IsMember && p.DefaultTab != ChannelTab.Membership)
+                    yield return new($"{p.Title} · Üyeler", "Üyelere özel videolar", "I.Star", "Sabit", null,
+                        () => main.OpenChannelTabAsync(p.Url, ChannelTab.Membership), "üye katıl membership");
+            }
+            else
+            {
+                yield return new(p.Title, string.IsNullOrEmpty(p.Channel) ? tag : $"{p.Channel} · {tag}", "I.Playlist", "Sabit", null,
+                    () => main.OpenLinkAsync(p.Url), $"playlist kurs liste sabit {p.Channel}");
+            }
+        }
 
         foreach (var f in main.Account.Feeds)
             yield return new(f.Label, f.Hint, "I.User", "Hesap", null, () => OpenFeedAsync(f), "akış hesap feed");
@@ -175,5 +200,16 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
             return;
         }
         await main.Account.OpenFeedCommand.ExecuteAsync(f);
+    }
+
+    private async Task CheckAllFollowsAsync()
+    {
+        main.ShowToast("Takip edilen kaynaklar kontrol ediliyor…");
+        var (checkedCount, totalNew, errors) = await host.Follow.CheckAllAsync();
+        var msg = totalNew > 0
+            ? $"{checkedCount} kaynak kontrol edildi: {totalNew} yeni video kuyruğa eklendi"
+            : $"{checkedCount} kaynak kontrol edildi: yeni video yok";
+        if (errors > 0) msg += $" ({errors} hata)";
+        main.ShowToast(msg, totalNew > 0 ? "Kuyruğu aç" : null, totalNew > 0 ? () => main.Go(Page.Queue) : null);
     }
 }

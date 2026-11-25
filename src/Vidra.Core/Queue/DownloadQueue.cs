@@ -462,12 +462,33 @@ public sealed partial class DownloadQueue : ObservableObject
             return;
         }
         var entry = HistoryEntry.From(job);
+        List<HistoryEntry>? m3uEntries = null;
         _dispatch(() =>
         {
             Jobs.Remove(job);
             History.Insert(0, entry);
             while (History.Count > HistoryLimit) History.RemoveAt(History.Count - 1);
+            if (job.Status == JobStatus.Done && job.Options.WriteM3u && job.Options.Playlist is not null && job.FilePath is { } fp)
+            {
+                var dir = Path.GetDirectoryName(fp);
+                if (dir is not null)
+                    m3uEntries = History
+                        .Where(h => h.Status == JobStatus.Done && h.FilePath is { } p &&
+                                    string.Equals(Path.GetDirectoryName(p), dir, StringComparison.OrdinalIgnoreCase) && File.Exists(p))
+                        .ToList();
+            }
         });
+        if (m3uEntries is { Count: > 0 } && job.Options.Playlist is { } pl && job.FilePath is { } donePath && Path.GetDirectoryName(donePath) is { } m3uDir)
+        {
+            try
+            {
+                Export.WriteCourseM3u(m3uDir, pl.Title, m3uEntries.Select(h => (h.Options.Playlist?.Index ?? 0, h.Title, h.Duration, h.FilePath!)));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                job.Warning ??= $"Oynatma listesi (.m3u8) yazılamadı: {e.Message}";
+            }
+        }
         _ = SaveHistoryAsync();
         JobFinished?.Invoke(this, job);
     }

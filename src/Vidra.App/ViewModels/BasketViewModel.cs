@@ -94,8 +94,8 @@ public sealed partial class BasketViewModel : ObservableObject
         if (Items.Count == 0) return;
         var o = _host.Settings.Defaults with { Mode = Mode, Height = Height == 0 ? null : Height, AudioFormat = AudioFormat, MusicMode = MusicMode };
         _host.Queue.Enqueue(Items.Select(i => i.PlaylistTitle is { } list
-            ? new NewJob(i.Url, i.Title, o with { Playlist = new PlaylistRef(list, i.PlaylistIndex) }, i.Channel, i.Thumbnail, i.Duration,
-                Templates.ResolvePlaylist(_host.Settings.PlaylistTemplate, list, i.PlaylistIndex), i.Source)
+            ? new NewJob(i.Url, i.Title, o with { Playlist = new PlaylistRef(list, i.PlaylistIndex, i.PlaylistUrl, i.Channel) }, i.Channel, i.Thumbnail, i.Duration,
+                Templates.ResolvePlaylist(_host.Settings.PlaylistTemplate, list, i.PlaylistIndex, i.Channel), i.Source)
             : new NewJob(i.Url, i.Title, o, i.Channel, i.Thumbnail, i.Duration, Source: i.Source)).ToList());
         var n = Items.Count;
         ClearItems();

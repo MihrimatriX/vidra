@@ -274,6 +274,13 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>Kanalı doğrudan istenen sekmede açar (Kurslar, Playlistler, Üyeler vb.).</summary>
+    public async Task OpenChannelTabAsync(string url, ChannelTab tab)
+    {
+        Go(Page.Playlist);
+        await Playlist.LoadTabAsync(url, tab);
+    }
+
     [RelayCommand]
     private async Task AnalyzeClipboard()
     {
