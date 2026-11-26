@@ -40,6 +40,7 @@ public sealed partial class DownloadQueue : ObservableObject
     private readonly Dictionary<string, DownloadJob> _jobsById = new();
     private readonly Dictionary<string, JobStatus> _intentional = new();
     private readonly Lock _gate = new();
+    private readonly Lock _m3uGate = new();
     private bool _wasBusy;
     private bool _lastEndNatural;
     private volatile bool _shuttingDown;
@@ -462,35 +463,44 @@ public sealed partial class DownloadQueue : ObservableObject
             return;
         }
         var entry = HistoryEntry.From(job);
-        List<HistoryEntry>? m3uEntries = null;
         _dispatch(() =>
         {
             Jobs.Remove(job);
             History.Insert(0, entry);
             while (History.Count > HistoryLimit) History.RemoveAt(History.Count - 1);
-            if (job.Status == JobStatus.Done && job.Options.WriteM3u && job.Options.Playlist is not null && job.FilePath is { } fp)
-            {
-                var dir = Path.GetDirectoryName(fp);
-                if (dir is not null)
-                    m3uEntries = History
-                        .Where(h => h.Status == JobStatus.Done && h.FilePath is { } p &&
-                                    string.Equals(Path.GetDirectoryName(p), dir, StringComparison.OrdinalIgnoreCase) && File.Exists(p))
-                        .ToList();
-            }
         });
-        if (m3uEntries is { Count: > 0 } && job.Options.Playlist is { } pl && job.FilePath is { } donePath && Path.GetDirectoryName(donePath) is { } m3uDir)
-        {
-            try
-            {
-                Export.WriteCourseM3u(m3uDir, pl.Title, m3uEntries.Select(h => (h.Options.Playlist?.Index ?? 0, h.Title, h.Duration, h.FilePath!)));
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-                job.Warning ??= $"Oynatma listesi (.m3u8) yazılamadı: {e.Message}";
-            }
-        }
+        if (job.Status == JobStatus.Done && job.Options.WriteM3u && job.Options.Playlist is { } pl &&
+            job.FilePath is { } donePath && Path.GetDirectoryName(donePath) is { } m3uDir)
+            UpdateCourseM3u(job, pl.Title, m3uDir);
         _ = SaveHistoryAsync();
         JobFinished?.Invoke(this, job);
+    }
+
+    /// <summary>
+    /// Kurs klasöründeki .m3u8'i geçmişteki derslerden yeniden yazar. Aynı kursun iki dersi aynı anda bitebilir:
+    /// anlık görüntü ile yazma tek kilit altında olmazsa, eski görüntüyü taşıyan iş yenisinin üzerine yazar ve
+    /// listede ders eksik kalır (ya da iki yazma çakışıp biri hata verir).
+    /// </summary>
+    private void UpdateCourseM3u(DownloadJob job, string title, string dir)
+    {
+        try
+        {
+            lock (_m3uGate)
+            {
+                List<HistoryEntry> lessons = [];
+                _dispatch(() => lessons = History
+                    .Where(h => h.Status == JobStatus.Done && h.FilePath is { } p &&
+                                string.Equals(Path.GetDirectoryName(p), dir, StringComparison.OrdinalIgnoreCase))
+                    .ToList());
+                lessons.RemoveAll(h => !File.Exists(h.FilePath));
+                if (lessons.Count > 0)
+                    Export.WriteCourseM3u(dir, title, lessons.Select(h => (h.Options.Playlist?.Index ?? 0, h.Title, h.Duration, h.FilePath!)));
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            job.Warning ??= $"Oynatma listesi (.m3u8) yazılamadı: {e.Message}";
+        }
     }
 
     private Task SaveHistoryAsync()

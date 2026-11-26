@@ -146,40 +146,89 @@ public class CourseAndMemberTests : IDisposable
         Assert.Equal(6, lines.Length);
     }
 
+    /// <summary>İki derslik kurs kuyruğu (ikisi de koşuyor, ikisi de .m3u8 istiyor) ve biten işleri sayan bekleme.</summary>
+    private sealed class CourseRun
+    {
+        private readonly SemaphoreSlim _finished = new(0);
+        public FakeRunner Runner { get; } = new();
+        public DownloadQueue Queue { get; }
+        public string M3uPath { get; }
+        private readonly string[] _files;
+
+        public CourseRun(string root)
+        {
+            var paths = new AppPaths(Path.Combine(root, "dq"), Path.Combine(root, "lq"));
+            var courseDir = Directory.CreateDirectory(Path.Combine(root, "out", "Rust Kursu")).FullName;
+            _files = [Path.Combine(courseDir, "001 - Ders 1.mp4"), Path.Combine(courseDir, "002 - Ders 2.mp4")];
+            foreach (var f in _files) File.WriteAllText(f, "x");
+            M3uPath = Path.Combine(courseDir, "Rust Kursu.m3u8");
+
+            // Uygulamada koleksiyonlar UI thread'inde sırayla değişir; süreç bitişleri ise iş parçacığı havuzundan
+            // aynı anda gelebilir. Dispatcher'sız kuyrukta bu, ObservableCollection'ı bozar: testte de sırala.
+            var ui = new Lock();
+            Queue = new DownloadQueue(Runner, new ToolManager(paths, Runner, new HttpClient()),
+                () => new AppSettings { OutputDir = Path.Combine(root, "out"), Concurrency = 2 }, paths, a => { lock (ui) a(); });
+            // JobFinished, geçmiş ve .m3u8 yazıldıktan sonra tetiklenir
+            Queue.JobFinished += (_, _) => _finished.Release();
+
+            const string list = "https://www.youtube.com/playlist?list=PLrust";
+            Queue.Enqueue([
+                new NewJob("https://youtu.be/d1", "Ders 1", new DownloadOptions { WriteM3u = true, Playlist = new PlaylistRef("Rust Kursu", 1, list, "Hoca") }, "Hoca", Duration: 100),
+                new NewJob("https://youtu.be/d2", "Ders 2", new DownloadOptions { WriteM3u = true, Playlist = new PlaylistRef("Rust Kursu", 2, list, "Hoca") }, "Hoca", Duration: 200),
+            ]);
+        }
+
+        /// <summary>Dersin (1 ya da 2) yt-dlp sürecini dosyasını bildirip başarıyla bitirir.</summary>
+        public void Complete(int lesson)
+        {
+            Runner.Started[lesson - 1].Emit($"{YtDlpArgs.MarkDone}{_files[lesson - 1]}");
+            Runner.Started[lesson - 1].Exit(0);
+        }
+
+        public async Task WaitFinished(int count)
+        {
+            for (var i = 0; i < count; i++)
+                Assert.True(await _finished.WaitAsync(TimeSpan.FromSeconds(10)), "İş 10 sn içinde bitmedi");
+        }
+
+        /// <summary>.m3u8 içindeki dosya satırları (# ile başlayan etiketler hariç), yazıldığı sırayla.</summary>
+        public string[] M3uFiles() =>
+            File.ReadAllLines(M3uPath).Where(l => l.Length > 0 && l[0] != '#').ToArray();
+    }
+
     [Fact]
     public async Task Queue_auto_updates_course_m3u8_in_lesson_order()
     {
-        var paths = new AppPaths(Path.Combine(_dir, "dq"), Path.Combine(_dir, "lq"));
-        var courseDir = Directory.CreateDirectory(Path.Combine(_dir, "out", "Rust Kursu")).FullName;
-        var f1 = Path.Combine(courseDir, "001 - Ders 1.mp4");
-        var f2 = Path.Combine(courseDir, "002 - Ders 2.mp4");
-        File.WriteAllText(f1, "a");
-        File.WriteAllText(f2, "b");
+        var run = new CourseRun(Path.Combine(_dir, "sirali"));
 
-        var runner = new FakeRunner();
-        var queue = new DownloadQueue(runner, new ToolManager(paths, runner, new HttpClient()),
-            () => new AppSettings { OutputDir = Path.Combine(_dir, "out"), Concurrency = 2 }, paths);
+        // 2. ders önce bitsin, sonra 1. ders bitsin: .m3u8 yine 1 → 2 sırasında olmalı.
+        // Bitişler iş parçacığı havuzunda işlenir: sıranın gerçekten "önce 2" olması için ilkinin işlenmesini bekle.
+        run.Complete(2);
+        await run.WaitFinished(1);
+        Assert.Equal(["002 - Ders 2.mp4"], run.M3uFiles());
 
-        var opts1 = new DownloadOptions { WriteM3u = true, Playlist = new PlaylistRef("Rust Kursu", 1, "https://www.youtube.com/playlist?list=PLrust", "Hoca") };
-        var opts2 = new DownloadOptions { WriteM3u = true, Playlist = new PlaylistRef("Rust Kursu", 2, "https://www.youtube.com/playlist?list=PLrust", "Hoca") };
-        queue.Enqueue([
-            new NewJob("https://youtu.be/d1", "Ders 1", opts1, "Hoca", Duration: 100),
-            new NewJob("https://youtu.be/d2", "Ders 2", opts2, "Hoca", Duration: 200),
-        ]);
+        run.Complete(1);
+        await run.WaitFinished(1);
+        Assert.Empty(run.Queue.Jobs);
+        Assert.Equal(["001 - Ders 1.mp4", "002 - Ders 2.mp4"], run.M3uFiles());
+    }
 
-        // 2. ders önce bitsin, sonra 1. ders bitsin: .m3u8 yine 1 → 2 sırasında olmalı
-        runner.Started[1].Emit($"{YtDlpArgs.MarkDone}{f2}");
-        runner.Started[1].Exit(0);
-        runner.Started[0].Emit($"{YtDlpArgs.MarkDone}{f1}");
-        runner.Started[0].Exit(0);
+    [Fact]
+    public async Task Queue_course_m3u8_keeps_both_lessons_when_they_finish_together()
+    {
+        // İki ders aynı anda biterse biri eski geçmiş görüntüsüyle diğerinin üzerine yazabiliyordu (liste eksik kalıyordu).
+        // Yarış her seferinde tutmaz: birkaç tur dene.
+        for (var round = 0; round < 25; round++)
+        {
+            var run = new CourseRun(Path.Combine(_dir, "birlikte", round.ToString()));
+            run.Complete(2);
+            run.Complete(1);
+            await run.WaitFinished(2);
 
-        for (var i = 0; i < 200 && queue.Jobs.Count > 0; i++) await Task.Delay(10);
-        Assert.Empty(queue.Jobs);
-
-        var m3uPath = Path.Combine(courseDir, "Rust Kursu.m3u8");
-        Assert.True(File.Exists(m3uPath));
-        var text = File.ReadAllText(m3uPath);
-        Assert.True(text.IndexOf("001 - Ders 1.mp4", StringComparison.Ordinal) < text.IndexOf("002 - Ders 2.mp4", StringComparison.Ordinal));
+            Assert.Empty(run.Queue.Jobs);
+            Assert.Equal(2, run.Queue.History.Count);
+            Assert.Equal(["001 - Ders 1.mp4", "002 - Ders 2.mp4"], run.M3uFiles());
+        }
     }
 
     // ================= ListCacheStore & ListStats =================
