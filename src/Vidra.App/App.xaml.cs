@@ -22,6 +22,9 @@ public partial class App : Application
 
     public static AppHost Host => ((App)Current)._host!;
 
+    /// <summary>Uygulama içi güncelleme: kapanışta, tek örnek kilidi bırakıldıktan sonra başlatılacak kurulum ya da yeni exe.</summary>
+    internal System.Diagnostics.ProcessStartInfo? LaunchAfterExit { get; set; }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         // Tarayıcı eklentisi Vidra'yı native messaging host'u olarak başlatır (ilk argüman: chrome-extension://kimlik/).
@@ -167,7 +170,7 @@ public partial class App : Application
         }
     }
 
-    private static void Log(Exception ex)
+    internal static void Log(Exception ex)
     {
         try
         {
@@ -217,6 +220,11 @@ public partial class App : Application
     {
         if (_ownsMutex) _mutex?.ReleaseMutex();
         _mutex?.Dispose();
+        if (LaunchAfterExit is { } launch)
+        {
+            try { System.Diagnostics.Process.Start(launch); }
+            catch (Exception ex) { Log(ex); } // ör. UAC reddedildi: Vidra eski sürümle bir sonraki açılışta yine güncelleme önerir
+        }
         base.OnExit(e);
     }
 }

@@ -246,6 +246,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public bool MinimizeToTray { get => S.MinimizeToTray; set => Set(s => s.MinimizeToTray = value); }
     public bool KeepAwake { get => S.KeepAwake; set => Set(s => s.KeepAwake = value); }
     public bool CheckAppUpdates { get => S.CheckAppUpdates; set => Set(s => s.CheckAppUpdates = value); }
+    public bool AutoDownloadAppUpdates { get => S.AutoDownloadAppUpdates; set => Set(s => s.AutoDownloadAppUpdates = value); }
 
     // ---- Bileşenler
     public UpdateChannel UpdateChannel { get => S.UpdateChannel; set => Set(s => s.UpdateChannel = value); }

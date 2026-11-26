@@ -225,6 +225,8 @@
               <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding MinimizeToTray}" Content="Sistem tepsisi" Tag="Kapatınca arka planda devam et" />
               <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding KeepAwake}" Content="Uyumayı engelle" Tag="İndirme sürerken ve zamanlanmış başlangıç beklenirken" />
               <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding CheckAppUpdates}" Content="Güncelleme denetimi" Tag="Açılışta yeni Vidra sürümü var mı bak" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding AutoDownloadAppUpdates}" Content="Güncellemeyi kendiliğinden indir"
+                        Tag="Yeni sürüm arka planda insin; kurulum için yine sorulur" IsEnabled="{Binding CheckAppUpdates}" />
             </c:UniformWrapPanel>
           </StackPanel>
         </Border>

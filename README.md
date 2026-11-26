@@ -32,7 +32,7 @@
 - **Canlı yayın ve prömiyer:** başlamamış yayın için "Başlayınca indir", süren yayında "Baştan kaydet"
 - **Gizli mod:** geçmişe ve indirme arşivine iz bırakmadan indir (komut paleti ya da kenar çubuğu)
 - **Uyumayı engelle:** indirme sürerken ve zamanlanmış başlangıç beklenirken bilgisayar uykuya geçmez
-- **Ek yt-dlp argümanları** (ileri düzey) ve **güncelleme denetimi** (yeni Vidra sürümü çıkınca haber verir)
+- **Ek yt-dlp argümanları** (ileri düzey) ve **uygulama içi güncelleme** (yeni sürümü indirir, sha256 ile doğrular, tek tıkla kurup yeniden açar; kurulu ve taşınabilir sürümde)
 
 <table>
 <tr>
@@ -73,7 +73,7 @@ pwsh installer/make-icon.ps1                   # ikonu yeniden üret (renk/şeki
 
 **Sürüm yayınlama:** `Directory.Build.props`'ta `<Version>`'ı artır, notları `docs/releases/v<sürüm>.md` olarak yaz ve
 `main`'e al; ardından Actions › **Sürüm yayınla** › *Run workflow*. Workflow Windows'ta testleri çalıştırır, iki exe'yi
-derleyip açılışını dener ve `v<sürüm>` sürümünü bu dosyalarla yayınlar. Uygulama içi güncelleme bildirimi bu sürümü görür.
+derleyip açılışını dener ve `v<sürüm>` sürümünü bu dosyalarla yayınlar. Uygulama içi güncelleme bu sürümün `Vidra-Setup.exe` / `Vidra-Portable.exe` dosyalarını indirir; dosya adlarını değiştirme.
 
 Kurulum yönetici izni istemez (`%LOCALAPPDATA%\Programs\Vidra`), Başlat menüsüne ve isteğe bağlı masaüstüne kısayol
 ekler, Ayarlar › Uygulamalar'dan kaldırılabilir. Kaldırınca ayarlar ve geçmiş silinmez; yeni sürüm eskisinin üzerine kurulur.

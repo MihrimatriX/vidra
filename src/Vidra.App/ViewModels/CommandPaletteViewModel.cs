@@ -136,6 +136,11 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
         yield return new(main.Incognito ? "Gizli modu kapat" : "Gizli modu aç", "Yeni indirmeler geçmişe ve arşive yazılmaz", "I.Lock", "Eylem", null,
             Sync(() => main.ToggleIncognitoCommand.Execute(null)), "incognito iz bırakma özel");
         yield return new("Vidra güncellemelerini denetle", $"Şu an {main.Version}", "I.Refresh", "Eylem", null, () => main.CheckUpdatesAsync(manual: true), "sürüm yeni");
+        if (main.Update is { } upd)
+        {
+            yield return new($"Vidra {upd.Tag}: {main.UpdateLabel}", main.UpdateTip, "I.Refresh", "Eylem", null, () => main.UpdateActionCommand.ExecuteAsync(null), "güncelle kur sürüm yeni");
+            yield return new($"Vidra {upd.Tag} sürüm notları", "GitHub'da açılır", "I.Refresh", "Eylem", null, Sync(() => main.OpenUpdateCommand.Execute(null)), "değişiklikler yenilikler");
+        }
         yield return new("Açık / koyu tema", null, "I.Sun", "Eylem", null, Sync(() => main.ToggleThemeCommand.Execute(null)), "karanlık aydınlık görünüm");
         yield return new("yt-dlp'yi güncelle", "Ayarlar › Bileşenler", "I.Refresh", "Eylem", null, UpdateYtDlpAsync, "bileşen sürüm");
         yield return new("Veri klasörünü aç", "Ayarlar, geçmiş, günlük", "I.Folder", "Eylem", null, Sync(() => main.Settings.OpenDataDirCommand.Execute(null)), "log günlük");

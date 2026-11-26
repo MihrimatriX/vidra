@@ -20,6 +20,8 @@ public enum Page { Download, Search, Playlist, Basket, Queue, Library, Stats, Ac
 /// <summary>Alttaki kısa bildirim; Action varsa yanında düğme olarak (ör. "Geri al").</summary>
 public sealed record ToastMessage(string Text, string? ActionLabel, Action? Action);
 
+public enum UpdateState { None, Available, Downloading, Ready, Failed }
+
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly AppHost _host;
@@ -60,7 +62,9 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _incognito;
 
     /// <summary>GitHub'da daha yeni Vidra sürümü varsa; kenar çubuğunda bağlantı olarak görünür.</summary>
-    [ObservableProperty] private AppRelease? _update;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateLabel), nameof(UpdateTip))]
+    private AppRelease? _update;
     private readonly DispatcherTimer _toastTimer = new();
     private bool _toastHeld;
     private string _trayTip = "";
@@ -105,6 +109,7 @@ public sealed partial class MainViewModel : ObservableObject
         };
         _timer.Start();
         RefreshStatus();
+        CleanupUpdates();
         if (host.Settings.CheckAppUpdates) _ = CheckUpdatesLaterAsync();
     }
 
@@ -119,16 +124,152 @@ public sealed partial class MainViewModel : ObservableObject
     {
         using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
         var r = await AppUpdate.CheckAsync(_host.Http, cts.Token);
-        var current = typeof(MainViewModel).Assembly.GetName().Version ?? new System.Version(0, 0, 0);
-        if (r is not null && AppUpdate.IsNewer(r, current))
+        if (r is not null && AppUpdate.IsNewer(r, CurrentVersion))
         {
+            if (Update?.Version == r.Version && UpdateState != UpdateState.Failed) { if (manual) ShowUpdateToast(); return; }
             Update = r;
-            ShowToast($"Vidra {r.Tag} çıktı", "Sürüm notları", () => OpenInBrowser(r.Url));
+            UpdateState = UpdateState.Available;
+            if (_host.Settings.AutoDownloadAppUpdates && AppUpdate.AssetFor(r, Kind) is not null) await DownloadUpdateAsync(announce: false);
+            ShowUpdateToast();
         }
         else if (manual) ShowToast(r is null ? "Güncelleme denetlenemedi: GitHub'a ulaşılamadı" : $"Vidra güncel ({Version})");
     }
 
+    // ================= Uygulama içi güncelleme =================
+
+    private static readonly System.Version CurrentVersion = typeof(MainViewModel).Assembly.GetName().Version ?? new System.Version(0, 0, 0);
+    private static readonly string ExePath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Vidra.exe");
+    private static readonly InstallKind Kind = AppUpdate.DetectInstallKind(Path.GetDirectoryName(ExePath)!);
+    private string UpdatesDir => Path.Combine(_host.Paths.LocalDir, "updates");
+    private string? _updateFile;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateLabel), nameof(UpdateTip))]
+    private UpdateState _updateState;
+
+    /// <summary>İndirme ilerlemesi 0–1; boyut bilinmiyorsa null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateLabel))]
+    private double? _updateProgress;
+
+    /// <summary>Kenar çubuğundaki güncelleme düğmesinin yazısı.</summary>
+    public string UpdateLabel => UpdateState switch
+    {
+        UpdateState.Downloading => UpdateProgress is { } p ? $"İndiriliyor %{p * 100:0}" : "İndiriliyor…",
+        UpdateState.Ready => "Yeniden başlat ve kur",
+        UpdateState.Failed => "Güncellenemedi: tekrar dene",
+        _ => $"{Update?.Tag} çıktı · İndir",
+    };
+
+    public string UpdateTip => UpdateState switch
+    {
+        UpdateState.Ready => $"Vidra {Update?.Tag} indirildi. Vidra kapanıp güncellenir ve yeniden açılır; duraklatılan indirmeler kaldığı yerden sürer.",
+        UpdateState.Downloading => "Güncelleme indiriliyor",
+        _ => $"Vidra {Update?.Tag} sürümünü indirip kur",
+    };
+
+    private void ShowUpdateToast()
+    {
+        if (Update is not { } r) return;
+        if (UpdateState == UpdateState.Ready) ShowToast($"Vidra {r.Tag} kurulmaya hazır", "Yeniden başlat", () => UpdateActionCommand.Execute(null));
+        else ShowToast($"Vidra {r.Tag} çıktı", "İndir ve kur", () => UpdateActionCommand.Execute(null));
+    }
+
+    /// <summary>Kenar çubuğundaki düğme: duruma göre indirir ya da kurar.</summary>
+    [RelayCommand]
+    private async Task UpdateAction()
+    {
+        switch (UpdateState)
+        {
+            case UpdateState.Available or UpdateState.Failed:
+                await DownloadUpdateAsync(announce: true);
+                if (UpdateState == UpdateState.Ready) ApplyUpdate(confirmed: false);
+                break;
+            case UpdateState.Ready:
+                ApplyUpdate(confirmed: false);
+                break;
+        }
+    }
+
     [RelayCommand] private void OpenUpdate() { if (Update is { } r) OpenInBrowser(r.Url); }
+
+    private async Task DownloadUpdateAsync(bool announce)
+    {
+        if (Update is not { } r || UpdateState == UpdateState.Downloading) return;
+        // Sürümde bu kurulum türünün dosyası yoksa (ör. eski biçimli sürüm) eski davranış: sürüm sayfası
+        if (AppUpdate.AssetFor(r, Kind) is not { } asset)
+        {
+            if (announce) OpenInBrowser(r.Url);
+            return;
+        }
+        UpdateState = UpdateState.Downloading;
+        UpdateProgress = null;
+        try
+        {
+            // Progress<T> arayüz thread'inde yaratıldığı için raporları oraya taşır
+            var progress = new Progress<double?>(p => UpdateProgress = p);
+            _updateFile = await AppUpdater.DownloadAsync(_host.Http, asset, r.Version, UpdatesDir, progress);
+            UpdateState = UpdateState.Ready;
+        }
+        catch (Exception e)
+        {
+            UpdateState = UpdateState.Failed;
+            App.Log(e);
+            if (announce) ShowToast(e is InvalidDataException ? "Güncelleme dosyası doğrulanamadı; silindi" : "Güncelleme indirilemedi", "Sürüm sayfası", () => OpenInBrowser(r.Url));
+        }
+    }
+
+    private void ApplyUpdate(bool confirmed)
+    {
+        if (_updateFile is not { } file || Update is not { } r) return;
+        // Etkin indirme varsa önce sor: kapanışta duraklatılır, açılışta .part dosyalarından sürer
+        if (!confirmed && _host.Queue.ActiveCount > 0)
+        {
+            ShowToast($"{_host.Queue.ActiveCount} indirme duraklatılıp güncellemeden sonra sürecek", "Yine de kur", () => ApplyUpdate(confirmed: true));
+            return;
+        }
+        try
+        {
+            ProcessStartInfo launch;
+            if (Kind == InstallKind.Installed)
+            {
+                var dir = Path.GetDirectoryName(ExePath)!;
+                var allUsers = IsUnder(dir, Environment.SpecialFolder.ProgramFiles) || IsUnder(dir, Environment.SpecialFolder.ProgramFilesX86);
+                launch = new ProcessStartInfo(file, AppUpdate.SetupArguments(allUsers)) { UseShellExecute = true }; // ShellExecute: UAC istemi çıkabilsin
+            }
+            else
+            {
+                AppUpdater.SwapPortable(ExePath, file);
+                launch = new ProcessStartInfo(ExePath) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(ExePath)! };
+            }
+            // Yeni süreç tek örnek kilidi bırakıldıktan sonra başlamalı (yoksa çalışan Vidra'ya iletip kapanır): bkz. App.OnExit
+            ((App)System.Windows.Application.Current).LaunchAfterExit = launch;
+            ((MainWindow)System.Windows.Application.Current.MainWindow!).ExitApp();
+        }
+        catch (Exception e)
+        {
+            App.Log(e);
+            UpdateState = UpdateState.Failed;
+            ShowToast("Güncelleme uygulanamadı", "Sürüm sayfası", () => OpenInBrowser(r.Url));
+        }
+    }
+
+    private static bool IsUnder(string dir, Environment.SpecialFolder folder)
+    {
+        var root = Environment.GetFolderPath(folder);
+        return root.Length > 0 && Path.GetFullPath(dir).StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Açılışta: kurulmuş eski indirmeleri ve taşınabilir güncellemeden kalan exe'yi sil.</summary>
+    private void CleanupUpdates()
+    {
+        try
+        {
+            AppUpdater.CleanupDownloads(UpdatesDir, CurrentVersion);
+            if (Kind == InstallKind.Portable) AppUpdater.CleanupPortable(ExePath);
+        }
+        catch (Exception e) { App.Log(e); }
+    }
 
     partial void OnIncognitoChanged(bool value)
     {
