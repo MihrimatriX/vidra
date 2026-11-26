@@ -10,6 +10,8 @@
   <a href="https://mihrimatrix.github.io/vidra/">Web sitesi</a>
 </p>
 
+<p align="center"><a href="https://github.com/MihrimatriX/vidra/actions/workflows/ci.yml"><img src="https://github.com/MihrimatriX/vidra/actions/workflows/ci.yml/badge.svg" alt="CI"></a></p>
+
 ![Vidra](docs/screenshots/light-01-indir.png)
 
 - **Orijinal kalite:** YouTube'daki akışlar dönüştürülmeden kaydedilir; bir seçim yeniden kodlamaya yol açıyorsa (MP3, kesin kesim) ekranda yazar
