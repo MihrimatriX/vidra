@@ -41,6 +41,7 @@ public sealed partial class DownloadQueue : ObservableObject
     private readonly Dictionary<string, JobStatus> _intentional = new();
     private readonly Lock _gate = new();
     private readonly Lock _m3uGate = new();
+    private readonly Lock _collectionsGate = new();
     private bool _wasBusy;
     private bool _lastEndNatural;
     private volatile bool _shuttingDown;
@@ -63,7 +64,9 @@ public sealed partial class DownloadQueue : ObservableObject
         _tools = tools;
         _settings = settings;
         _paths = paths;
-        _dispatch = dispatch ?? (a => a());
+        // Arayüz yokken (testler, CLI) koleksiyonlar thread-pool'dan aynı anda değişmesin: WPF dispatcher'ı gibi sıraya sok.
+        // ObservableCollection thread-safe değil; iki iş aynı anda bitince Jobs.Remove kaybolabiliyordu.
+        _dispatch = dispatch ?? (a => { lock (_collectionsGate) a(); });
         foreach (var h in JsonStore.Read<List<HistoryEntry>>(paths.HistoryFile) ?? []) History.Add(h);
         // Önceki oturumda bitmemiş işler duraklatılmış olarak geri gelir; .part dosyalarından devam ederler
         foreach (var n in JsonStore.Read<List<NewJob>>(paths.PendingFile) ?? [])
