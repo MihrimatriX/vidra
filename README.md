@@ -73,9 +73,13 @@ pwsh installer/build.ps1
 pwsh installer/make-icon.ps1                   # ikonu yeniden üret (renk/şekil değişince)
 ```
 
-**Sürüm yayınlama:** `Directory.Build.props`'ta `<Version>`'ı artır, notları `docs/releases/v<sürüm>.md` olarak yaz ve
-`main`'e al; ardından Actions › **Sürüm yayınla** › *Run workflow*. Workflow Windows'ta testleri çalıştırır, iki exe'yi
-derleyip açılışını dener ve `v<sürüm>` sürümünü bu dosyalarla yayınlar. Uygulama içi güncelleme bu sürümün `Vidra-Setup.exe` / `Vidra-Portable.exe` dosyalarını indirir; dosya adlarını değiştirme.
+**Sürüm yayınlama:** Kullanıcının fark edeceği değişiklikleri PR'da `docs/releases/next.md`'ye madde olarak ekle.
+Yayınlamak için Actions › **Sürüm yayınla** › *Run workflow* ve **artır** seçimi: `minor` (0.6.0 → 0.7.0, varsayılan),
+`patch` (0.6.1), `major` (1.0.0) ya da `elle` (`Directory.Build.props`'taki sürüm ve hazır `docs/releases/v<sürüm>.md`).
+Workflow sürümü son `v*` etiketinden hesaplar, `Directory.Build.props`'a yazar, `next.md`'yi `docs/releases/v<sürüm>.md`
+yapar (madde yoksa birleşen PR başlıklarından üretir), Windows'ta testleri çalıştırıp iki exe'yi derler ve açılışını dener;
+hepsi geçerse sürüm commit'ini `main`'e push'lar ve `v<sürüm>` sürümünü bu dosyalarla yayınlar. Yerelde hazırlamak için (dosyaları değiştirir, commit atmaz):
+`pwsh installer/prepare-release.ps1 -Bump patch`. Uygulama içi güncelleme bu sürümün `Vidra-Setup.exe` / `Vidra-Portable.exe` dosyalarını indirir; dosya adlarını değiştirme.
 
 Kurulum yönetici izni istemez (`%LOCALAPPDATA%\Programs\Vidra`), Başlat menüsüne ve isteğe bağlı masaüstüne kısayol
 ekler, Ayarlar › Uygulamalar'dan kaldırılabilir. Kaldırınca ayarlar ve geçmiş silinmez; yeni sürüm eskisinin üzerine kurulur.
