@@ -10,6 +10,8 @@
   <a href="https://mihrimatrix.github.io/vidra/">Web sitesi</a>
 </p>
 
+<p align="center"><a href="https://github.com/MihrimatriX/vidra/actions/workflows/ci.yml"><img src="https://github.com/MihrimatriX/vidra/actions/workflows/ci.yml/badge.svg" alt="CI"></a></p>
+
 ![Vidra](docs/screenshots/light-01-indir.png)
 
 - **Orijinal kalite:** YouTube'daki akışlar dönüştürülmeden kaydedilir; bir seçim yeniden kodlamaya yol açıyorsa (MP3, kesin kesim) ekranda yazar
@@ -32,7 +34,7 @@
 - **Canlı yayın ve prömiyer:** başlamamış yayın için "Başlayınca indir", süren yayında "Baştan kaydet"
 - **Gizli mod:** geçmişe ve indirme arşivine iz bırakmadan indir (komut paleti ya da kenar çubuğu)
 - **Uyumayı engelle:** indirme sürerken ve zamanlanmış başlangıç beklenirken bilgisayar uykuya geçmez
-- **Ek yt-dlp argümanları** (ileri düzey) ve **güncelleme denetimi** (yeni Vidra sürümü çıkınca haber verir)
+- **Ek yt-dlp argümanları** (ileri düzey) ve **uygulama içi güncelleme** (yeni sürümü indirir, sha256 ile doğrular, tek tıkla kurup yeniden açar; kurulu ve taşınabilir sürümde)
 
 <table>
 <tr>
@@ -73,7 +75,7 @@ pwsh installer/make-icon.ps1                   # ikonu yeniden üret (renk/şeki
 
 **Sürüm yayınlama:** `Directory.Build.props`'ta `<Version>`'ı artır, notları `docs/releases/v<sürüm>.md` olarak yaz ve
 `main`'e al; ardından Actions › **Sürüm yayınla** › *Run workflow*. Workflow Windows'ta testleri çalıştırır, iki exe'yi
-derleyip açılışını dener ve `v<sürüm>` sürümünü bu dosyalarla yayınlar. Uygulama içi güncelleme bildirimi bu sürümü görür.
+derleyip açılışını dener ve `v<sürüm>` sürümünü bu dosyalarla yayınlar. Uygulama içi güncelleme bu sürümün `Vidra-Setup.exe` / `Vidra-Portable.exe` dosyalarını indirir; dosya adlarını değiştirme.
 
 Kurulum yönetici izni istemez (`%LOCALAPPDATA%\Programs\Vidra`), Başlat menüsüne ve isteğe bağlı masaüstüne kısayol
 ekler, Ayarlar › Uygulamalar'dan kaldırılabilir. Kaldırınca ayarlar ve geçmiş silinmez; yeni sürüm eskisinin üzerine kurulur.
@@ -165,8 +167,16 @@ yalnızca şu durumlarda olur ve indirme ekranında yazar: ses MP3/FLAC/WAV'a d�
 
 - **Bot doğrulaması / 429:** veri merkezi ve VPN IP'lerinde YouTube "Sign in to confirm you're not a bot" der; uygulama
   bunu ayrı bir hata türü olarak gösterir ve girişe yönlendirir. Ev bağlantısında genelde sorun olmaz.
+- **YouTube sınırları:** 429, "try again later" ya da bot doğrulaması gelince Vidra kuyruğu bekletir (5 → 15 → 45 → 60 dk),
+  süre dolunca işleri kendiliğinden yeniden dener ve bir süre tek tek indirir; kenar çubuğundaki **YouTube durumu** geri sayımı gösterir.
+  Ağ ve 403 hatalarında yalnızca o iş 30 sn / 2 dk sonra yeniden denenir. yt-dlp günde bir kez, kuyruk boşken kendiliğinden güncellenir.
+- **PO token (deneysel):** YouTube bazı videolarda PO token ister; yoksa 403 ya da "Requested format is not available" görülür.
+  Ayarlar › Bileşenler'den [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) 2.0.2
+  kurulabilir: eklenti `yt-dlp-plugins` klasörüne, betik `bgutil-pot/server` klasörüne iner ve token'lar Vidra'nın Deno'suyla
+  (betik modu, ayrı sunucu yok) üretilir; `mweb` istemcisi varsayılanlara eklenir. Varsayılan kapalı.
 - **Hesap riski:** yt-dlp ekibi, çerezle yoğun indirmenin hesabın/IP'nin işaretlenmesine yol açabileceği konusunda uyarıyor.
-  Nazik mod (varsayılan açık) oturumla istekler arasına bekleme ekler; mümkünse ikincil bir hesap kullan.
+  Nazik mod (Kapalı / **Dengeli** / Güvenli) istekler arasına bekleme ekler; saatlik sınıra yaklaşınca kendiliğinden Güvenli'ye geçer.
+  Mümkünse ikincil bir hesap kullan.
 - **Chromium tarayıcı çerezleri:** Windows'ta Chrome/Edge açıkken çerez veritabanını kilitleyebilir; Firefox ya da uygulama içi giriş daha güvenilir.
 - `Playlistlerim` (`feed/playlists`) akışının yt-dlp desteği sürüme göre değişebilir; boş dönerse yt-dlp'yi güncelle.
 - **Üyeler sekmesi:** yt-dlp kanalın `/membership` sekmesini okuyamadığı için Vidra kanal kimliğinden (`UC…`) üyelere özel

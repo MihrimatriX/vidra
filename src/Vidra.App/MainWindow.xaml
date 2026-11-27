@@ -200,6 +200,28 @@
               </Border>
             </StackPanel>
           </Button>
+          <!-- YouTube durumu: soğuma geri sayımı, saatlik sınır, yt-dlp yaşı; tıklayınca ilgili çözüm -->
+          <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" HorizontalAlignment="Left" HorizontalContentAlignment="Left" Foreground="{DynamicResource Muted}"
+                  Command="{Binding HealthActionCommand}" ToolTip="{Binding HealthTip}" AutomationProperties.Name="YouTube durumu">
+            <StackPanel Orientation="Horizontal">
+              <Ellipse Width="7" Height="7" Margin="0,0,7,0">
+                <Ellipse.Style>
+                  <Style TargetType="Ellipse">
+                    <Setter Property="Fill" Value="{DynamicResource Ok}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding HealthLevel}" Value="warn">
+                        <Setter Property="Fill" Value="{DynamicResource Warn}" />
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding HealthLevel}" Value="bad">
+                        <Setter Property="Fill" Value="{DynamicResource Danger}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Ellipse.Style>
+              </Ellipse>
+              <TextBlock Text="{Binding HealthLabel}" FontSize="12.5" FontWeight="Normal" />
+            </StackPanel>
+          </Button>
           <DockPanel Margin="-8,6,0,0">
             <Button DockPanel.Dock="Left" Style="{StaticResource BtnGhostIcon}" Width="30" Height="30" MinHeight="30"
                     Command="{Binding ToggleThemeCommand}" ToolTip="Açık / koyu tema" AutomationProperties.Name="Temayı değiştir">
@@ -207,9 +229,11 @@
             </Button>
             <Grid HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding NavCompact, Converter={StaticResource Vis}, ConverterParameter=!}">
               <TextBlock Text="{Binding Version}" FontSize="11.5" VerticalAlignment="Center" Visibility="{Binding Update, Converter={StaticResource Vis}, ConverterParameter=!}" />
-              <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" FontSize="12" Command="{Binding OpenUpdateCommand}"
-                      Visibility="{Binding Update, Converter={StaticResource Vis}}" ToolTip="Yeni sürümün sayfasını aç">
-                <TextBlock><Run Text="{Binding Update.Tag, Mode=OneWay}" /><Run Text=" çıktı" /></TextBlock>
+              <!-- Yeni sürüm: indir → "Yeniden başlat ve kur". Sürüm notları komut paletinde -->
+              <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" FontSize="12" Command="{Binding UpdateActionCommand}"
+                      Visibility="{Binding Update, Converter={StaticResource Vis}}" ToolTip="{Binding UpdateTip}"
+                      AutomationProperties.Name="{Binding UpdateLabel}">
+                <TextBlock Text="{Binding UpdateLabel}" />
               </Button>
             </Grid>
           </DockPanel>

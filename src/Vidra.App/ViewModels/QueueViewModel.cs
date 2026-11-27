@@ -143,8 +143,29 @@ public sealed partial class QueueViewModel : ObservableObject
                      || (h.Channel?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false));
     }
 
+    /// <summary>Soğuma ya da kendiliğinden yeniden deneme bekleyen işler için şerit metni (null: gizli).</summary>
+    [ObservableProperty] private string? _cooldownText;
+
+    public void RefreshCooldown()
+    {
+        var waiting = _host.Queue.WaitingCount;
+        CooldownText = _host.Guard.CooldownUntil is { } u
+            ? $"YouTube sınırı: {waiting} iş {u.ToLocalTime():HH:mm}'e kadar bekliyor, sonra kendiliğinden devam edecek"
+            : waiting > 0 ? $"{waiting} iş kısa süre sonra kendiliğinden yeniden denenecek" : null;
+    }
+
+    [RelayCommand]
+    private void SkipCooldown()
+    {
+        _host.Queue.SkipCooldown();
+        RefreshCooldown();
+    }
+
+    [RelayCommand] private Task UpdateYtDlp() => _main.MaybeUpdateYtDlpAsync(force: true);
+
     private void RefreshCounts()
     {
+        RefreshCooldown();
         var jobs = _host.Queue.Jobs;
         RunningCount = jobs.Count(j => j.Status is JobStatus.Running or JobStatus.Processing);
         QueuedCount = jobs.Count(j => j.Status == JobStatus.Queued);
@@ -291,9 +312,6 @@ public sealed partial class QueueViewModel : ObservableObject
     [RelayCommand] private void IncConcurrency() => Concurrency++;
     [RelayCommand] private void DecConcurrency() => Concurrency--;
     [RelayCommand] private void OpenAccount() => _main.Go(Page.Account);
-
-    /// <summary>Tanınmayan hata: çoğu zaman eski yt-dlp; Ayarlar'ı Bileşenler bölümünde açar.</summary>
-    [RelayCommand] private void OpenComponents() => _main.OpenSettingsSection("SecTools");
     [RelayCommand] private void ShowLog(object? p) => _main.LogVm.Show(p as DownloadJob);
 
     [RelayCommand]

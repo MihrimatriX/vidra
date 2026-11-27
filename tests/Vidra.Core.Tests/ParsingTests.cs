@@ -103,6 +103,10 @@ public class OutputParserTests
     [InlineData("HTTP Error 429: Too Many Requests", ErrorKind.RateLimited)]
     [InlineData("Video unavailable. This video has been removed", ErrorKind.Unavailable)]
     [InlineData("Unable to download webpage: timed out", ErrorKind.Network)]
+    [InlineData("[youtube] abc: This content isn't available, try again later.", ErrorKind.RateLimited)]
+    [InlineData("unable to download video data: HTTP Error 403: Forbidden", ErrorKind.Forbidden)]
+    [InlineData("[youtube] abc: Requested format is not available. Use --list-formats for a list of available formats", ErrorKind.Forbidden)]
+    [InlineData("[youtube] abc: Only images are available for download. use --list-formats to see them", ErrorKind.Forbidden)]
     public void Classify_errors(string msg, ErrorKind kind) => Assert.Equal(kind, OutputParser.Classify(msg));
 
     [Fact]

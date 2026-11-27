@@ -41,6 +41,11 @@ public sealed class AppPaths
     public string WatchProgressFile => Path.Combine(DataDir, "watched.json");
     public string ListCacheFile => Path.Combine(LocalDir, "list-cache.json");
     public string LogFile => Path.Combine(LocalDir, "vidra.log");
+    public string PerfLogFile => Path.Combine(LocalDir, "perf.log");
+    /// <summary>Kapak resimlerinin disk önbelleği (bkz. ThumbnailCache).</summary>
+    public string ThumbCacheDir => Path.Combine(LocalDir, "thumbs");
+    /// <summary>Analiz sırasında alınan video bilgisi (--load-info-json ile indirmede yeniden kullanılır).</summary>
+    public string InfoJsonDir => Path.Combine(LocalDir, "info-json");
 
     public static string DefaultOutputDir() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Vidra");

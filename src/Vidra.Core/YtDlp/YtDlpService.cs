@@ -13,7 +13,10 @@ public sealed class ProbeException(string message, ErrorKind kind) : Exception(m
 public sealed record SessionTestResult(bool Ok, string Message, ErrorKind? Kind = null);
 
 /// <summary>Kısa ömürlü yt-dlp çağrıları: bilgi alma (probe) ve oturum testi.</summary>
-public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings)
+/// <param name="guard">Verilirse analizde alınan YouTube sınırı (429, bot doğrulaması) kuyruğu da soğumaya sokar.</param>
+/// <param name="infoCache">Verilirse tek video analizlerinin bilgisi indirmede yeniden kullanılmak üzere saklanır.</param>
+public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings, Queue.RateGuard? guard = null,
+    InfoJsonCache? infoCache = null)
 {
     public async Task<object> ProbeAsync(string rawUrl, ChannelTab tab = ChannelTab.Videos, int? limit = null, CancellationToken ct = default)
     {
@@ -35,10 +38,19 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
             url = YouTubeUrl.MembersPlaylistUrl(id);
         }
 
-        using var doc = await RunJsonAsync(YtDlpArgs.Probe(url, kind, settings(), tools.Paths, limit), ct).ConfigureAwait(false);
-        var root = doc.RootElement;
-        if (kind == LinkKind.Video || !ProbeParser.IsPlaylist(root)) return ProbeParser.ParseVideo(root);
-        return ProbeParser.ParsePlaylist(root, kind);
+        var (doc, json) = await RunJsonRawAsync(YtDlpArgs.Probe(url, kind, settings(), tools.Paths, limit), ct).ConfigureAwait(false);
+        using (doc)
+        {
+            var root = doc.RootElement;
+            if (kind == LinkKind.Video || !ProbeParser.IsPlaylist(root))
+            {
+                var v = ProbeParser.ParseVideo(root);
+                // Canlı yayının format adresleri kısa ömürlü ve değişken: yeniden kullanma
+                if (!v.Live) infoCache?.Save(v.Id, json);
+                return v;
+            }
+            return ProbeParser.ParsePlaylist(root, kind);
+        }
     }
 
     private async Task<string?> ResolveChannelIdAsync(string rawUrl, CancellationToken ct)
@@ -68,9 +80,14 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
         return ProbeParser.ParsePlaylist(doc.RootElement, LinkKind.Playlist);
     }
 
-    private async Task<JsonDocument> RunJsonAsync(List<string> args, CancellationToken ct)
+    private async Task<JsonDocument> RunJsonAsync(List<string> args, CancellationToken ct) =>
+        (await RunJsonRawAsync(args, ct).ConfigureAwait(false)).Doc;
+
+    private async Task<(JsonDocument Doc, string Json)> RunJsonRawAsync(List<string> args, CancellationToken ct)
     {
-        var r = await runner.RunAsync(tools.YtDlpPath, args, ct).ConfigureAwait(false);
+        ProcessResult r;
+        using (Perf.Measure("probe", args[^1]))
+            r = await runner.RunAsync(tools.YtDlpPath, args, ct).ConfigureAwait(false);
         var json = r.StdOut.Trim();
         // Çıkarım başarısızsa yt-dlp stdout'a "null" basabilir: bunu da hata say
         if (json.Length == 0 || json == "null" || json[0] != '{')
@@ -78,9 +95,10 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
             var err = LastError(r.StdErr);
             if (OutputParser.MissingTab(err) is { } tab) throw new ProbeException($"Bu kanalda {tab.Label()} sekmesi yok.", ErrorKind.Unavailable);
             var k = OutputParser.Classify(err);
+            if (k is ErrorKind.RateLimited or ErrorKind.BotCheck) guard?.Trip(k);
             throw new ProbeException(OutputParser.FriendlyError(k, string.IsNullOrWhiteSpace(err) ? "Video bilgisi alınamadı." : err), k);
         }
-        return JsonDocument.Parse(json);
+        return (JsonDocument.Parse(json), json);
     }
 
     public async Task<SessionTestResult> TestSessionAsync(CancellationToken ct = default)

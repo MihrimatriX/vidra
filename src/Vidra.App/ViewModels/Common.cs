@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Vidra.Core.Models;
+using Vidra.Core.Playlists;
 
 namespace Vidra.App.ViewModels;
 
@@ -37,6 +38,9 @@ public static class Choices
     public static readonly IReadOnlyList<Choice> Themes =
         [new(ThemeMode.Light, "Açık"), new(ThemeMode.Dark, "Koyu"), new(ThemeMode.System, "Sistem")];
 
+    public static readonly IReadOnlyList<Choice> PoliteLevels =
+        [new(PoliteLevel.Off, PoliteLevel.Off.Label()), new(PoliteLevel.Balanced, PoliteLevel.Balanced.Label()), new(PoliteLevel.Safe, PoliteLevel.Safe.Label())];
+
     public static readonly IReadOnlyList<Choice> Channels = [new(UpdateChannel.Stable, "Kararlı"), new(UpdateChannel.Nightly, "Nightly")];
 
     public static readonly IReadOnlyList<Choice> ChannelTabs =
@@ -53,24 +57,24 @@ public static class Choices
         [new(0, "Kapalı"), new(1, "Saatte bir"), new(6, "6 saatte bir"), new(12, "12 saatte bir"), new(24, "Günde bir")];
 
     public static readonly IReadOnlyList<Choice> DurationBuckets =
-        [new("all", "Hepsi"), new("short", "< 4 dk"), new("mid", "4–20 dk"), new("long", "> 20 dk")];
+        [new(DurationBucket.All, "Hepsi"), new(DurationBucket.Short, "< 4 dk"), new(DurationBucket.Mid, "4–20 dk"), new(DurationBucket.Long, "> 20 dk")];
 
     public static readonly IReadOnlyList<Choice> VideoSorts =
     [
-        new("list", "Liste sırası"),
-        new("reverse", "Ters sıra (eskiden yeniye)"),
-        new("newest", "En yeni tarih"),
-        new("longest", "En uzun süre"),
-        new("views", "En çok izlenen"),
+        new(VideoSort.List, "Liste sırası"),
+        new(VideoSort.Reverse, "Ters sıra (eskiden yeniye)"),
+        new(VideoSort.Newest, "En yeni tarih"),
+        new(VideoSort.Longest, "En uzun süre"),
+        new(VideoSort.Views, "En çok izlenen"),
     ];
 
     public static readonly IReadOnlyList<Choice> ListSorts =
     [
-        new("default", "Varsayılan sıra"),
-        new("members", "Üyelere özel önce"),
-        new("missing", "Eksik videosu olanlar önce"),
-        new("count", "En çok video"),
-        new("name", "Ada göre"),
+        new(ListSort.Default, "Varsayılan sıra"),
+        new(ListSort.Members, "Üyelere özel önce"),
+        new(ListSort.Missing, "Eksik videosu olanlar önce"),
+        new(ListSort.Count, "En çok video"),
+        new(ListSort.Name, "Ada göre"),
     ];
 }
 
@@ -94,7 +98,7 @@ public sealed partial class CardGrid : ObservableObject
     public static double MinCard { get; set; } = 250;
     private IReadOnlyList<object> _items = [];
 
-    public System.Collections.ObjectModel.ObservableCollection<object[]> Rows { get; } = [];
+    public Vidra.Core.BulkObservableCollection<object[]> Rows { get; } = [];
     [ObservableProperty] private int _columns = 4;
     /// <summary>16:9 kapak yüksekliği; kart genişliğinden (iç boşluk ve aralık düşülerek) hesaplanır.</summary>
     [ObservableProperty] private double _thumbHeight = 124;
@@ -117,13 +121,33 @@ public sealed partial class CardGrid : ObservableObject
 
     private void Rebuild()
     {
-        Rows.Clear();
-        foreach (var r in _items.Chunk(Columns)) Rows.Add(r);
+        Rows.ReplaceAll(_items.Chunk(Columns));
     }
 }
 
 public static class Ui
 {
+    /// <summary>
+    /// Son çağrıdan <paramref name="delay"/> sonra bir kez çalıştırır (yazarken filtre: her tuşta binlerce satırı
+    /// yeniden süzmek yerine yazma durunca). Uygulama dışında (testler) doğrudan çağırır.
+    /// </summary>
+    public static Action Debounce(Action action, TimeSpan delay)
+    {
+        System.Windows.Threading.DispatcherTimer? timer = null;
+        return () =>
+        {
+            var d = System.Windows.Application.Current?.Dispatcher;
+            if (d is null) { action(); return; }
+            if (timer is null)
+            {
+                timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background, d) { Interval = delay };
+                timer.Tick += (_, _) => { timer.Stop(); action(); };
+            }
+            timer.Stop();
+            timer.Start();
+        };
+    }
+
     /// <summary>
     /// Aynı arayüz turunda gelen çağrıları tek çağrıya indirir (ör. koleksiyona art arda 1000 ekleme → bir yenileme).
     /// Uygulama dışında (testler) doğrudan çağırır.

@@ -13,6 +13,10 @@ public interface IProcessRunner
 
     /// <summary>Kısa ömürlü çağrı (probe, --version, -U).</summary>
     Task<ProcessResult> RunAsync(string exe, IReadOnlyList<string> args, CancellationToken ct = default);
+
+    /// <summary>Belirli bir klasörde kısa ömürlü çağrı (ör. "deno install"). Varsayılan: klasörü yok sayar.</summary>
+    Task<ProcessResult> RunInAsync(string workingDirectory, string exe, IReadOnlyList<string> args, CancellationToken ct = default) =>
+        RunAsync(exe, args, ct);
 }
 
 public interface IRunningProcess
@@ -53,7 +57,7 @@ public sealed class ProcessRunner(string? cookieCopyDir = null) : IProcessRunner
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* çıkışta oturum temizliği siler */ }
     }
 
-    private static ProcessStartInfo Info(string exe, IReadOnlyList<string> args)
+    private static ProcessStartInfo Info(string exe, IReadOnlyList<string> args, string? workingDirectory = null)
     {
         var psi = new ProcessStartInfo(exe)
         {
@@ -63,7 +67,7 @@ public sealed class ProcessRunner(string? cookieCopyDir = null) : IProcessRunner
             RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
-            WorkingDirectory = Path.GetDirectoryName(exe) ?? Environment.CurrentDirectory,
+            WorkingDirectory = workingDirectory ?? Path.GetDirectoryName(exe) ?? Environment.CurrentDirectory,
         };
         // ArgumentList: her eleman ayrı argüman, tırnaklama/enjeksiyon derdi yok
         foreach (var a in args) psi.ArgumentList.Add(a);
@@ -114,9 +118,12 @@ public sealed class ProcessRunner(string? cookieCopyDir = null) : IProcessRunner
         finally { TryDelete(copy); }
     }
 
-    private static async Task<ProcessResult> RunCoreAsync(string exe, IReadOnlyList<string> args, CancellationToken ct)
+    public Task<ProcessResult> RunInAsync(string workingDirectory, string exe, IReadOnlyList<string> args, CancellationToken ct = default) =>
+        RunCoreAsync(exe, args, ct, workingDirectory);
+
+    private static async Task<ProcessResult> RunCoreAsync(string exe, IReadOnlyList<string> args, CancellationToken ct, string? workingDirectory = null)
     {
-        using var p = new System.Diagnostics.Process { StartInfo = Info(exe, args) };
+        using var p = new System.Diagnostics.Process { StartInfo = Info(exe, args, workingDirectory) };
         p.Start();
         var stdout = p.StandardOutput.ReadToEndAsync(ct);
         var stderr = p.StandardError.ReadToEndAsync(ct);

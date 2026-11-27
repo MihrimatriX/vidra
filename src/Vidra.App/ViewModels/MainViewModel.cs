@@ -20,6 +20,8 @@ public enum Page { Download, Search, Playlist, Basket, Queue, Library, Stats, Ac
 /// <summary>Alttaki kısa bildirim; Action varsa yanında düğme olarak (ör. "Geri al").</summary>
 public sealed record ToastMessage(string Text, string? ActionLabel, Action? Action);
 
+public enum UpdateState { None, Available, Downloading, Ready, Failed }
+
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly AppHost _host;
@@ -53,6 +55,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Hesabım son açıldığından beri takip edilen listelerden kuyruğa eklenen yeni video sayısı (hesap satırında rozet).</summary>
     [ObservableProperty] private int _followNew;
+    /// <summary>"YouTube durumu": soğuma, saatlik bütçe, yt-dlp yaşı. Level: ok / warn / bad.</summary>
+    [ObservableProperty] private string _healthLabel = "YouTube: normal";
+    [ObservableProperty] private string _healthLevel = "ok";
+    [ObservableProperty] private string _healthTip = "";
+    private string? _ytDlpVersion;
+    private DateTimeOffset _lastAuthToast = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastSessionCheck = DateTimeOffset.Now;
+    private bool _updatingYtDlp;
 
     /// <summary>Pano izleme: kopyalanan bağlantı için üstte çıkan şerit.</summary>
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(ClipboardIsVideo))] private string? _clipboardLink;
@@ -69,7 +79,9 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _incognito;
 
     /// <summary>GitHub'da daha yeni Vidra sürümü varsa; kenar çubuğunda bağlantı olarak görünür.</summary>
-    [ObservableProperty] private AppRelease? _update;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateLabel), nameof(UpdateTip))]
+    private AppRelease? _update;
     private readonly DispatcherTimer _toastTimer = new();
     private bool _toastHeld;
     private string _trayTip = "";
@@ -112,10 +124,131 @@ public sealed partial class MainViewModel : ObservableObject
             QueueVm.CheckSchedule();
             RefreshStatus(); // duraklat/hata gibi durum değişiklikleri koleksiyon olayı üretmez
             RefreshProgress();
+            if (_host.Guard.InCooldown || HealthLevel == "bad" || QueueVm.CooldownText is not null) RefreshHealth(); // geri sayım ve soğuma bitişi
+            _ = MaybeCheckSessionAsync();
         };
         _timer.Start();
         RefreshStatus();
+        CleanupUpdates();
         if (host.Settings.CheckAppUpdates) _ = CheckUpdatesLaterAsync();
+
+        // Oturum düştüyse her işte ayrı ayrı değil, en fazla 10 dakikada bir söyle
+        host.Queue.AuthFailed += (_, _) => System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            if (DateTimeOffset.Now - _lastAuthToast < TimeSpan.FromMinutes(10)) return;
+            _lastAuthToast = DateTimeOffset.Now;
+            ShowToast(CookieActive ? "Oturum düşmüş olabilir: üyelik/giriş isteyen videolar inmiyor" : "Bu video giriş istiyor",
+                CookieActive ? "Yeniden giriş" : "Giriş yap", () => Go(Page.Account));
+        });
+        host.Guard.Changed += (_, _) => System.Windows.Application.Current?.Dispatcher.BeginInvoke(RefreshHealth);
+        host.Queue.Drained += (_, _) => System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => _ = MaybeUpdateYtDlpAsync());
+        _ = StartHealthAsync();
+    }
+
+    private async Task StartHealthAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(20)); // açılışı yavaşlatmasın; kurulum ekranı da bitmiş olsun
+        await RefreshYtDlpVersionAsync();
+        await MaybeUpdateYtDlpAsync();
+    }
+
+    private async Task RefreshYtDlpVersionAsync()
+    {
+        try
+        {
+            var st = await _host.Tools.StatusAsync();
+            _ytDlpVersion = st.FirstOrDefault(t => t.Id == Core.Tools.ToolId.YtDlp)?.Version;
+        }
+        catch { /* bileşen yoksa kurulum ekranı ilgilenir */ }
+        RefreshHealth();
+    }
+
+    /// <summary>
+    /// yt-dlp'yi günde en fazla bir kez, yalnızca kuyruk boşken günceller (çalışan exe Windows'ta değiştirilemez).
+    /// YouTube değişikliklerine karşı en etkili önlem budur.
+    /// </summary>
+    public async Task MaybeUpdateYtDlpAsync(bool force = false)
+    {
+        var s = _host.Settings;
+        if (_updatingYtDlp || !_host.Tools.AllInstalled) return;
+        if (!force && (!s.AutoUpdateYtDlp || !Core.Tools.YtDlpFreshness.IsCheckDue(s.LastYtDlpUpdateCheck, DateTimeOffset.Now))) return;
+        if (_host.Queue.ActiveCount > 0)
+        {
+            if (force) ShowToast("İndirmeler sürerken yt-dlp güncellenemez; kuyruk boşalınca kendiliğinden güncellenir");
+            return;
+        }
+        _updatingYtDlp = true;
+        try
+        {
+            var r = await _host.Tools.UpdateYtDlpAsync(s.UpdateChannel);
+            _host.SettingsStore.Update(x => x.LastYtDlpUpdateCheck = DateTimeOffset.Now);
+            if (Core.Tools.YtDlpFreshness.UpdatedTo(r.StdOut + "\n" + r.StdErr) is { } v) ShowToast($"yt-dlp güncellendi ({v})");
+            else if (force) ShowToast(r.ExitCode == 0 ? "yt-dlp zaten güncel" : "yt-dlp güncellenemedi: " + (r.StdErr.Trim() is { Length: > 0 } e ? e : "bilinmeyen hata"));
+        }
+        catch (Exception e) when (force) { ShowToast("yt-dlp güncellenemedi: " + e.Message); }
+        catch { /* sessiz deneme; bir sonraki açılışta yine denenir */ }
+        finally { _updatingYtDlp = false; }
+        await RefreshYtDlpVersionAsync();
+    }
+
+    /// <summary>Oturum açıkken 12 saatte bir hafif oturum testi; düştüyse kullanıcı indirme hata vermeden önce öğrenir.</summary>
+    private async Task MaybeCheckSessionAsync()
+    {
+        if (!CookieActive || _host.Guard.InCooldown || DateTimeOffset.Now - _lastSessionCheck < TimeSpan.FromHours(12)) return;
+        _lastSessionCheck = DateTimeOffset.Now;
+        try
+        {
+            var r = await _host.YtDlp.TestSessionAsync();
+            if (!r.Ok && r.Kind == ErrorKind.Auth)
+                ShowToast("YouTube oturumunun süresi dolmuş", "Yeniden giriş", () => Go(Page.Account));
+        }
+        catch { /* ağ yoksa sonraki turda */ }
+    }
+
+    public void RefreshHealth()
+    {
+        QueueVm.RefreshCooldown();
+        var signedIn = _host.Settings.Cookies is not NoCookies;
+        var st = _host.Guard.State(signedIn);
+        var now = DateTimeOffset.Now;
+        var age = Core.Tools.YtDlpFreshness.AgeDays(_ytDlpVersion, now);
+        var waiting = _host.Queue.WaitingCount;
+        var budget = $"Son 1 saatte {st.StartsLastHour} indirme başlatıldı (YouTube'un yaklaşık sınırı: {st.HourlyBudget}/saat {(signedIn ? "hesapla" : "girişsiz")}).";
+        var ver = _ytDlpVersion is null ? "" : $"\nyt-dlp {_ytDlpVersion}{(age is { } d ? $" · {d} gün önce" : "")}";
+        if (st.CooldownUntil is { } until)
+        {
+            HealthLevel = "bad";
+            HealthLabel = $"YouTube sınırı · {until.ToLocalTime():HH:mm}'e kadar";
+            HealthTip = $"YouTube {(st.CooldownReason == ErrorKind.BotCheck ? "bot doğrulaması istedi" : "istek sınırı uyguladı")}. " +
+                        $"Sınırı uzatmamak için yeni indirme başlatılmıyor; {waiting} iş bekliyor ve süre dolunca kendiliğinden yeniden denenecek.\n{budget}{ver}\nTıkla: kuyruğu aç";
+        }
+        else if (st.Recovering || st.NearBudget)
+        {
+            HealthLevel = "warn";
+            HealthLabel = st.NearBudget ? $"YouTube: yavaşlatıldı ({st.StartsLastHour}/{st.HourlyBudget})" : "YouTube: toparlanıyor";
+            HealthTip = (st.NearBudget ? "Saatlik sınıra yaklaşıldı: " : "Yakın zamanda sınıra takıldı: ") +
+                        $"indirmeler tek tek ve Güvenli nazik modla sürüyor.\n{budget}{ver}";
+        }
+        else if (Core.Tools.YtDlpFreshness.IsStale(_ytDlpVersion, now))
+        {
+            HealthLevel = "warn";
+            HealthLabel = $"yt-dlp {age} gün eski";
+            HealthTip = $"Eski yt-dlp YouTube'da 403, bot doğrulaması ve \"biçim yok\" hatalarının en yaygın sebebi.{ver}\nTıkla: şimdi güncelle";
+        }
+        else
+        {
+            HealthLevel = "ok";
+            HealthLabel = "YouTube: normal";
+            HealthTip = $"{budget}{ver}\nNazik mod: {_host.Guard.EffectivePolite(_host.Settings).Label()}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task HealthAction()
+    {
+        if (HealthLevel == "bad") Go(Page.Queue);
+        else if (Core.Tools.YtDlpFreshness.IsStale(_ytDlpVersion, DateTimeOffset.Now)) await MaybeUpdateYtDlpAsync(force: true);
+        else Go(Page.Settings);
     }
 
     private async Task CheckUpdatesLaterAsync()
@@ -129,16 +262,152 @@ public sealed partial class MainViewModel : ObservableObject
     {
         using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
         var r = await AppUpdate.CheckAsync(_host.Http, cts.Token);
-        var current = typeof(MainViewModel).Assembly.GetName().Version ?? new System.Version(0, 0, 0);
-        if (r is not null && AppUpdate.IsNewer(r, current))
+        if (r is not null && AppUpdate.IsNewer(r, CurrentVersion))
         {
+            if (Update?.Version == r.Version && UpdateState != UpdateState.Failed) { if (manual) ShowUpdateToast(); return; }
             Update = r;
-            ShowToast($"Vidra {r.Tag} çıktı", "Sürüm notları", () => OpenInBrowser(r.Url));
+            UpdateState = UpdateState.Available;
+            if (_host.Settings.AutoDownloadAppUpdates && AppUpdate.AssetFor(r, Kind) is not null) await DownloadUpdateAsync(announce: false);
+            ShowUpdateToast();
         }
         else if (manual) ShowToast(r is null ? "Güncelleme denetlenemedi: GitHub'a ulaşılamadı" : $"Vidra güncel ({Version})");
     }
 
+    // ================= Uygulama içi güncelleme =================
+
+    private static readonly System.Version CurrentVersion = typeof(MainViewModel).Assembly.GetName().Version ?? new System.Version(0, 0, 0);
+    private static readonly string ExePath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Vidra.exe");
+    private static readonly InstallKind Kind = AppUpdate.DetectInstallKind(Path.GetDirectoryName(ExePath)!);
+    private string UpdatesDir => Path.Combine(_host.Paths.LocalDir, "updates");
+    private string? _updateFile;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateLabel), nameof(UpdateTip))]
+    private UpdateState _updateState;
+
+    /// <summary>İndirme ilerlemesi 0–1; boyut bilinmiyorsa null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateLabel))]
+    private double? _updateProgress;
+
+    /// <summary>Kenar çubuğundaki güncelleme düğmesinin yazısı.</summary>
+    public string UpdateLabel => UpdateState switch
+    {
+        UpdateState.Downloading => UpdateProgress is { } p ? $"İndiriliyor %{p * 100:0}" : "İndiriliyor…",
+        UpdateState.Ready => "Yeniden başlat ve kur",
+        UpdateState.Failed => "Güncellenemedi: tekrar dene",
+        _ => $"{Update?.Tag} çıktı · İndir",
+    };
+
+    public string UpdateTip => UpdateState switch
+    {
+        UpdateState.Ready => $"Vidra {Update?.Tag} indirildi. Vidra kapanıp güncellenir ve yeniden açılır; duraklatılan indirmeler kaldığı yerden sürer.",
+        UpdateState.Downloading => "Güncelleme indiriliyor",
+        _ => $"Vidra {Update?.Tag} sürümünü indirip kur",
+    };
+
+    private void ShowUpdateToast()
+    {
+        if (Update is not { } r) return;
+        if (UpdateState == UpdateState.Ready) ShowToast($"Vidra {r.Tag} kurulmaya hazır", "Yeniden başlat", () => UpdateActionCommand.Execute(null));
+        else ShowToast($"Vidra {r.Tag} çıktı", "İndir ve kur", () => UpdateActionCommand.Execute(null));
+    }
+
+    /// <summary>Kenar çubuğundaki düğme: duruma göre indirir ya da kurar.</summary>
+    [RelayCommand]
+    private async Task UpdateAction()
+    {
+        switch (UpdateState)
+        {
+            case UpdateState.Available or UpdateState.Failed:
+                await DownloadUpdateAsync(announce: true);
+                if (UpdateState == UpdateState.Ready) ApplyUpdate(confirmed: false);
+                break;
+            case UpdateState.Ready:
+                ApplyUpdate(confirmed: false);
+                break;
+        }
+    }
+
     [RelayCommand] private void OpenUpdate() { if (Update is { } r) OpenInBrowser(r.Url); }
+
+    private async Task DownloadUpdateAsync(bool announce)
+    {
+        if (Update is not { } r || UpdateState == UpdateState.Downloading) return;
+        // Sürümde bu kurulum türünün dosyası yoksa (ör. eski biçimli sürüm) eski davranış: sürüm sayfası
+        if (AppUpdate.AssetFor(r, Kind) is not { } asset)
+        {
+            if (announce) OpenInBrowser(r.Url);
+            return;
+        }
+        UpdateState = UpdateState.Downloading;
+        UpdateProgress = null;
+        try
+        {
+            // Progress<T> arayüz thread'inde yaratıldığı için raporları oraya taşır
+            var progress = new Progress<double?>(p => UpdateProgress = p);
+            _updateFile = await AppUpdater.DownloadAsync(_host.Http, asset, r.Version, UpdatesDir, progress);
+            UpdateState = UpdateState.Ready;
+        }
+        catch (Exception e)
+        {
+            UpdateState = UpdateState.Failed;
+            App.Log(e);
+            if (announce) ShowToast(e is InvalidDataException ? "Güncelleme dosyası doğrulanamadı; silindi" : "Güncelleme indirilemedi", "Sürüm sayfası", () => OpenInBrowser(r.Url));
+        }
+    }
+
+    private void ApplyUpdate(bool confirmed)
+    {
+        if (_updateFile is not { } file || Update is not { } r) return;
+        // Etkin indirme varsa önce sor: kapanışta duraklatılır, açılışta .part dosyalarından sürer
+        if (!confirmed && _host.Queue.ActiveCount > 0)
+        {
+            ShowToast($"{_host.Queue.ActiveCount} indirme duraklatılıp güncellemeden sonra sürecek", "Yine de kur", () => ApplyUpdate(confirmed: true));
+            return;
+        }
+        try
+        {
+            ProcessStartInfo launch;
+            if (Kind == InstallKind.Installed)
+            {
+                var dir = Path.GetDirectoryName(ExePath)!;
+                var allUsers = IsUnder(dir, Environment.SpecialFolder.ProgramFiles) || IsUnder(dir, Environment.SpecialFolder.ProgramFilesX86);
+                launch = new ProcessStartInfo(file, AppUpdate.SetupArguments(allUsers)) { UseShellExecute = true }; // ShellExecute: UAC istemi çıkabilsin
+            }
+            else
+            {
+                AppUpdater.SwapPortable(ExePath, file);
+                launch = new ProcessStartInfo(ExePath) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(ExePath)! };
+            }
+            // Yeni süreç tek örnek kilidi bırakıldıktan sonra başlamalı (yoksa çalışan Vidra'ya iletip kapanır): bkz. App.OnExit
+            ((App)System.Windows.Application.Current).LaunchAfterExit = launch;
+            ((MainWindow)System.Windows.Application.Current.MainWindow!).ExitApp();
+        }
+        catch (Exception e)
+        {
+            App.Log(e);
+            UpdateState = UpdateState.Failed;
+            ShowToast("Güncelleme uygulanamadı", "Sürüm sayfası", () => OpenInBrowser(r.Url));
+        }
+    }
+
+    private static bool IsUnder(string dir, Environment.SpecialFolder folder)
+    {
+        var root = Environment.GetFolderPath(folder);
+        return root.Length > 0 && Path.GetFullPath(dir).StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Açılışta: kurulmuş eski indirmeleri ve taşınabilir güncellemeden kalan exe'yi sil.</summary>
+    private void CleanupUpdates()
+    {
+        try
+        {
+            AppUpdater.CleanupDownloads(UpdatesDir, CurrentVersion);
+            if (Kind == InstallKind.Portable) AppUpdater.CleanupPortable(ExePath);
+        }
+        catch (Exception e) { App.Log(e); }
+    }
 
     partial void OnIncognitoChanged(bool value)
     {

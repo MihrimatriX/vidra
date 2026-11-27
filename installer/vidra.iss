@@ -57,6 +57,21 @@ Root: HKCU; Subkey: "Software\Chromium\NativeMessagingHosts\com.vidra.app"; Valu
 
 [Run]
 Filename: "{app}\Vidra.exe"; Description: "{cm:LaunchProgram,Vidra}"; Flags: nowait postinstall skipifsilent
+; Uygulama içi güncelleme kurulumu /VERYSILENT /RELAUNCH ile çalıştırır (bkz. AppUpdate.SetupArguments): bitince Vidra yeniden açılır.
+; Yalnızca sessiz kipte ve /RELAUNCH verilmişse; postinstall girdileri yönetici kurulumunda da kullanıcının kendi hesabıyla çalışır.
+Filename: "{app}\Vidra.exe"; Flags: nowait postinstall; Check: ShouldRelaunch
 
 ; Kaldırma ayarları, geçmişi ve indirilen bileşenleri (%APPDATA%\Vidra, %LOCALAPPDATA%\Vidra) bilerek silmez:
 ; yeniden kurunca her şey yerinde olur. İndirilen videolar zaten kullanıcının klasöründe.
+
+[Code]
+// Bilinmeyen komut satırı argümanlarını Inno yok sayar; /RELAUNCH yalnızca bu denetim için var
+function ShouldRelaunch: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  if not WizardSilent then Exit;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/RELAUNCH') = 0 then Result := True;
+end;

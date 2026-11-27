@@ -22,6 +22,9 @@ public partial class App : Application
 
     public static AppHost Host => ((App)Current)._host!;
 
+    /// <summary>Uygulama içi güncelleme: kapanışta, tek örnek kilidi bırakıldıktan sonra başlatılacak kurulum ya da yeni exe.</summary>
+    internal System.Diagnostics.ProcessStartInfo? LaunchAfterExit { get; set; }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         // Tarayıcı eklentisi Vidra'yı native messaging host'u olarak başlatır (ilk argüman: chrome-extension://kimlik/).
@@ -62,7 +65,9 @@ public partial class App : Application
 
     private void StartApp(StartupEventArgs e)
     {
+        Core.Perf.Mark("process");
         _host = new AppHost();
+        Core.Perf.Mark("host");
 #if DEBUG
         // Ekran görüntüsü turu: kendi ayarlarıyla, dış etkiler (güncelleme bildirimi, pano, tepsi balonu) kapalı
         var tour = e.Args.Length > 1 && e.Args[0] == "--screenshot-tour";
@@ -81,12 +86,17 @@ public partial class App : Application
         var vm = new MainViewModel(_host);
         var window = new MainWindow(vm, _host);
         MainWindow = window;
+        Core.Perf.Mark("viewmodels");
+        window.ContentRendered += (_, _) => Core.Perf.Mark("first-render");
         window.Show();
 
         _host.Tray = new TrayService(window, _host.Queue.PauseAll, _host.Queue.ResumeAll, () => window.ExitApp());
         _host.Clipboard.Attach(window);
         _host.Clipboard.Enabled = _host.Settings.WatchClipboard;
         _host.Follow.StartBackgroundLoop();
+        // Eski tek dosyalık yt-dlp'yi hızlı açılan onedir paketine taşı; açılışla yarışmasın diye biraz sonra
+        if (_host.Tools.AllInstalled)
+            _ = Task.Delay(TimeSpan.FromSeconds(20)).ContinueWith(_ => _host.Tools.MigrateAndCleanupAsync(_host.Settings.UpdateChannel), TaskScheduler.Default).Unwrap();
         try { ExtensionService.RegisterHost(_host.Paths); }
         catch (Exception ex) { Log(ex); } // kayıt olmazsa yalnızca eklenti bağlanamaz
         // Kuyruk olayları arka plan thread'inden gelir: pencereye dokunmadan önce UI thread'ine geç
@@ -168,7 +178,7 @@ public partial class App : Application
         }
     }
 
-    private static void Log(Exception ex)
+    internal static void Log(Exception ex)
     {
         try
         {
@@ -218,6 +228,11 @@ public partial class App : Application
     {
         if (_ownsMutex) _mutex?.ReleaseMutex();
         _mutex?.Dispose();
+        if (LaunchAfterExit is { } launch)
+        {
+            try { System.Diagnostics.Process.Start(launch); }
+            catch (Exception ex) { Log(ex); } // ör. UAC reddedildi: Vidra eski sürümle bir sonraki açılışta yine güncelleme önerir
+        }
         base.OnExit(e);
     }
 }

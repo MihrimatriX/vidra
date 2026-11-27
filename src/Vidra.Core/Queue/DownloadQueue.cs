@@ -30,6 +30,7 @@ public sealed record NewJob(
 public sealed partial class DownloadQueue : ObservableObject
 {
     private const int HistoryLimit = 1000;
+    private const long ProgressLogInterval = 5000;
 
     private readonly IProcessRunner _runner;
     private readonly ToolManager _tools;
@@ -39,8 +40,12 @@ public sealed partial class DownloadQueue : ObservableObject
     private readonly Dictionary<string, IRunningProcess> _running = new();
     private readonly Dictionary<string, DownloadJob> _jobsById = new();
     private readonly Dictionary<string, JobStatus> _intentional = new();
+
+    /// <summary>Schedule'ın "Running" diye işaretlediği ama süreci henüz başlamamış işler.</summary>
+    private readonly HashSet<string> _claimed = new();
     private readonly Lock _gate = new();
     private readonly Lock _m3uGate = new();
+    private readonly Lock _collectionsGate = new();
     private bool _wasBusy;
     private bool _lastEndNatural;
     private volatile bool _shuttingDown;
@@ -55,15 +60,31 @@ public sealed partial class DownloadQueue : ObservableObject
     public event EventHandler? Drained;
     public event EventHandler<DownloadJob>? JobFinished;
 
+    /// <summary>Bir iş oturum/üyelik hatası aldı: oturum düşmüş olabilir (arayüz yeniden giriş önerir).</summary>
+    public event EventHandler<DownloadJob>? AuthFailed;
+
+    /// <summary>YouTube sınırlarına karşı kuyruk geneli koruma: soğuma, eşzamanlılık ve nazik mod yükseltme.</summary>
+    public RateGuard Guard { get; }
+
+    private Timer? _wake;
+
     [ObservableProperty] private double _totalSpeed;
 
-    public DownloadQueue(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings, AppPaths paths, Action<Action>? dispatch = null)
+    private readonly InfoJsonCache? _infoCache;
+
+    /// <param name="infoCache">Analizde saklanan video bilgisi; verilirse ilk denemede çıkarım atlanır.</param>
+    public DownloadQueue(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings, AppPaths paths, Action<Action>? dispatch = null, RateGuard? guard = null,
+        InfoJsonCache? infoCache = null)
     {
+        Guard = guard ?? new RateGuard();
+        _infoCache = infoCache;
         _runner = runner;
         _tools = tools;
         _settings = settings;
         _paths = paths;
-        _dispatch = dispatch ?? (a => a());
+        // Arayüz yokken (testler, CLI) koleksiyonlar thread-pool'dan aynı anda değişmesin: WPF dispatcher'ı gibi sıraya sok.
+        // ObservableCollection thread-safe değil; iki iş aynı anda bitince Jobs.Remove kaybolabiliyordu.
+        _dispatch = dispatch ?? (a => { lock (_collectionsGate) a(); });
         foreach (var h in JsonStore.Read<List<HistoryEntry>>(paths.HistoryFile) ?? []) History.Add(h);
         // Önceki oturumda bitmemiş işler duraklatılmış olarak geri gelir; .part dosyalarından devam ederler
         foreach (var n in JsonStore.Read<List<NewJob>>(paths.PendingFile) ?? [])
@@ -118,13 +139,21 @@ public sealed partial class DownloadQueue : ObservableObject
                 p.Kill();
                 return;
             }
+            // Başlatılmak üzere: Start süreci açmadan (ya da açar açmaz) duraklatır
+            if (_claimed.Contains(j.Id))
+            {
+                _intentional[j.Id] = JobStatus.Paused;
+                return;
+            }
+            // Kilit içinde: Schedule aynı anda bu işi başlatmak üzere işaretleyemesin
+            if (j.Status is JobStatus.Queued) { j.RetryAt = null; j.Status = JobStatus.Paused; j.Stage = "Duraklatıldı"; }
         }
-        if (j.Status is JobStatus.Queued) { j.Status = JobStatus.Paused; j.Stage = "Duraklatıldı"; }
     }
 
     public void Resume(DownloadJob j)
     {
         if (j.Status is not (JobStatus.Paused or JobStatus.Error)) return;
+        j.RetryAt = null;
         j.Status = JobStatus.Queued;
         j.Stage = "Sırada";
         Schedule();
@@ -132,6 +161,8 @@ public sealed partial class DownloadQueue : ObservableObject
 
     public void Retry(DownloadJob j)
     {
+        j.RetryAt = null;
+        j.AutoRetries = 0;
         j.ErrorKind = null;
         j.ErrorMessage = null;
         j.ResetProgress("Sırada");
@@ -147,6 +178,11 @@ public sealed partial class DownloadQueue : ObservableObject
             {
                 _intentional[j.Id] = JobStatus.Canceled;
                 p.Kill();
+                return;
+            }
+            if (_claimed.Contains(j.Id))
+            {
+                _intentional[j.Id] = JobStatus.Canceled;
                 return;
             }
         }
@@ -165,6 +201,21 @@ public sealed partial class DownloadQueue : ObservableObject
         var i = Jobs.IndexOf(j);
         if (i >= 0 && i < Jobs.Count - 1) Jobs.Move(i, Jobs.Count - 1);
     });
+
+    /// <summary>Kendiliğinden yeniden denenmeyi bekleyen işler (soğuma ya da ağ hatası sonrası).</summary>
+    public int WaitingCount => Snapshot().Count(j => j.Status == JobStatus.Queued && j.RetryAt is not null);
+
+    /// <summary>Kullanıcı beklemeyi atladı: soğuma biter, bekleyen işler hemen sıraya girer.</summary>
+    public void SkipCooldown()
+    {
+        Guard.Clear();
+        foreach (var j in Snapshot().Where(j => j.Status == JobStatus.Queued && j.RetryAt is not null))
+        {
+            j.RetryAt = null;
+            j.Stage = "Sırada";
+        }
+        Schedule();
+    }
 
     /// <summary>Hata almış işlerin hepsini yeniden sıraya koyar.</summary>
     public int RetryFailed()
@@ -267,26 +318,42 @@ public sealed partial class DownloadQueue : ObservableObject
     public void Schedule()
     {
         if (Held) return;
-        var limit = Math.Max(1, _settings().Concurrency);
+        var limit = Guard.EffectiveConcurrency(_settings());
+        // YouTube sınırı sürerken yeni istek sınırı uzatır: hiçbir iş başlamaz (çalışanlar kendi işini bitirir)
+        var cooling = Guard.InCooldown;
+        var now = Guard.Now;
+        DateTimeOffset? wakeAt = Guard.CooldownUntil;
         // Anlık görüntüyü kilit DIŞINDA al: dispatch UI thread'ine senkron gider, kilit içinde çağırmak kilitlenme riski
         var jobs = Snapshot();
         List<DownloadJob> toStart = [];
         bool idle;
         lock (_gate)
         {
-            var active = _running.Count;
+            // Başlatılmak üzere işaretlenenler de sayılır: eşzamanlı iki Schedule sınırı aşmasın
+            var active = _running.Count + _claimed.Count;
             foreach (var j in jobs)
             {
-                if (active >= limit) break;
                 if (j.Status != JobStatus.Queued) continue;
+                if (j.RetryAt is { } at)
+                {
+                    if (at > now)
+                    {
+                        if (wakeAt is null || at < wakeAt) wakeAt = at;
+                        continue;
+                    }
+                    j.RetryAt = null;
+                }
+                if (cooling || active >= limit) continue;
                 // Aynı anda iki kez başlamasın: kilit içinde işaretle
                 j.Status = JobStatus.Running;
+                _claimed.Add(j.Id);
                 active++;
                 toStart.Add(j);
             }
-            idle = toStart.Count == 0 && _running.Count == 0;
+            idle = toStart.Count == 0 && _running.Count == 0 && _claimed.Count == 0;
             if (!idle) _wasBusy = true;
         }
+        ArmWake(wakeAt, now);
         foreach (var j in toStart) Start(j);
         // Yalnızca gerçek bitişte tetikle: son iş kendiliğinden bitti (duraklatma/iptal değil), bekleyen ya da duraklatılmış iş yok
         if (idle && _wasBusy && _lastEndNatural && !_shuttingDown &&
@@ -297,10 +364,45 @@ public sealed partial class DownloadQueue : ObservableObject
         }
     }
 
+    /// <summary>Bir sonraki bekleme bitiminde (soğuma ya da işin yeniden deneme zamanı) kuyruğu yeniden değerlendirir.</summary>
+    private void ArmWake(DateTimeOffset? at, DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            if (_shuttingDown || at is null)
+            {
+                _wake?.Change(Timeout.Infinite, Timeout.Infinite);
+                return;
+            }
+            var due = at.Value - now + TimeSpan.FromMilliseconds(250);
+            if (due < TimeSpan.FromMilliseconds(250)) due = TimeSpan.FromMilliseconds(250);
+            if (due > TimeSpan.FromDays(1)) due = TimeSpan.FromDays(1);
+            _wake ??= new Timer(_ => Schedule());
+            _wake.Change(due, Timeout.InfiniteTimeSpan);
+        }
+    }
+
     private void Start(DownloadJob job)
     {
+        JobStatus? early;
+        lock (_gate)
+        {
+            early = _intentional.Remove(job.Id, out var w) ? w : null;
+            if (early is not null) _claimed.Remove(job.Id);
+        }
+        if (early is not null)
+        {
+            // Başlamadan duraklatıldı/iptal edildi
+            if (early == JobStatus.Canceled) { job.Status = JobStatus.Canceled; Finish(job); }
+            else { job.Status = JobStatus.Paused; job.Stage = "Duraklatıldı"; }
+            Schedule();
+            return;
+        }
         var s = _settings();
-        var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate);
+        Guard.RecordStart();
+        // Canlı bekleme ve ek argümanlar (ör. --extractor-args) analizdekinden farklı formatlar verebilir: o durumda adresle çıkar
+        var info = !job.Options.WaitForLive && string.IsNullOrWhiteSpace(s.ExtraArgs) ? _infoCache?.TryGetFresh(job.VideoId) : null;
+        var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate, Guard.EffectivePolite(s), info);
         job.LastArgs = args;
         job.ErrorKind = null;
         job.ErrorMessage = null;
@@ -313,6 +415,9 @@ public sealed partial class DownloadQueue : ObservableObject
         var gotFile = false;
 
         var lineGate = new Lock(); // stdout ve stderr farklı thread'lerden aynı anda gelir
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        long lastProgressLog = 0;
+        var firstProgress = true;
 
         void OnLine(string raw)
         {
@@ -321,8 +426,21 @@ public sealed partial class DownloadQueue : ObservableObject
 
         void HandleLine(string raw)
         {
-            job.Log.Add(raw);
-            switch (OutputParser.Parse(raw))
+            var line = OutputParser.Parse(raw);
+            // İlerleme satırları 300 satırlık tamponu doldurup asıl uyarıları/hataları dışarı itmesin: 5 sn'de bir yeter
+            if (line is DownloadLine)
+            {
+                var now = Environment.TickCount64;
+                if (now - lastProgressLog >= ProgressLogInterval) { lastProgressLog = now; job.Log.Add(raw); }
+                if (firstProgress)
+                {
+                    firstProgress = false;
+                    // Süreç açılışı + YouTube çıkarımı: "indirme neden geç başlıyor" sorusunun cevabı
+                    Perf.Write("job:first-byte", System.Diagnostics.Stopwatch.GetElapsedTime(started), $"{job.VideoId}{(info is null ? "" : " info-json")}");
+                }
+            }
+            else job.Log.Add(raw);
+            switch (line)
             {
                 case DownloadLine d when d.FormatId is not null:
                     // bv*+ba: önce video sonra ses akışı iner; format_id değişimi = yeni akış
@@ -374,6 +492,11 @@ public sealed partial class DownloadQueue : ObservableObject
         catch (Exception ex)
         {
             // Durum en son: Status'u izleyen (arayüz, testler) hata türünü dolu görsün
+            lock (_gate)
+            {
+                _claimed.Remove(job.Id);
+                _intentional.Remove(job.Id);
+            }
             job.ErrorKind = ErrorKind.Unknown;
             job.ErrorMessage = $"yt-dlp başlatılamadı: {ex.Message}";
             job.Status = JobStatus.Error;
@@ -382,8 +505,11 @@ public sealed partial class DownloadQueue : ObservableObject
         }
         lock (_gate)
         {
+            _claimed.Remove(job.Id);
             _running[job.Id] = proc;
             _jobsById[job.Id] = job;
+            // Süreç açılırken duraklatma/iptal geldiyse: hemen öldür, tamamlanma bunu kasıtlı sayar
+            if (_intentional.ContainsKey(job.Id)) proc.Kill();
         }
 
         proc.Completion.ContinueWith(t =>
@@ -396,10 +522,15 @@ public sealed partial class DownloadQueue : ObservableObject
                 why = _intentional.Remove(job.Id, out var w) ? w : null;
             }
             var code = t.IsCompletedSuccessfully ? t.Result : -1;
+            Perf.Write("job:total", System.Diagnostics.Stopwatch.GetElapsedTime(started), $"{job.VideoId} exit={code}{(info is null ? "" : " info-json")}");
             lock (_gate) _lastEndNatural = why is null;
             job.Log.Flush();
             job.Speed = null;
             job.Eta = null;
+
+            // Saklanan bilgi bir kez kullanılır: başarıda çerez taşıyabileceği için, hatada bayatlamış olabileceği (ör. 403) için
+            // silinir; otomatik ya da elle yeniden deneme adresle taze çıkarım yapar. Duraklatma/iptalde kalır.
+            if (info is not null && why is null) _infoCache?.Invalidate(job.VideoId);
 
             if (why == JobStatus.Paused)
             {
@@ -420,10 +551,24 @@ public sealed partial class DownloadQueue : ObservableObject
                 if (job.FilePath is { } fp && File.Exists(fp)) job.Total = new FileInfo(fp).Length;
                 if (code != 0 && lastError is not null) job.Warning ??= lastError.Message;
                 if (job.Options.Transcript && job.FilePath is { } tp) WriteTranscript(job, tp);
+                Guard.RecordSuccess();
                 Finish(job);
+            }
+            else if (lastError is not null && RateGuard.Decide(lastError.Kind, job.AutoRetries) is var d && d != RetryDecision.Fail)
+            {
+                // Kendiliğinden yeniden deneme: iş sırada kalır, zamanı gelince .part dosyasından devam eder
+                var at = d == RetryDecision.Cooldown ? Guard.Trip(lastError.Kind) : Guard.Now + RateGuard.JobRetryDelay(job.AutoRetries);
+                job.AutoRetries++;
+                job.ErrorKind = lastError.Kind;
+                job.RetryAt = at;
+                job.Stage = d == RetryDecision.Cooldown
+                    ? $"YouTube sınırı · {at:HH:mm}'de yeniden denenecek"
+                    : $"Bağlantı sorunu · {at:HH:mm:ss}'de yeniden denenecek ({job.AutoRetries}/{RateGuard.JobRetrySteps.Length})";
+                job.Status = JobStatus.Queued;
             }
             else
             {
+                if (lastError?.Kind == ErrorKind.Auth) AuthFailed?.Invoke(this, job);
                 job.ErrorKind = lastError?.Kind ?? ErrorKind.Unknown;
                 job.ErrorMessage = lastError is not null
                     ? OutputParser.FriendlyError(lastError.Kind, lastError.Message)

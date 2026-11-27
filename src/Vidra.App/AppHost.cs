@@ -24,6 +24,9 @@ public sealed class AppHost : IAsyncDisposable
     public ToolManager Tools { get; }
     public YtDlpService YtDlp { get; }
     public DownloadQueue Queue { get; }
+
+    /// <summary>YouTube sınırlarına karşı kuyruk, analiz ve takip servisinin paylaştığı koruma.</summary>
+    public RateGuard Guard { get; }
     public FollowService Follow { get; }
     public AccountService Account { get; }
     public ListCacheStore ListCache { get; }
@@ -34,14 +37,20 @@ public sealed class AppHost : IAsyncDisposable
     public AppHost()
     {
         Paths = new AppPaths();
+        Core.Perf.LogFile = Paths.PerfLogFile;
+        ThumbConverter.DiskDir = Paths.ThumbCacheDir;
+        _ = Task.Run(() => ThumbnailDiskCache.Prune(Paths.ThumbCacheDir));
         Runner = new ProcessRunner(Paths.CookieCopyDir);
         SettingsStore = new SettingsStore(Paths);
         SettingsStore.Load();
         Http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
         Http.DefaultRequestHeaders.UserAgent.ParseAdd($"Vidra/{typeof(AppHost).Assembly.GetName().Version?.ToString(3)} (+https://github.com/yt-dlp/yt-dlp)");
         Tools = new ToolManager(Paths, Runner, Http);
-        YtDlp = new YtDlpService(Runner, Tools, () => SettingsStore.Current);
-        Queue = new DownloadQueue(Runner, Tools, () => SettingsStore.Current, Paths, Dispatch);
+        Guard = new RateGuard();
+        var info = new InfoJsonCache(Paths.InfoJsonDir);
+        _ = Task.Run(info.Prune);
+        YtDlp = new YtDlpService(Runner, Tools, () => SettingsStore.Current, Guard, info);
+        Queue = new DownloadQueue(Runner, Tools, () => SettingsStore.Current, Paths, Dispatch, Guard, info);
         Follow = new FollowService(YtDlp, Queue, Paths, () => SettingsStore.Current, Dispatch);
         Account = new AccountService(Paths, SettingsStore);
         ListCache = new ListCacheStore(Paths.ListCacheFile);
