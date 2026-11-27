@@ -88,6 +88,9 @@ public sealed class AppSettings
     /// <summary>Açılışta GitHub'da Vidra'nın yeni sürümünü denetle.</summary>
     public bool CheckAppUpdates { get; set; } = true;
 
+    /// <summary>Yeni sürüm bulununca arka planda indir; kurulum yine de kullanıcının "Yeniden başlat ve kur" demesini bekler.</summary>
+    public bool AutoDownloadAppUpdates { get; set; }
+
     /// <summary>İndirmelere eklenecek ek yt-dlp argümanları (ileri düzey). Vidra'nın yönettiği bayraklar reddedilir: bkz. ExtraArgs.</summary>
     public string ExtraArgs { get; set; } = "";
 

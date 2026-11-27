@@ -223,9 +223,11 @@
             </Button>
             <Grid HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
               <TextBlock Text="{Binding Version}" FontSize="11.5" VerticalAlignment="Center" Visibility="{Binding Update, Converter={StaticResource Vis}, ConverterParameter=!}" />
-              <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" FontSize="12" Command="{Binding OpenUpdateCommand}"
-                      Visibility="{Binding Update, Converter={StaticResource Vis}}" ToolTip="Yeni sürümün sayfasını aç">
-                <TextBlock><Run Text="{Binding Update.Tag, Mode=OneWay}" /><Run Text=" çıktı" /></TextBlock>
+              <!-- Yeni sürüm: indir → "Yeniden başlat ve kur". Sürüm notları komut paletinde -->
+              <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" FontSize="12" Command="{Binding UpdateActionCommand}"
+                      Visibility="{Binding Update, Converter={StaticResource Vis}}" ToolTip="{Binding UpdateTip}"
+                      AutomationProperties.Name="{Binding UpdateLabel}">
+                <TextBlock Text="{Binding UpdateLabel}" />
               </Button>
             </Grid>
           </DockPanel>
