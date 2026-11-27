@@ -157,6 +157,15 @@
              Text="{Binding QueuedCount, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text}" /><Run Text=" sırada  ·  " /><Run
              Text="{Binding PausedCount, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Text}" /><Run Text=" duraklatıldı" />
       </TextBlock>
+      <!-- YouTube sınırı: kuyruk bekletiliyor, süre dolunca kendiliğinden devam eder -->
+      <Border Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}" BorderThickness="1" CornerRadius="10" Padding="12,4,4,4" Margin="0,0,10,6"
+              TextElement.Foreground="{DynamicResource Warn}" Visibility="{Binding CooldownText, Converter={StaticResource Vis}}">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock VerticalAlignment="Center" Text="{Binding CooldownText}" TextWrapping="Wrap" MaxWidth="560" />
+          <Button Style="{StaticResource BtnSm}" Margin="12,0,0,0" Content="Şimdi dene" Command="{Binding SkipCooldownCommand}"
+                  ToolTip="Beklemeyi atla. YouTube sınırı sürüyorsa bir sonraki bekleme daha uzun olur." />
+        </StackPanel>
+      </Border>
       <Border Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}" BorderThickness="1" CornerRadius="10" Padding="12,4,4,4" Margin="0,0,0,6"
               TextElement.Foreground="{DynamicResource Warn}" Visibility="{Binding ErrorCount, Converter={StaticResource Vis}}">
         <StackPanel Orientation="Horizontal">
@@ -330,7 +339,13 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                       <Button Style="{StaticResource BtnSm}" Content="Hesabım" Margin="0,0,8,0" Command="{Binding DataContext.OpenAccountCommand, ElementName=Root}">
                         <Button.Visibility>
-                          <Binding Path="ErrorKind" Converter="{StaticResource EqVis}" ConverterParameter="Auth" />
+                          <Binding Path="ErrorKind" Converter="{StaticResource EqVis}" ConverterParameter="Auth|BotCheck" />
+                        </Button.Visibility>
+                      </Button>
+                      <Button Style="{StaticResource BtnSm}" Content="yt-dlp'yi güncelle" Margin="0,0,8,0" ToolTip="YouTube değişince eski yt-dlp akışları alamaz"
+                              Command="{Binding DataContext.UpdateYtDlpCommand, ElementName=Root}">
+                        <Button.Visibility>
+                          <Binding Path="ErrorKind" Converter="{StaticResource EqVis}" ConverterParameter="Forbidden|BotCheck|Unknown" />
                         </Button.Visibility>
                       </Button>
                       <Button Style="{StaticResource BtnSm}" Content="Günlük" Margin="0,0,8,0" ToolTip="yt-dlp'nin bu işteki çıktısı"

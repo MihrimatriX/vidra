@@ -38,6 +38,9 @@ public static class Choices
     public static readonly IReadOnlyList<Choice> Themes =
         [new(ThemeMode.Light, "Açık"), new(ThemeMode.Dark, "Koyu"), new(ThemeMode.System, "Sistem")];
 
+    public static readonly IReadOnlyList<Choice> PoliteLevels =
+        [new(PoliteLevel.Off, PoliteLevel.Off.Label()), new(PoliteLevel.Balanced, PoliteLevel.Balanced.Label()), new(PoliteLevel.Safe, PoliteLevel.Safe.Label())];
+
     public static readonly IReadOnlyList<Choice> Channels = [new(UpdateChannel.Stable, "Kararlı"), new(UpdateChannel.Nightly, "Nightly")];
 
     public static readonly IReadOnlyList<Choice> ChannelTabs =

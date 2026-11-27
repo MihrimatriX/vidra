@@ -62,10 +62,15 @@ public sealed partial class AccountViewModel : ObservableObject
     [ObservableProperty] private bool _busy;
     [ObservableProperty] private string? _notice;
 
+    /// <summary>Hesap ekranındaki anahtar: Kapalı ↔ en az Dengeli (Güvenli seçiliyse korunur).</summary>
     public bool PoliteMode
     {
-        get => _host.Settings.PoliteMode;
-        set { _host.SettingsStore.Update(s => s.PoliteMode = value); OnPropertyChanged(); }
+        get => _host.Settings.EffectivePolite != PoliteLevel.Off;
+        set
+        {
+            _host.SettingsStore.Update(s => s.Polite = value ? (s.EffectivePolite == PoliteLevel.Off ? PoliteLevel.Balanced : s.EffectivePolite) : PoliteLevel.Off);
+            OnPropertyChanged();
+        }
     }
 
     public int FollowInterval

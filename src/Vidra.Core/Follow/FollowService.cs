@@ -122,8 +122,16 @@ public sealed class FollowService : IAsyncDisposable
         _dispatch(() => due = Items.Where(i => i.Enabled && (i.LastChecked is null || DateTimeOffset.Now - i.LastChecked > interval)).ToList());
         foreach (var f in due)
         {
-            try { await CheckAsync(f, ct).ConfigureAwait(false); }
+            // YouTube sınırı sürerken arka plan sorguları sınırı uzatır; kaynak "vadesi geçmiş" kalır, sonraki turda denenir
+            if (_queue.Guard.InCooldown) return;
+            try
+            {
+                await CheckAsync(f, ct).ConfigureAwait(false);
+                // Kaynaklar arasında insan benzeri, düzensiz aralık
+                await Task.Delay(TimeSpan.FromSeconds(Random.Shared.Next(3, 9)), ct).ConfigureAwait(false);
+            }
             catch (OperationCanceledException) { throw; }
+            catch (ProbeException e) when (e.Kind is ErrorKind.RateLimited or ErrorKind.BotCheck) { return; /* YtDlpService soğumayı başlattı */ }
             catch { /* tek kaynak hatası diğerlerini durdurmasın; bir sonraki turda tekrar denenir */ }
         }
     }
