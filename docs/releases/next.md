@@ -7,4 +7,8 @@
 
 ### Yenilikler
 
+- Hata ekranlarında kısa açıklamanın altında yt-dlp'nin ham çıktısı görünür ve kopyalanabilir; analiz ve indirme hataları `%LOCALAPPDATA%\Vidra\vidra.log` dosyasına da yazılır.
+
 ### Düzeltmeler
+
+- 1080p olan videolarda yalnızca 360p seçeneği gelmesi: YouTube akışları kısıtladığında (SABR, PO token, JS doğrulaması) Vidra TV istemcileriyle, gerekirse oturumsuz yeniden analiz eder; indirme de aynı yolu kullanır. İşe yaramazsa nedeni analiz ekranında yazar.

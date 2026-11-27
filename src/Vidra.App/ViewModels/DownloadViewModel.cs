@@ -110,6 +110,14 @@ public sealed partial class DownloadViewModel : ObservableObject
         : null;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowEmpty))] private bool _isLoading;
     [ObservableProperty] private string? _error;
+
+    /// <summary>Hatanın yt-dlp'deki ham hâli (stderr'in son satırları); kısa açıklamanın altında seçilebilir metin.</summary>
+    [ObservableProperty] private string? _errorDetail;
+
+    partial void OnErrorChanged(string? value)
+    {
+        if (value is null) ErrorDetail = null;
+    }
     [ObservableProperty] private bool _errorIsAuth;
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasInfo), nameof(ShowEmpty))] private VideoInfo? _info;
@@ -297,6 +305,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         catch (ProbeException e)
         {
             Error = e.Message;
+            ErrorDetail = e.Detail;
             ErrorIsAuth = e.Kind is ErrorKind.Auth or ErrorKind.BotCheck;
             UpcomingUrl = e.Kind == ErrorKind.Upcoming ? url : null;
         }
@@ -305,6 +314,7 @@ public sealed partial class DownloadViewModel : ObservableObject
         {
             Error = e.Message;
             ErrorIsAuth = false;
+            Vidra.Core.AppLog.Write($"Analiz hatası (beklenmeyen): {url}", e.ToString());
         }
         finally
         {

@@ -165,6 +165,7 @@ public sealed partial class DownloadQueue : ObservableObject
         j.AutoRetries = 0;
         j.ErrorKind = null;
         j.ErrorMessage = null;
+        j.ErrorDetail = null;
         j.ResetProgress("Sırada");
         j.Status = JobStatus.Queued;
         Schedule();
@@ -402,16 +403,19 @@ public sealed partial class DownloadQueue : ObservableObject
         Guard.RecordStart();
         // Canlı bekleme ve ek argümanlar (ör. --extractor-args) analizdekinden farklı formatlar verebilir: o durumda adresle çıkar
         var info = !job.Options.WaitForLive && string.IsNullOrWhiteSpace(s.ExtraArgs) ? _infoCache?.TryGetFresh(job.VideoId) : null;
-        var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate, Guard.EffectivePolite(s), info);
+        var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate, Guard.EffectivePolite(s), info,
+            _tools.Fallback.For(job.VideoId));
         job.LastArgs = args;
         job.ErrorKind = null;
         job.ErrorMessage = null;
+        job.ErrorDetail = null;
         job.Warning = null;
         job.StartedAt ??= DateTimeOffset.Now;
         job.ResetProgress(job.Options.WaitForLive ? "Yayının başlaması bekleniyor" : "Bilgi alınıyor");
 
         string? lastFormat = null;
         ErrorLine? lastError = null;
+        var formatIssues = new List<FormatIssue>();
         var gotFile = false;
 
         var lineGate = new Lock(); // stdout ve stderr farklı thread'lerden aynı anda gelir
@@ -475,6 +479,11 @@ public sealed partial class DownloadQueue : ObservableObject
                     break;
                 case ErrorLine e:
                     lastError = e;
+                    break;
+                // "Some formats may be missing", SABR, PO token…: dosya iner ama istenen kalitede olmayabilir
+                case WarningLine w:
+                    foreach (var issue in FormatDiagnostics.Detect([w.Message]))
+                        if (!formatIssues.Contains(issue)) formatIssues.Add(issue);
                     break;
                 case OtherLine o when o.Text.Contains("has already been recorded in the archive", StringComparison.Ordinal):
                     job.Percent = 100;
@@ -550,6 +559,11 @@ public sealed partial class DownloadQueue : ObservableObject
                 // İlerleme satırları son inen akışın (çoğu zaman ses) boyutunu taşır; geçmişe birleştirilmiş/dönüştürülmüş dosyanın gerçek boyutu yazılır
                 if (job.FilePath is { } fp && File.Exists(fp)) job.Total = new FileInfo(fp).Length;
                 if (code != 0 && lastError is not null) job.Warning ??= lastError.Message;
+                if (formatIssues.Count > 0)
+                {
+                    job.Warning ??= "Bazı kaliteler alınamamış olabilir: " + FormatDiagnostics.Explain(formatIssues[0]);
+                    AppLog.Write($"İndirmede biçim kısıtı: {job.Title} ({job.Url}) · {string.Join(", ", formatIssues)}", job.Log.Text.Length > 0 ? AppLog.Tail(job.Log.Text) : null);
+                }
                 if (job.Options.Transcript && job.FilePath is { } tp) WriteTranscript(job, tp);
                 Guard.RecordSuccess();
                 Finish(job);
@@ -573,12 +587,24 @@ public sealed partial class DownloadQueue : ObservableObject
                 job.ErrorMessage = lastError is not null
                     ? OutputParser.FriendlyError(lastError.Kind, lastError.Message)
                     : $"yt-dlp {code} koduyla çıktı";
+                // Kısa açıklama ham mesajla aynı değilse ayrıntı olarak ham mesaj; ERROR satırı yoksa son satırlar
+                var tail = AppLog.Tail(job.Log.Text, 8);
+                job.ErrorDetail = lastError is not null && job.ErrorMessage != lastError.Message ? lastError.Message
+                    : lastError is null && tail.Length > 0 ? tail : null;
+                AppLog.Write($"İndirme hatası ({job.ErrorKind}, çıkış {code}): {job.Title} ({job.Url}) · {job.ErrorMessage}",
+                    "Komut: " + YtDlpArgs.ToCommandLine("yt-dlp", args, CookieArg(args)) + Environment.NewLine + AppLog.Tail(job.Log.Text, 20));
                 job.Stage = "Hata";
                 job.Status = JobStatus.Error;
             }
             UpdateTotalSpeed();
             Schedule();
         }, TaskScheduler.Default);
+    }
+
+    private static string? CookieArg(IReadOnlyList<string> args)
+    {
+        for (var i = 0; i + 1 < args.Count; i++) if (args[i] == "--cookies") return args[i + 1];
+        return null;
     }
 
     private static void WriteTranscript(DownloadJob job, string mediaPath)

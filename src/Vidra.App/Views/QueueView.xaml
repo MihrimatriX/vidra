@@ -343,7 +343,11 @@
                               Command="{Binding DataContext.ShowLogCommand, ElementName=Root}" CommandParameter="{Binding}" />
                       <Button Style="{StaticResource BtnSm}" Content="Tekrar dene" Command="{Binding DataContext.RetryCommand, ElementName=Root}" CommandParameter="{Binding}" />
                     </StackPanel>
-                    <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                      <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+                      <TextBox Style="{StaticResource DetailText}" Margin="0,4,0,0" Text="{Binding ErrorDetail, Mode=OneWay}"
+                               Visibility="{Binding ErrorDetail, Converter={StaticResource Vis}}" ToolTip="yt-dlp'nin çıktısı · tamamı Günlük'te ve vidra.log'da" />
+                    </StackPanel>
                   </DockPanel>
                 </Border>
               </StackPanel>

@@ -82,6 +82,9 @@ public sealed class ToolManager(AppPaths paths, IProcessRunner runner, HttpClien
     public string FfprobePath => Path.Combine(BinDir, Exe("ffprobe"));
     public string DenoPath => Path.Combine(BinDir, Exe("deno"));
 
+    /// <summary>Analizde YouTube kısıtına karşı işe yarayan yol; indirmeler de aynısını kullanır.</summary>
+    public FormatFallback Fallback { get; } = new();
+
     public ToolPaths Paths => PotInstalled
         ? new(YtDlpPath, BinDir, DenoPath, paths.ArchiveFile, PotServerDir, PluginDir)
         : new(YtDlpPath, BinDir, DenoPath, paths.ArchiveFile);

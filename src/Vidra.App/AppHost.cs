@@ -38,6 +38,7 @@ public sealed class AppHost : IAsyncDisposable
     {
         Paths = new AppPaths();
         Core.Perf.LogFile = Paths.PerfLogFile;
+        Core.AppLog.File = Paths.LogFile;
         ThumbConverter.DiskDir = Paths.ThumbCacheDir;
         _ = Task.Run(() => ThumbnailDiskCache.Prune(Paths.ThumbCacheDir));
         Runner = new ProcessRunner(Paths.CookieCopyDir);

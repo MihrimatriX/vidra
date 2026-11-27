@@ -61,6 +61,12 @@ public sealed record VideoInfo
 
     /// <summary>"En çok tekrar oynatılan" grafiği; yeterince izlenmemiş videolarda boş.</summary>
     public IReadOnlyList<HeatPoint> Heatmap { get; init; } = [];
+
+    /// <summary>YouTube bazı kaliteleri vermediyse kullanıcıya nedeni (bkz. FormatDiagnostics); sorun yoksa null.</summary>
+    public string? FormatNote { get; init; }
+
+    /// <summary>Ayrıntı için yt-dlp uyarıları (kopyalanabilir).</summary>
+    public string? FormatDetail { get; init; }
 }
 
 public sealed record PlaylistEntry
