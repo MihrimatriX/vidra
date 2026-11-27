@@ -50,6 +50,9 @@ public class RateGuardTests : IDisposable
         Assert.True(cond());
     }
 
+    /// <summary>Durum en son yazılır: Queued + RetryAt birlikte görülünce tamamlanma işlenmiştir.</summary>
+    private static bool Waiting(DownloadJob j) => j.Status == JobStatus.Queued && j.RetryAt is not null;
+
     private void Fail(int index, string error)
     {
         _runner.Started[index].Emit("ERROR: " + error);
@@ -70,7 +73,7 @@ public class RateGuardTests : IDisposable
         var a = _queue.Jobs[0];
 
         Fail(0, "[youtube] a: HTTP Error 429: Too Many Requests");
-        await Until(() => a.Status == JobStatus.Queued && a.RetryAt is not null);
+        await Until(() => a.Status == JobStatus.Queued && Waiting(a));
         Assert.Equal(ErrorKind.RateLimited, a.ErrorKind);
         Assert.Null(a.ErrorMessage);
         Assert.Equal(_clock.GetLocalNow() + TimeSpan.FromMinutes(5), a.RetryAt);
@@ -79,14 +82,14 @@ public class RateGuardTests : IDisposable
 
         // Boşalan yere "c" başlamaz: soğuma sürerken yeni istek atılmaz
         Succeed(1);
-        await Until(() => _queue.History.Count == 1);
+        await Until(() => _queue.History.Count == 1 && _queue.Jobs.Count == 2);
         Assert.Equal(2, _runner.Started.Count);
         Assert.Equal(2, _queue.WaitingCount + _queue.Jobs.Count(j => j.Status == JobStatus.Queued && j.RetryAt is null));
 
         // Soğuma bitti: eşzamanlılık bir süre 1
         _clock.Advance(TimeSpan.FromMinutes(6));
         _queue.Schedule();
-        Assert.Equal(3, _runner.Started.Count);
+        await Until(() => _runner.Started.Count == 3);
         Assert.Equal(1, _queue.Jobs.Count(j => j.Status == JobStatus.Running));
         Assert.Null(a.RetryAt);
     }
@@ -98,7 +101,7 @@ public class RateGuardTests : IDisposable
         Fail(0, "HTTP Error 429: Too Many Requests");
         _clock.Advance(TimeSpan.FromSeconds(10));
         Fail(1, "HTTP Error 429: Too Many Requests");
-        await Until(() => _queue.Jobs.All(j => j.RetryAt is not null));
+        await Until(() => _queue.Jobs.All(Waiting));
         Assert.Equal(1, _queue.Guard.State(false).Strikes);
         Assert.Equal(_queue.Jobs[0].RetryAt, _queue.Jobs[1].RetryAt);
 
@@ -119,7 +122,7 @@ public class RateGuardTests : IDisposable
         for (var i = 0; i < RateGuard.CooldownSteps.Length - 1; i++)
         {
             Fail(i, "HTTP Error 429: Too Many Requests");
-            await Until(() => a.RetryAt is not null);
+            await Until(() => Waiting(a));
             _clock.Advance(TimeSpan.FromHours(2));
             _queue.Schedule();
             await Until(() => _runner.Started.Count == i + 2);
@@ -136,7 +139,7 @@ public class RateGuardTests : IDisposable
         _queue.Enqueue([Job("a"), Job("b")]);
         var a = _queue.Jobs[0];
         Fail(0, "Unable to download webpage: timed out");
-        await Until(() => a.RetryAt is not null);
+        await Until(() => Waiting(a));
         Assert.False(_queue.Guard.InCooldown);
         Assert.Equal(_clock.GetLocalNow() + TimeSpan.FromSeconds(30), a.RetryAt);
         Assert.Contains("(1/2)", a.Stage);
@@ -145,7 +148,7 @@ public class RateGuardTests : IDisposable
         _queue.Schedule();
         await Until(() => _runner.Started.Count == 3);
         Fail(2, "unable to download video data: HTTP Error 403: Forbidden");
-        await Until(() => a.RetryAt is not null && a.AutoRetries == 2);
+        await Until(() => Waiting(a) && a.AutoRetries == 2);
         Assert.Equal(_clock.GetLocalNow() + TimeSpan.FromMinutes(2), a.RetryAt);
 
         _clock.Advance(TimeSpan.FromMinutes(3));
@@ -162,7 +165,7 @@ public class RateGuardTests : IDisposable
         _queue.Enqueue([Job("a")]);
         var a = _queue.Jobs[0];
         Fail(0, "Sign in to confirm you’re not a bot. Use --cookies-from-browser");
-        await Until(() => a.RetryAt is not null);
+        await Until(() => Waiting(a));
         _clock.Advance(TimeSpan.FromMinutes(10));
         _queue.Schedule();
         await Until(() => _runner.Started.Count == 2);
@@ -188,10 +191,10 @@ public class RateGuardTests : IDisposable
     {
         _queue.Enqueue([Job("a")]);
         Fail(0, "HTTP Error 429: Too Many Requests");
-        await Until(() => _queue.Jobs[0].RetryAt is not null);
+        await Until(() => Waiting(_queue.Jobs[0]));
         _queue.SkipCooldown();
         Assert.False(_queue.Guard.InCooldown);
-        Assert.Equal(2, _runner.Started.Count);
+        await Until(() => _runner.Started.Count == 2);
     }
 
     [Fact]
@@ -200,12 +203,13 @@ public class RateGuardTests : IDisposable
         _queue.Enqueue([Job("a")]);
         var a = _queue.Jobs[0];
         Fail(0, "timed out");
-        await Until(() => a.RetryAt is not null);
+        await Until(() => Waiting(a));
         _queue.Pause(a);
         Assert.Null(a.RetryAt);
         _queue.Retry(a);
         Assert.Equal(0, a.AutoRetries);
-        Assert.Equal(2, _runner.Started.Count);
+        // Başlatma, kuyruğun o an süren başka bir Schedule çağrısından da gelebilir
+        await Until(() => _runner.Started.Count == 2);
     }
 
     [Fact]

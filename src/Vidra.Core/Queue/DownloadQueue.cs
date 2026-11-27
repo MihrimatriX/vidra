@@ -39,8 +39,12 @@ public sealed partial class DownloadQueue : ObservableObject
     private readonly Dictionary<string, IRunningProcess> _running = new();
     private readonly Dictionary<string, DownloadJob> _jobsById = new();
     private readonly Dictionary<string, JobStatus> _intentional = new();
+
+    /// <summary>Schedule'ın "Running" diye işaretlediği ama süreci henüz başlamamış işler.</summary>
+    private readonly HashSet<string> _claimed = new();
     private readonly Lock _gate = new();
     private readonly Lock _m3uGate = new();
+    private readonly Lock _collectionsGate = new();
     private bool _wasBusy;
     private bool _lastEndNatural;
     private volatile bool _shuttingDown;
@@ -72,7 +76,9 @@ public sealed partial class DownloadQueue : ObservableObject
         _tools = tools;
         _settings = settings;
         _paths = paths;
-        _dispatch = dispatch ?? (a => a());
+        // Arayüz yokken (testler, CLI) koleksiyonlar thread-pool'dan aynı anda değişmesin: WPF dispatcher'ı gibi sıraya sok.
+        // ObservableCollection thread-safe değil; iki iş aynı anda bitince Jobs.Remove kaybolabiliyordu.
+        _dispatch = dispatch ?? (a => { lock (_collectionsGate) a(); });
         foreach (var h in JsonStore.Read<List<HistoryEntry>>(paths.HistoryFile) ?? []) History.Add(h);
         // Önceki oturumda bitmemiş işler duraklatılmış olarak geri gelir; .part dosyalarından devam ederler
         foreach (var n in JsonStore.Read<List<NewJob>>(paths.PendingFile) ?? [])
@@ -127,8 +133,15 @@ public sealed partial class DownloadQueue : ObservableObject
                 p.Kill();
                 return;
             }
+            // Başlatılmak üzere: Start süreci açmadan (ya da açar açmaz) duraklatır
+            if (_claimed.Contains(j.Id))
+            {
+                _intentional[j.Id] = JobStatus.Paused;
+                return;
+            }
+            // Kilit içinde: Schedule aynı anda bu işi başlatmak üzere işaretleyemesin
+            if (j.Status is JobStatus.Queued) { j.RetryAt = null; j.Status = JobStatus.Paused; j.Stage = "Duraklatıldı"; }
         }
-        if (j.Status is JobStatus.Queued) { j.RetryAt = null; j.Status = JobStatus.Paused; j.Stage = "Duraklatıldı"; }
     }
 
     public void Resume(DownloadJob j)
@@ -159,6 +172,11 @@ public sealed partial class DownloadQueue : ObservableObject
             {
                 _intentional[j.Id] = JobStatus.Canceled;
                 p.Kill();
+                return;
+            }
+            if (_claimed.Contains(j.Id))
+            {
+                _intentional[j.Id] = JobStatus.Canceled;
                 return;
             }
         }
@@ -305,7 +323,8 @@ public sealed partial class DownloadQueue : ObservableObject
         bool idle;
         lock (_gate)
         {
-            var active = _running.Count;
+            // Başlatılmak üzere işaretlenenler de sayılır: eşzamanlı iki Schedule sınırı aşmasın
+            var active = _running.Count + _claimed.Count;
             foreach (var j in jobs)
             {
                 if (j.Status != JobStatus.Queued) continue;
@@ -321,10 +340,11 @@ public sealed partial class DownloadQueue : ObservableObject
                 if (cooling || active >= limit) continue;
                 // Aynı anda iki kez başlamasın: kilit içinde işaretle
                 j.Status = JobStatus.Running;
+                _claimed.Add(j.Id);
                 active++;
                 toStart.Add(j);
             }
-            idle = toStart.Count == 0 && _running.Count == 0;
+            idle = toStart.Count == 0 && _running.Count == 0 && _claimed.Count == 0;
             if (!idle) _wasBusy = true;
         }
         ArmWake(wakeAt, now);
@@ -358,6 +378,20 @@ public sealed partial class DownloadQueue : ObservableObject
 
     private void Start(DownloadJob job)
     {
+        JobStatus? early;
+        lock (_gate)
+        {
+            early = _intentional.Remove(job.Id, out var w) ? w : null;
+            if (early is not null) _claimed.Remove(job.Id);
+        }
+        if (early is not null)
+        {
+            // Başlamadan duraklatıldı/iptal edildi
+            if (early == JobStatus.Canceled) { job.Status = JobStatus.Canceled; Finish(job); }
+            else { job.Status = JobStatus.Paused; job.Stage = "Duraklatıldı"; }
+            Schedule();
+            return;
+        }
         var s = _settings();
         Guard.RecordStart();
         var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate, Guard.EffectivePolite(s));
@@ -434,6 +468,11 @@ public sealed partial class DownloadQueue : ObservableObject
         catch (Exception ex)
         {
             // Durum en son: Status'u izleyen (arayüz, testler) hata türünü dolu görsün
+            lock (_gate)
+            {
+                _claimed.Remove(job.Id);
+                _intentional.Remove(job.Id);
+            }
             job.ErrorKind = ErrorKind.Unknown;
             job.ErrorMessage = $"yt-dlp başlatılamadı: {ex.Message}";
             job.Status = JobStatus.Error;
@@ -442,8 +481,11 @@ public sealed partial class DownloadQueue : ObservableObject
         }
         lock (_gate)
         {
+            _claimed.Remove(job.Id);
             _running[job.Id] = proc;
             _jobsById[job.Id] = job;
+            // Süreç açılırken duraklatma/iptal geldiyse: hemen öldür, tamamlanma bunu kasıtlı sayar
+            if (_intentional.ContainsKey(job.Id)) proc.Kill();
         }
 
         proc.Completion.ContinueWith(t =>
