@@ -234,11 +234,17 @@
       </Grid.RowDefinitions>
 
       <!-- Pano şeridi -->
-      <Border Background="{DynamicResource AccentSoft}" CornerRadius="10" Margin="32,0,32,6" Padding="12,4,4,4"
+      <Border Background="{DynamicResource AccentSoft}" CornerRadius="10" Margin="24,0,24,6" Padding="12,4,4,4"
               Visibility="{Binding ClipboardLink, Converter={StaticResource Vis}}">
         <DockPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-            <Button Style="{StaticResource BtnSm}" Content="Analiz et" Command="{Binding AnalyzeClipboardCommand}" Margin="0,0,8,0" />
+            <Button Style="{StaticResource BtnPrimary}" MinHeight="{DynamicResource CtlHSm}" Padding="10,0" FontSize="12.5" Margin="0,0,8,0"
+                    Command="{Binding QuickDownloadCommand}" Visibility="{Binding ClipboardIsVideo, Converter={StaticResource Vis}}"
+                    ToolTip="Analiz etmeden Ayarlar'daki varsayılan biçimle kuyruğa ekle">
+              <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Download}" Size="13" Margin="0,0,6,0" /><TextBlock Text="Hemen indir" /></StackPanel>
+            </Button>
+            <Button Style="{StaticResource BtnSm}" Content="Seçeneklerle aç" Command="{Binding AnalyzeClipboardCommand}" Margin="0,0,8,0"
+                    ToolTip="Kaliteyi, biçimi ve diğer seçenekleri seçmek için aç" />
             <Button Style="{StaticResource BtnSm}" Content="Kapat" Command="{Binding DismissClipboardCommand}" />
           </StackPanel>
           <c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Link}" Foreground="{DynamicResource AccentStrong}" Margin="0,0,10,0" />

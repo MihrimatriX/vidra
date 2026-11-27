@@ -172,8 +172,10 @@ internal static class ScreenshotTour
         // Dar pencere: kenar menüsü yalnızca ikon
         w.Width = 1000;
         vm.Go(Page.Queue);
+        vm.ClipboardLink = "https://www.youtube.com/watch?v=aqz-KE-bpKQ"; // pano şeridi: Hemen indir
         await Settle(1500);
         await Save(w, $"{theme}-16-dar-pencere");
+        vm.ClipboardLink = null;
         w.Width = 1280;
         await Settle(600);
     }

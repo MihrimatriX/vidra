@@ -55,7 +55,10 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _followNew;
 
     /// <summary>Pano izleme: kopyalanan bağlantı için üstte çıkan şerit.</summary>
-    [ObservableProperty] private string? _clipboardLink;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ClipboardIsVideo))] private string? _clipboardLink;
+
+    /// <summary>Şeritteki "Hemen indir" yalnızca tek video için (liste/kanal seçim ister).</summary>
+    public bool ClipboardIsVideo => ClipboardLink is { } l && YouTubeUrl.Classify(l) == LinkKind.Video;
 
     /// <summary>Tüm kuyruğun ilerlemesi (görev çubuğu, tepsi ipucu); saniyede bir yenilenir.</summary>
     [ObservableProperty] private QueueProgress _progress = QueueProgress.From([]);
@@ -302,6 +305,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void DismissClipboard() => ClipboardLink = null;
+
+    /// <summary>Panodaki videoyu analiz etmeden, Ayarlar'daki varsayılan biçimle kuyruğa ekler; bulunulan ekran değişmez.</summary>
+    [RelayCommand]
+    private void QuickDownload()
+    {
+        if (ClipboardLink is not { } link || YouTubeUrl.Classify(link) != LinkKind.Video) return;
+        ClipboardLink = null;
+        _host.Queue.Enqueue([new NewJob(link, link, _host.Settings.Defaults, Source: "Pano")]);
+        ShowToast($"Kuyruğa eklendi · {_host.Settings.Defaults.Describe()}", "Kuyruğu aç", () => Go(Page.Queue));
+    }
 
     public string Version { get; } = "v" + typeof(MainViewModel).Assembly.GetName().Version?.ToString(3);
 
