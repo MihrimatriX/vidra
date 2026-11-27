@@ -7,7 +7,7 @@ using Vidra.Core.YtDlp;
 
 namespace Vidra.Core.Tools;
 
-public enum ToolId { YtDlp, Ffmpeg, Deno }
+public enum ToolId { YtDlp, Ffmpeg, Deno, PoToken }
 
 public sealed record ToolStatus(ToolId Id, string Name, bool Installed, string? Version, string Purpose);
 
@@ -82,7 +82,85 @@ public sealed class ToolManager(AppPaths paths, IProcessRunner runner, HttpClien
     public string FfprobePath => Path.Combine(BinDir, Exe("ffprobe"));
     public string DenoPath => Path.Combine(BinDir, Exe("deno"));
 
-    public ToolPaths Paths => new(YtDlpPath, BinDir, DenoPath, paths.ArchiveFile);
+    public ToolPaths Paths => PotInstalled
+        ? new(YtDlpPath, BinDir, DenoPath, paths.ArchiveFile, PotServerDir, PluginDir)
+        : new(YtDlpPath, BinDir, DenoPath, paths.ArchiveFile);
+
+    // ---- PO token sağlayıcısı (bgutil-ytdlp-pot-provider, betik modu, Deno ile)
+    // Sürüm sabit: eklenti ile betik aynı sürümden olmalı; 2.0.0 öncesi uzaktan kod çalıştırma açığı taşır.
+    public const string PotVersion = "2.0.2";
+    private const string PotRepo = "Brainicism/bgutil-ytdlp-pot-provider";
+    private const string PotZip = "bgutil-ytdlp-pot-provider.zip";
+
+    /// <summary>yt-dlp'ye --plugin-dirs ile verilen klasör; eklenti zip'i doğrudan buraya konur.</summary>
+    public string PluginDir => Path.Combine(BinDir, "yt-dlp-plugins");
+    public string PotHome => Path.Combine(BinDir, "bgutil-pot");
+
+    /// <summary>Eklentinin server_home'u: src/generate_once.ts ve node_modules burada.</summary>
+    public string PotServerDir => Path.Combine(PotHome, "server");
+
+    public bool PotInstalled =>
+        File.Exists(Path.Combine(PluginDir, PotZip)) &&
+        File.Exists(Path.Combine(PotServerDir, "src", "generate_once.ts")) &&
+        Directory.Exists(Path.Combine(PotServerDir, "node_modules"));
+
+    /// <summary>
+    /// Eklenti zip'ini ve sağlayıcının betiğini (aynı sürüm) indirir, bağımlılıklarını Deno ile kurar.
+    /// Betik modu ayrı bir sunucu süreci gerektirmez: yt-dlp her token için betiği Deno ile çalıştırır.
+    /// </summary>
+    public async Task InstallPotProviderAsync(IProgress<SetupProgress>? progress = null, CancellationToken ct = default)
+    {
+        if (!File.Exists(DenoPath)) await InstallDenoAsync(progress, ct).ConfigureAwait(false);
+        Directory.CreateDirectory(PluginDir);
+        await DownloadAsync(ToolId.PoToken, $"{Gh}/{PotRepo}/releases/download/{PotVersion}/{PotZip}", Path.Combine(PluginDir, PotZip), progress, ct).ConfigureAwait(false);
+
+        var src = Path.Combine(Path.GetTempPath(), $"vidra-pot-{Guid.NewGuid():N}.zip");
+        try
+        {
+            await DownloadAsync(ToolId.PoToken, $"{Gh}/{PotRepo}/archive/refs/tags/{PotVersion}.zip", src, progress, ct).ConfigureAwait(false);
+            progress?.Report(new(ToolId.PoToken, "PO token betiği açılıyor…", null));
+            if (Directory.Exists(PotHome)) Directory.Delete(PotHome, recursive: true);
+            ExtractSubtree(src, "server/", PotServerDir);
+        }
+        finally { TryDelete(src); }
+
+        progress?.Report(new(ToolId.PoToken, "PO token bağımlılıkları kuruluyor (Deno)…", null));
+        // README'deki Deno kurulumu: canvas'ın kurulum betiğine yalnızca o pakete izin vererek
+        var r = await runner.RunInAsync(PotServerDir, DenoPath, ["install", "--allow-scripts=npm:canvas", "--frozen"], ct).ConfigureAwait(false);
+        if (r.ExitCode != 0 || !PotInstalled)
+        {
+            var why = r.StdErr.Split('\n', StringSplitOptions.RemoveEmptyEntries).TakeLast(3).Select(l => l.Trim());
+            throw new InvalidOperationException("PO token sağlayıcısı kurulamadı: " + string.Join(" ", why));
+        }
+        progress?.Report(new(ToolId.PoToken, $"PO token sağlayıcısı {PotVersion} hazır", 1));
+    }
+
+    public void RemovePotProvider()
+    {
+        TryDelete(Path.Combine(PluginDir, PotZip));
+        try { if (Directory.Exists(PotHome)) Directory.Delete(PotHome, recursive: true); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* süreç tutuyorsa sonraki kaldırmada */ }
+    }
+
+    /// <summary>GitHub kaynak arşivinden "kök/prefix…" altını hedefe çıkarır; arşiv dışına yazan girdiler (zip slip) reddedilir.</summary>
+    internal static void ExtractSubtree(string zip, string prefix, string dest)
+    {
+        using var archive = ZipFile.OpenRead(zip);
+        var root = Path.GetFullPath(dest) + Path.DirectorySeparatorChar;
+        foreach (var e in archive.Entries)
+        {
+            // GitHub arşivleri tek bir "repo-sürüm/" klasörüyle başlar
+            var slash = e.FullName.IndexOf('/');
+            if (slash < 0) continue;
+            var rel = e.FullName[(slash + 1)..];
+            if (!rel.StartsWith(prefix, StringComparison.Ordinal) || rel.Length == prefix.Length) continue;
+            var target = Path.GetFullPath(Path.Combine(dest, rel[prefix.Length..]));
+            if (!target.StartsWith(root, StringComparison.Ordinal)) throw new InvalidDataException($"Geçersiz arşiv girdisi: {e.FullName}");
+            if (e.FullName.EndsWith('/')) { Directory.CreateDirectory(target); continue; }
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            e.ExtractToFile(target, overwrite: true);
+        }
+    }
 
     public bool AllInstalled => File.Exists(YtDlpPath) && File.Exists(FfmpegPath) && File.Exists(FfprobePath) && File.Exists(DenoPath);
 
@@ -128,6 +206,7 @@ public sealed class ToolManager(AppPaths paths, IProcessRunner runner, HttpClien
     {
         ToolId.YtDlp => InstallYtDlpAsync(progress, ct),
         ToolId.Deno => InstallDenoAsync(progress, ct),
+        ToolId.PoToken => InstallPotProviderAsync(progress, ct),
         _ => InstallFfmpegAsync(progress, ct),
     };
 
@@ -308,7 +387,7 @@ public sealed class ToolManager(AppPaths paths, IProcessRunner runner, HttpClien
 
     private async Task DownloadAsync(ToolId id, string url, string dest, IProgress<SetupProgress>? progress, CancellationToken ct)
     {
-        var name = id switch { ToolId.YtDlp => "yt-dlp", ToolId.Deno => "Deno", _ => "ffmpeg" };
+        var name = id switch { ToolId.YtDlp => "yt-dlp", ToolId.Deno => "Deno", ToolId.PoToken => "PO token sağlayıcısı", _ => "ffmpeg" };
         progress?.Report(new(id, $"{name} indiriliyor…", 0));
         using var res = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         res.EnsureSuccessStatusCode();

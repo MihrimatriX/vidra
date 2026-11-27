@@ -126,10 +126,31 @@ public class ArgsTests
     }
 
     [Fact]
-    public void Polite_mode_only_with_cookies()
+    public void Polite_mode_applies_to_downloads_with_or_without_cookies()
     {
-        Assert.Contains("--sleep-requests", YtDlpArgs.Download("u", Opts, Settings(), Tools));
-        Assert.DoesNotContain("--sleep-requests", YtDlpArgs.Download("u", Opts, Settings(new NoCookies()), Tools));
+        // Eski ayar dosyası: Polite yok, PoliteMode=true → Dengeli
+        Assert.Equal("3", After(YtDlpArgs.Download("u", Opts, Settings(), Tools), "--sleep-subtitles"));
+        Assert.Equal("3", After(YtDlpArgs.Download("u", Opts, Settings(new NoCookies()), Tools), "--sleep-subtitles"));
+        var off = Settings(); off.PoliteMode = false;
+        Assert.Equal(PoliteLevel.Off, off.EffectivePolite);
+        Assert.DoesNotContain("--sleep-requests", YtDlpArgs.Download("u", Opts, off, Tools));
+        var safe = Settings(); safe.Polite = PoliteLevel.Safe;
+        var a = YtDlpArgs.Download("u", Opts, safe, Tools);
+        Assert.Equal("10", After(a, "--sleep-interval"));
+        Assert.Equal("20", After(a, "--max-sleep-interval"));
+        // Kuyruk seviyeyi yükseltebilir
+        Assert.Equal("5", After(YtDlpArgs.Download("u", Opts, Settings(), Tools, polite: PoliteLevel.Safe), "--sleep-subtitles"));
+    }
+
+    [Fact]
+    public void Probes_stay_fast_unless_safe_with_cookies()
+    {
+        Assert.DoesNotContain("--sleep-requests", YtDlpArgs.Probe("u", LinkKind.Video, Settings(), Tools));
+        Assert.DoesNotContain("--sleep-interval", YtDlpArgs.Probe("u", LinkKind.Video, Settings(), Tools));
+        var safe = Settings(); safe.Polite = PoliteLevel.Safe;
+        Assert.Contains("--sleep-requests", YtDlpArgs.Probe("u", LinkKind.Video, safe, Tools));
+        safe.Cookies = new NoCookies();
+        Assert.DoesNotContain("--sleep-requests", YtDlpArgs.Probe("u", LinkKind.Video, safe, Tools));
     }
 
     [Fact]

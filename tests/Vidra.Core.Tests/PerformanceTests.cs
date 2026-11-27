@@ -7,7 +7,7 @@ using Vidra.Core.YtDlp;
 
 namespace Vidra.Core.Tests;
 
-/// <summary>Hız iyileştirmeleri: önbellekler, nazik mod kapsamı, analiz bilgisinin yeniden kullanımı, onedir yt-dlp.</summary>
+/// <summary>Hız iyileştirmeleri: önbellekler, analiz bilgisinin yeniden kullanımı, onedir yt-dlp.</summary>
 public class PerformanceTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "vidra-perf-" + Guid.NewGuid().ToString("N"));
@@ -130,22 +130,7 @@ public class PerformanceTests : IDisposable
         Assert.Equal("Eski", new ListCacheStore(path).TryGet("https://www.youtube.com/playlist?list=PL2")?.Title);
     }
 
-    // ================= Nazik mod kapsamı =================
-
-    [Fact]
-    public void Polite_sleeps_skip_single_video_probe_but_keep_list_probes()
-    {
-        Assert.DoesNotContain("--sleep-requests", YtDlpArgs.Probe("https://youtu.be/jNQXAC9IVRw", LinkKind.Video, Polite, Tools));
-        Assert.Contains("--sleep-requests", YtDlpArgs.Probe("https://www.youtube.com/playlist?list=PL1", LinkKind.Playlist, Polite, Tools));
-        Assert.Contains("--sleep-requests", YtDlpArgs.Probe("https://www.youtube.com/@x", LinkKind.Channel, Polite, Tools));
-    }
-
-    [Fact]
-    public void Polite_sleeps_only_for_bulk_downloads()
-    {
-        Assert.DoesNotContain("--sleep-interval", YtDlpArgs.Download("u", new DownloadOptions(), Polite, Tools, bulk: false));
-        Assert.Contains("--sleep-interval", YtDlpArgs.Download("u", new DownloadOptions(), Polite, Tools, bulk: true));
-    }
+    // ================= İndirme argümanları =================
 
     [Fact]
     public void Download_throttles_progress_lines()
@@ -208,7 +193,7 @@ public class PerformanceTests : IDisposable
         var json = """{"id":"jNQXAC9IVRw","title":"Me at the zoo","webpage_url":"https://www.youtube.com/watch?v=jNQXAC9IVRw","formats":[]}""";
         var runner = new JsonRunner(json);
         var cache = new InfoJsonCache(paths.InfoJsonDir);
-        var svc = new YtDlpService(runner, new ToolManager(paths, runner, new HttpClient()), () => new AppSettings(), cache);
+        var svc = new YtDlpService(runner, new ToolManager(paths, runner, new HttpClient()), () => new AppSettings(), infoCache: cache);
 
         Assert.IsType<VideoInfo>(await svc.ProbeAsync("https://www.youtube.com/watch?v=jNQXAC9IVRw"));
         var saved = cache.TryGetFresh("jNQXAC9IVRw");
@@ -224,21 +209,10 @@ public class PerformanceTests : IDisposable
         var runner = new FakeRunner();
         var cache = new InfoJsonCache(paths.InfoJsonDir);
         var s = settings ?? new AppSettings { OutputDir = "/tmp", Concurrency = 2, Cookies = new BrowserCookies(BrowserKind.Firefox), PoliteMode = true };
-        return (new DownloadQueue(runner, new ToolManager(paths, runner, new HttpClient()), () => s, paths, null, cache), runner, cache);
+        return (new DownloadQueue(runner, new ToolManager(paths, runner, new HttpClient()), () => s, paths, null, infoCache: cache), runner, cache);
     }
 
     private static NewJob Job(string id) => new($"https://www.youtube.com/watch?v={id}", id, new DownloadOptions());
-
-    [Fact]
-    public void Single_download_is_not_slowed_by_polite_mode_but_a_batch_is()
-    {
-        var (q, runner, _) = Queue();
-        q.Enqueue([Job("aaaaaaaaaaa")]);
-        Assert.DoesNotContain("--sleep-interval", runner.Started[0].Args);
-
-        q.Enqueue([Job("bbbbbbbbbbb"), Job("ccccccccccc")]);
-        Assert.Contains("--sleep-interval", runner.Started[1].Args);
-    }
 
     [Fact]
     public async Task Download_reuses_probe_info_then_drops_it()
@@ -264,9 +238,9 @@ public class PerformanceTests : IDisposable
         runner.Started[0].Emit("ERROR: [download] Got error: HTTP Error 403: Forbidden");
         runner.Started[0].Exit(1);
         var job = q.Jobs[0];
-        await Until(() => job.Status == JobStatus.Error);
+        await Until(() => job.AutoRetries == 1); // 403: kuyruk kendisi yeniden dener
 
-        q.Retry(job);
+        q.Retry(job); // beklemeden şimdi dene
         Assert.DoesNotContain("--load-info-json", runner.Started[1].Args);
         Assert.Contains("https://www.youtube.com/watch?v=jNQXAC9IVRw", runner.Started[1].Args);
     }

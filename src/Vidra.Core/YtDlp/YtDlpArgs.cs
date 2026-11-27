@@ -4,7 +4,9 @@ using Vidra.Core.Models;
 namespace Vidra.Core.YtDlp;
 
 /// <summary>Bileşenlerin yeri. ffmpeg/ffprobe/deno aynı klasörde olmak zorunda değil ama genelde öyledir.</summary>
-public sealed record ToolPaths(string YtDlp, string FfmpegDir, string Deno, string ArchiveFile);
+/// <param name="PotServerHome">Kuruluysa bgutil PO token betiğinin klasörü (server_home).</param>
+/// <param name="PluginDir">yt-dlp eklenti klasörü (--plugin-dirs).</param>
+public sealed record ToolPaths(string YtDlp, string FfmpegDir, string Deno, string ArchiveFile, string? PotServerHome = null, string? PluginDir = null);
 
 /// <summary>
 /// Saf fonksiyonlar: ayarlar + seçim → yt-dlp argüman listesi.
@@ -213,11 +215,7 @@ public static class YtDlpArgs
     }
 
     /// <summary>Hem indirme hem probe için ortak: kodlama, bileşen yolları, ağ ve oturum.</summary>
-    /// <param name="polite">
-    /// Nazik mod beklemeleri bu çağrıda uygulansın mı. Tek bir videonun analizi/indirmesi birkaç istektir; --sleep-requests 1
-    /// orada her analize 5-10 sn ekliyordu. Beklemeler hesabı asıl yoran toplu işler (playlist, kanal, toplu yapıştırma) içindir.
-    /// </param>
-    public static List<string> Base(AppSettings s, ToolPaths t, bool polite = true)
+    public static List<string> Base(AppSettings s, ToolPaths t)
     {
         var a = new List<string>
         {
@@ -228,19 +226,42 @@ public static class YtDlpArgs
             "--js-runtimes", $"deno:{t.Deno}",
         };
         if (!string.IsNullOrWhiteSpace(s.Proxy)) a.AddRange(["--proxy", s.Proxy.Trim()]);
+        a.AddRange(PoToken(s, t));
         a.AddRange(Cookies(s.Cookies));
-        // Oturumla yoğun istek hesabın/IP'nin işaretlenmesine yol açabilir: araya bekleme koy
-        if (polite && s.PoliteMode && s.Cookies is not NoCookies)
-            a.AddRange(["--sleep-requests", "1", "--sleep-interval", "2", "--max-sleep-interval", "6"]);
+        // Analiz/arama hızlı kalsın: yalnızca Güvenli modda ve oturumla (hesap işaretlenme riski) istekler arası bekleme
+        if (s.EffectivePolite == PoliteLevel.Safe && s.Cookies is not NoCookies) a.AddRange(["--sleep-requests", "0.75"]);
         return a;
     }
 
-    /// <param name="infoJson">Analizde saklanan video bilgisi: verilirse çıkarım atlanır (--load-info-json), adres kullanılmaz.</param>
-    /// <param name="bulk">Toplu işin parçası (playlist, kanal, toplu yapıştırma, takip): nazik mod beklemeleri uygulanır.</param>
-    public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null, string? infoJson = null,
-        bool bulk = true)
+    /// <summary>
+    /// PO token sağlayıcısı (deneysel): bgutil eklentisi betik modunda, Vidra'nın Deno'suyla (--js-runtimes) token üretir.
+    /// yt-dlp wiki'sinin önerisi: GVS token'ı sağlanan mweb istemcisini varsayılanlara ekle.
+    /// </summary>
+    public static List<string> PoToken(AppSettings s, ToolPaths t) =>
+        s.PoTokenProvider && t.PotServerHome is { } home && t.PluginDir is { } dir
+            ? ["--plugin-dirs", dir,
+               "--extractor-args", $"youtubepot-bgutilscript:server_home={home}",
+               "--extractor-args", "youtube:player_client=default,mweb"]
+            : [];
+
+    /// <summary>
+    /// İndirmede istekler arası bekleme. Altyazı istekleri (timedtext) 429'un en sık kaynağı olduğu için
+    /// --sleep-subtitles her seviyede var. Güvenli = yt-dlp'nin "-t sleep" ön ayarı.
+    /// </summary>
+    public static List<string> PoliteArgs(PoliteLevel level) => level switch
     {
-        var a = Base(s, t, polite: bulk);
+        PoliteLevel.Balanced => ["--sleep-requests", "0.75", "--sleep-subtitles", "3", "--sleep-interval", "3", "--max-sleep-interval", "8"],
+        PoliteLevel.Safe => ["--sleep-requests", "0.75", "--sleep-subtitles", "5", "--sleep-interval", "10", "--max-sleep-interval", "20"],
+        _ => [],
+    };
+
+    /// <param name="polite">Kuyruğun o anki nazik mod seviyesi (bkz. RateGuard); verilmezse ayardaki.</param>
+    /// <param name="infoJson">Analizde saklanan video bilgisi: verilirse çıkarım atlanır (--load-info-json), adres kullanılmaz.</param>
+    public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null, PoliteLevel? polite = null,
+        string? infoJson = null)
+    {
+        var a = Base(s, t);
+        a.AddRange(PoliteArgs(polite ?? s.EffectivePolite));
         a.AddRange([
             "--newline",
             "--progress", // --print, --quiet'i ima eder; ilerlemeyi yine de istiyoruz
@@ -276,8 +297,7 @@ public static class YtDlpArgs
 
     public static List<string> Probe(string url, LinkKind kind, AppSettings s, ToolPaths t, int? limit = null)
     {
-        // Tek video analizi kullanıcıyı bekletir ve az istek yapar; liste/kanal sayfalarında beklemeler kalır
-        var a = Base(s, t, polite: kind != LinkKind.Video);
+        var a = Base(s, t);
         a.Add("-J");
         if (kind == LinkKind.Video) a.Add("--no-playlist");
         else a.Add("--flat-playlist");

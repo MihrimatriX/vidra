@@ -38,6 +38,19 @@ public sealed class AppSettings
     /// <summary>Giriş yapılıyken istekler arasına bekleme ekle (hesap/IP işaretlenme riskini azaltır).</summary>
     public bool PoliteMode { get; set; } = true;
 
+    /// <summary>Nazik mod seviyesi. null: eski sürümden gelen ayar, PoliteMode'a göre Dengeli/Kapalı sayılır.</summary>
+    public PoliteLevel? Polite { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public PoliteLevel EffectivePolite => Polite ?? (PoliteMode ? PoliteLevel.Balanced : PoliteLevel.Off);
+
+    /// <summary>yt-dlp günde bir kez, kuyruk boşken kendiliğinden güncellenir (YouTube değişikliklerine karşı en etkili önlem).</summary>
+    public bool AutoUpdateYtDlp { get; set; } = true;
+
+    /// <summary>Deneysel: bgutil PO token sağlayıcısı kuruluysa kullanılır (403 / "biçim yok" hatalarına karşı).</summary>
+    public bool PoTokenProvider { get; set; }
+    public DateTimeOffset? LastYtDlpUpdateCheck { get; set; }
+
     public bool UseArchive { get; set; } = true;
     public List<string> SubLangs { get; set; } = ["tr", "en"];
     public List<string> SponsorCategories { get; set; } = ["sponsor", "selfpromo", "interaction"];

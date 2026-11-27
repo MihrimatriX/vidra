@@ -12,13 +12,14 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Vidra.Core;
 using Vidra.Core.Models;
+using Vidra.Core.Playlists;
 using Vidra.Core.Queue;
 using Vidra.Core.Storage;
 using Vidra.Core.YtDlp;
 
 namespace Vidra.App.ViewModels;
 
-public sealed partial class PlaylistRow(PlaylistEntry entry, int index, bool done) : ObservableObject
+public sealed partial class PlaylistRow(PlaylistEntry entry, int index, bool done) : ObservableObject, IPlaylistItem
 {
     public PlaylistEntry Entry { get; } = entry;
     public int Index { get; } = index;
@@ -40,29 +41,18 @@ public sealed partial class PlaylistRow(PlaylistEntry entry, int index, bool don
     [ObservableProperty] private bool _isListFollowed;
     [ObservableProperty] private bool _isListPinned;
 
-    public string? CountText => Stats is { } s ? $"{s.Videos} video" : null;
-    public string? MembersText => Stats switch { { AllMembers: true } => "ÜYELERE ÖZEL", { Members: > 0 } s => $"{s.Members} ÜYE", _ => null };
-    public string? MembersHint => Stats is { Members: > 0 } s ? $"Üyelere özel: {s.Members} / {s.Videos} video" : null;
+    public string? CountText => ListStatsText.Count(Stats);
+    public string? MembersText => ListStatsText.Members(Stats);
+    public string? MembersHint => ListStatsText.MembersHint(Stats);
     public double Progress => Stats?.Progress ?? 0;
     public bool ShowProgress => Stats is { Done: > 0 };
     public bool Complete => Stats?.Complete ?? false;
     public bool HasMembers => Stats is { Members: > 0 };
-    public string StatsText => StatsError is not null ? "Okunamadı"
-        : Stats is not { } s ? (Selectable ? "Okunuyor…" : "")
-        : s.Complete ? string.Join(" · ", new[] { s.Seconds > 0 ? TimeText.Format(s.Seconds) : "", "Tümü indirildi" }.Where(x => x.Length > 0))
-        : string.Join(" · ", new[] { s.Seconds > 0 ? TimeText.Format(s.Seconds) : "", s.Done > 0 ? $"{s.Done}/{s.Videos} indirildi" : "" }.Where(x => x.Length > 0));
+    public string StatsText => ListStatsText.Status(Stats, StatsError, Selectable);
 }
 
 public sealed partial class PlaylistViewModel : ObservableObject
 {
-    /// <summary>Flat listede format bilgisi yok: boyutu süre × tipik YouTube bit hızıyla tahmin ederiz (kbps).</summary>
-    private static readonly Dictionary<int, double> TypicalKbps = new()
-    {
-        [0] = 9000, [2160] = 18000, [1440] = 9000, [1080] = 4300, [720] = 2500, [480] = 1200, [360] = 700,
-    };
-
-    private sealed record CollectItem(PlaylistEntry Entry, string List, int Index, string? ListUrl, string? Channel, bool WasDone);
-
     private readonly AppHost _host;
     private readonly MainViewModel _main;
     private readonly Stack<string> _back = new();
@@ -147,12 +137,12 @@ public sealed partial class PlaylistViewModel : ObservableObject
     [ObservableProperty] private string _range = "";
     [ObservableProperty] private string _dateFrom = "";
     [ObservableProperty] private string _dateTo = "";
-    [ObservableProperty] private string _bucket = "all";
+    [ObservableProperty] private DurationBucket _bucket;
     [ObservableProperty] private string _query = "";
     [ObservableProperty] private bool _onlyNew;
     [ObservableProperty] private bool _onlyMembers;
-    [ObservableProperty] private string _videoSort = "list";
-    [ObservableProperty] private string _listSort = "default";
+    [ObservableProperty] private VideoSort _videoSort;
+    [ObservableProperty] private ListSort _listSort;
 
     public ObservableCollection<PlaylistRow> Rows { get; } = [];
     public CardGrid Cards { get; } = new();
@@ -223,12 +213,12 @@ public sealed partial class PlaylistViewModel : ObservableObject
     partial void OnRangeChanged(string value) => ApplyFilter();
     partial void OnDateFromChanged(string value) => ApplyFilter();
     partial void OnDateToChanged(string value) => ApplyFilter();
-    partial void OnBucketChanged(string value) => ApplyFilter();
+    partial void OnBucketChanged(DurationBucket value) => ApplyFilter();
     partial void OnQueryChanged(string value) => ApplyFilter();
     partial void OnOnlyNewChanged(bool value) => ApplyFilter();
     partial void OnOnlyMembersChanged(bool value) => ApplyFilter();
-    partial void OnVideoSortChanged(string value) => ApplyFilter();
-    partial void OnListSortChanged(string value) => ApplyFilter();
+    partial void OnVideoSortChanged(VideoSort value) => ApplyFilter();
+    partial void OnListSortChanged(ListSort value) => ApplyFilter();
     partial void OnModeChanged(DownloadMode value) { UpdateSelection(); OnPropertyChanged(nameof(OptionsLabel)); }
     partial void OnHeightChanged(int value) => UpdateSelection();
     partial void OnAudioFormatChanged(AudioFormat value) => UpdateSelection();
@@ -322,12 +312,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
         DoneCount = _all.Count(r => r.Done);
         UnavailableCount = _all.Count(r => r.Entry.Unavailable);
         var secs = _all.Sum(r => r.Entry.Duration ?? 0);
-        MetaLine = string.Join(" · ", new[]
-        {
-            channelTitle ? "" : p.Channel ?? "",
-            IsListOfLists ? $"{_all.Count} liste" : $"{_all.Count} video",
-            secs > 0 ? TimeText.Format(secs) : "",
-        }.Where(s => s.Length > 0));
+        MetaLine = PlaylistSummary.MetaLine(channelTitle ? null : p.Channel, _all.Count, IsListOfLists, secs);
         IsFollowed = _host.Follow.IsFollowed(url, ChannelTab);
         MoreFilters = false;
         // Yeni sayfada eski arama/filtre kalmasın (kullanıcı başka sekmeye/listeye geçti)
@@ -396,68 +381,22 @@ public sealed partial class PlaylistViewModel : ObservableObject
     private void OnListStatsUpdated()
     {
         HasAnyListMembers = _all.Any(r => r.Stats is { Members: > 0 });
-        if (OnlyNew || OnlyMembers || ListSort is "members" or "missing" or "count")
-            _coalescedFilter();
+        if (Criteria().DependsOnListStats) _coalescedFilter();
     }
 
-    private double Kbps => Mode == DownloadMode.Audio
-        ? AudioFormat switch { AudioFormat.Mp3 => 245, AudioFormat.Flac => 900, AudioFormat.Wav => 1411, _ => 150 }
-        : (TypicalKbps.TryGetValue(Height, out var k) ? k : 4300) + 130;
-
-    private string EstimateFor(double seconds) => seconds > 0 ? Fmt.Bytes(seconds * Kbps * 1000 / 8) : "—";
-
     private bool _suppressFilter;
+
+    private PlaylistFilterCriteria Criteria() => new()
+    {
+        Query = Query, Range = Range, DateFrom = DateFrom, DateTo = DateTo, Bucket = Bucket,
+        OnlyNew = OnlyNew, OnlyMembers = OnlyMembers, VideoSort = VideoSort, ListSort = ListSort,
+    };
 
     private void ApplyFilter()
     {
         if (_suppressFilter) return;
         _anchorRow = null;
-        var q = Query.Trim();
-        var tr = StringComparer.Create(Fmt.Tr, ignoreCase: true);
-        IEnumerable<PlaylistRow> visible;
-
-        if (IsListOfLists)
-        {
-            visible = _all.Where(r =>
-                (q.Length == 0 || r.Entry.Title.Contains(q, StringComparison.CurrentCultureIgnoreCase)
-                               || (r.Entry.Channel?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false)) &&
-                (!OnlyNew || r.Stats is null || r.Stats.New > 0) &&
-                (!OnlyMembers || r.Stats is { Members: > 0 }));
-
-            visible = ListSort switch
-            {
-                "members" => visible.OrderByDescending(r => r.Stats?.Members ?? -1).ThenBy(r => r.Index),
-                "missing" => visible.OrderByDescending(r => r.Stats?.New ?? -1).ThenBy(r => r.Index),
-                "count" => visible.OrderByDescending(r => r.Stats?.Videos ?? -1).ThenBy(r => r.Index),
-                "name" => visible.OrderBy(r => r.Entry.Title, tr),
-                _ => visible.OrderBy(r => r.Index),
-            };
-        }
-        else
-        {
-            var set = ParseRange(Range, _all.Count);
-            var from = DateFrom.Replace("-", "").Trim();
-            var to = DateTo.Replace("-", "").Trim();
-            (double Min, double Max) b = Bucket switch { "short" => (0, 240), "mid" => (240, 1200), "long" => (1200, double.MaxValue), _ => (0, double.MaxValue) };
-
-            visible = _all.Where(r =>
-                (set is null || set.Contains(r.Index)) &&
-                (from.Length != 8 || r.Entry.UploadDate is null || string.CompareOrdinal(r.Entry.UploadDate, from) >= 0) &&
-                (to.Length != 8 || r.Entry.UploadDate is null || string.CompareOrdinal(r.Entry.UploadDate, to) <= 0) &&
-                (Bucket == "all" || (r.Entry.Duration is { } d && d >= b.Min && d < b.Max)) &&
-                (q.Length == 0 || r.Entry.Title.Contains(q, StringComparison.CurrentCultureIgnoreCase)) &&
-                (!OnlyNew || !r.Done) &&
-                (!OnlyMembers || r.Entry.MembersOnly));
-
-            visible = VideoSort switch
-            {
-                "reverse" => visible.OrderByDescending(r => r.Index),
-                "newest" => visible.OrderByDescending(r => r.Entry.UploadDate ?? "").ThenBy(r => r.Index),
-                "longest" => visible.OrderByDescending(r => r.Entry.Duration ?? 0).ThenBy(r => r.Index),
-                "views" => visible.OrderByDescending(r => r.Entry.Views ?? 0).ThenBy(r => r.Index),
-                _ => visible.OrderBy(r => r.Index),
-            };
-        }
+        var visible = PlaylistFilter.Apply(_all, Criteria(), IsListOfLists);
 
         Rows.Clear();
         foreach (var r in visible) Rows.Add(r);
@@ -509,26 +448,10 @@ public sealed partial class PlaylistViewModel : ObservableObject
         var sel = Selected.ToList();
         SelectedCount = sel.Count;
         if (!keepToast) Toast = null;
-        var lists = sel.Count(r => r.Entry.IsList);
-        SelectedLabel = (lists, videos: sel.Count - lists) switch
-        {
-            (0, var v) => $"{v} video seçili",
-            (var l, 0) => $"{l} liste seçili",
-            var (l, v) => $"{l} liste + {v} video seçili",
-        };
-        var secs = sel.Sum(r => r.Entry.Duration ?? 0);
+        SelectedLabel = PlaylistSummary.SelectedLabel(sel);
         // Seçili listelerin içeriği okunduysa indirilecek yeni videolar baştan bilinir (bkz. LoadListStatsAsync)
-        var stats = sel.Where(r => r.Entry.IsList).Select(r => r.Stats).ToList();
-        var count = sel.Count - lists + stats.Sum(s => s?.New ?? 0);
-        secs += stats.Sum(s => s?.NewSeconds ?? 0);
-        SelectedSummary = sel.Count == 0 ? (IsListOfLists ? "İndirmek istediğin listeleri işaretle" : "Listeden video seç")
-            : lists == 0 ? $"{TimeText.Format(secs)} · ≈ {EstimateFor(secs)}"
-            : stats.Any(s => s is null) ? "Listelerin videoları indirirken okunur, indirilmişler atlanır"
-            : count == 0 ? "Seçili listelerde indirilmemiş video yok"
-            : $"{count} video · {TimeText.Format(secs)} · ≈ {EstimateFor(secs)}";
-        var candidates = IsListOfLists
-            ? Rows.Where(r => r.Selectable && (r.Stats is null || r.Stats.New > 0)).ToList()
-            : Rows.Where(r => r.Selectable && !r.Done).ToList();
+        SelectedSummary = PlaylistSummary.SelectedSummary(sel, IsListOfLists, SizeEstimate.Kbps(Mode, Height, AudioFormat));
+        var candidates = Rows.Where(r => PlaylistFilter.IsBulkCandidate(r, IsListOfLists)).ToList();
         AllSelected = candidates.Count > 0 && candidates.All(r => r.IsSelected);
     }
 
@@ -542,9 +465,8 @@ public sealed partial class PlaylistViewModel : ObservableObject
         {
             foreach (var r in Rows.Where(r => r.Selectable))
             {
-                if (!target) { r.IsSelected = false; continue; }
-                var eligible = IsListOfLists ? (r.Stats is null || r.Stats.New > 0) : !r.Done;
-                if (eligible) r.IsSelected = true;
+                if (!target) r.IsSelected = false;
+                else if (PlaylistFilter.IsBulkCandidate(r, IsListOfLists)) r.IsSelected = true;
             }
         }
         finally { _bulk = false; }
@@ -760,14 +682,8 @@ public sealed partial class PlaylistViewModel : ObservableObject
                 BusyText = $"Listeler okunuyor {i + 1}/{lists.Count}: {list.Title}";
                 try
                 {
-                    var p = await ResolveSubListAsync(list.Url);
-                    if (p is not null)
-                    {
-                        var ch = !string.IsNullOrWhiteSpace(p.Channel) ? p.Channel : list.Channel ?? Info?.Channel;
-                        var lUrl = YouTubeUrl.CanonicalSourceUrl(list.Url);
-                        result.AddRange(p.Entries.Select((e, n) => new CollectItem(e, list.Title, n + 1, lUrl, ch, false))
-                            .Where(x => !x.Entry.IsList && !x.Entry.Unavailable && !archived.Contains(x.Entry.Id)));
-                    }
+                    if (await ResolveSubListAsync(list.Url) is { } p)
+                        result.AddRange(PlaylistCollect.Pending(list, p, Info?.Channel, archived));
                 }
                 catch (Exception e) { errors.Add($"{list.Title}: {e.Message}"); }
             }
@@ -799,18 +715,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
     {
         var o = Options();
         // Ters sıra açıksa her liste kendi içinde ters çevrilip 1..N yeniden numaralandırılır (Üyeler sekmesi / ters kurslar için)
-        IEnumerable<(CollectItem Item, int Index)> prepared;
-        if (ReverseOrder)
-        {
-            var list = new List<(CollectItem, int)>();
-            foreach (var g in items.GroupBy(x => (x.List, x.ListUrl)))
-            {
-                var rev = g.OrderByDescending(x => x.Index).ToList();
-                for (var i = 0; i < rev.Count; i++) list.Add((rev[i], i + 1));
-            }
-            prepared = list;
-        }
-        else prepared = items.Select(x => (x, x.Index));
+        var prepared = PlaylistCollect.Number(items, ReverseOrder);
 
         _host.Queue.Enqueue(prepared.Select(x => new NewJob(
             x.Item.Entry.Url,
@@ -889,13 +794,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
         {
             var pl = await ResolveSubListAsync(row.Entry.Url);
             if (pl is null) { _main.ShowToast("Liste okunamadı"); return; }
-            var archived = ArchivedIds();
-            var ch = !string.IsNullOrWhiteSpace(pl.Channel) ? pl.Channel : row.Entry.Channel ?? Info?.Channel;
-            var lUrl = YouTubeUrl.CanonicalSourceUrl(row.Entry.Url);
-            var items = pl.Entries
-                .Select((e, n) => new CollectItem(e, row.Entry.Title, n + 1, lUrl, ch, false))
-                .Where(x => !x.Entry.IsList && !x.Entry.Unavailable && !archived.Contains(x.Entry.Id) && (!onlyMembers || x.Entry.MembersOnly))
-                .ToList();
+            var items = PlaylistCollect.Pending(row.Entry, pl, Info?.Channel, ArchivedIds(), onlyMembers);
             if (items.Count == 0)
             {
                 _main.ShowToast(onlyMembers ? "Bu listede indirilecek yeni üye videosu yok" : "Bu listedeki tüm videolar zaten indirilmiş");
@@ -917,13 +816,9 @@ public sealed partial class PlaylistViewModel : ObservableObject
         {
             var pl = await ResolveSubListAsync(row.Entry.Url);
             if (pl is null) return;
-            var archived = ArchivedIds();
-            var ch = !string.IsNullOrWhiteSpace(pl.Channel) ? pl.Channel : row.Entry.Channel ?? Info?.Channel;
-            var lUrl = YouTubeUrl.CanonicalSourceUrl(row.Entry.Url);
-            var n = _main.Basket.Add(pl.Entries
-                .Select((e, i) => (e, i: i + 1))
-                .Where(x => !x.e.IsList && !x.e.Unavailable && !archived.Contains(x.e.Id))
-                .Select(x => new BasketItem(x.e.Url, x.e.Title, x.e.Channel ?? ch, x.e.Thumbnail, x.e.Duration, $"Liste: {row.Entry.Title}", row.Entry.Title, x.i, lUrl)));
+            var n = _main.Basket.Add(PlaylistCollect.Pending(row.Entry, pl, Info?.Channel, ArchivedIds())
+                .Select(x => new BasketItem(x.Entry.Url, x.Entry.Title, x.Entry.Channel ?? x.Channel, x.Entry.Thumbnail, x.Entry.Duration,
+                    $"Liste: {row.Entry.Title}", x.List, x.Index, x.ListUrl)));
             _main.ShowToast(n > 0 ? $"{n} video sepete eklendi" : "Yeni video yok ya da zaten sepette");
         }
         catch (Exception e) { Error = e.Message; }
@@ -1015,29 +910,5 @@ public sealed partial class PlaylistViewModel : ObservableObject
         if (p is not PlaylistRow r) return;
         _back.Push(IsChannel ? YouTubeUrl.ChannelTabUrl(SourceUrl, ChannelTab) : SourceUrl);
         await LoadAsync(r.Entry.Url, keepHistory: true);
-    }
-
-    /// <summary>"1-20, 31" → {1..20, 31}; 1 tabanlı. Geçersizse null (filtre yok).</summary>
-    public static HashSet<int>? ParseRange(string input, int max)
-    {
-        var s = input.Trim();
-        if (s.Length == 0) return null;
-        var set = new HashSet<int>();
-        foreach (var raw in s.Split(',', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var part = raw.Trim();
-            var dash = part.IndexOf('-');
-            if (dash >= 0)
-            {
-                if (!int.TryParse(part[..dash], NumberStyles.None, CultureInfo.InvariantCulture, out var a)) return null;
-                var rest = part[(dash + 1)..].Trim();
-                var b = rest.Length == 0 ? max : int.TryParse(rest, NumberStyles.None, CultureInfo.InvariantCulture, out var x) ? x : -1;
-                if (b < 0) return null;
-                for (var i = Math.Max(1, a); i <= Math.Min(b, max); i++) set.Add(i);
-            }
-            else if (int.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out var n)) { if (n >= 1 && n <= max) set.Add(n); }
-            else return null;
-        }
-        return set;
     }
 }

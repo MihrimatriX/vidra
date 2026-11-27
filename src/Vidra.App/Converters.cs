@@ -162,10 +162,11 @@ public sealed class EqualsConverter : IValueConverter
 }
 
 /// <summary>Değer parametreye eşitse Visible (sekme içerikleri için).</summary>
+/// <summary>Değer parametreye eşitse görünür; "A|B" biçiminde birkaç değerden biri de olabilir.</summary>
 public sealed class EqualsVisConverter : IValueConverter
 {
     public object Convert(object? value, Type t, object? p, CultureInfo c) =>
-        string.Equals(value?.ToString(), p?.ToString(), StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
+        value?.ToString() is { } v && Array.IndexOf((p?.ToString() ?? "").Split('|'), v) >= 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public object ConvertBack(object? value, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }

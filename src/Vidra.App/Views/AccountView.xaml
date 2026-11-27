@@ -82,7 +82,7 @@
           </Grid>
 
           <CheckBox Style="{StaticResource SwitchCard}" Margin="0,18,0,0" HorizontalAlignment="Left" MinWidth="460" IsChecked="{Binding PoliteMode}"
-                    Content="Nazik mod (önerilir)" Tag="Oturum açıkken toplu indirmelerde istekler arasına kısa bekleme ekler; hesabın ya da IP'nin işaretlenme riskini azaltır. Tek video bekletilmez." />
+                    Content="Nazik mod (önerilir)" Tag="İstekler arasına kısa bekleme ekler; hesabın ya da IP'nin işaretlenme riskini azaltır. Seviyesi Ayarlar'da" />
         </StackPanel>
       </Border>
 

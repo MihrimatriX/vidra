@@ -68,8 +68,13 @@
               <TextBlock TextWrapping="Wrap" FontSize="14"
                          Text="Windows'ta Chromium tabanlı tarayıcılar açıkken çerez veritabanını kilitleyebilir. İndirme başlamadan tarayıcıyı kapatman gerekebilir — Firefox ya da uygulama içi giriş daha güvenilir." />
             </Border>
-            <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="460" Margin="0" IsChecked="{Binding PoliteMode}"
-                      Content="Nazik mod" Tag="Oturum açıkken playlist, kanal ve toplu indirmelerde istekler arasına bekleme ekler. Tek video bekletilmez." />
+            <HeaderedContentControl Style="{StaticResource Field}" Header="Nazik mod: YouTube sınırlarına takılmamak için istekler arası bekleme" Margin="0">
+              <StackPanel>
+                <ListBox Style="{StaticResource Segmented}" HorizontalAlignment="Left" ItemsSource="{Binding PoliteLevels}" SelectedValue="{Binding Polite}"
+                         AutomationProperties.Name="Nazik mod seviyesi" />
+                <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left" Margin="0,6,0,0" Text="{Binding PoliteHint}" />
+              </StackPanel>
+            </HeaderedContentControl>
           </StackPanel>
         </Border>
 
@@ -242,6 +247,8 @@
                 <TextBlock Style="{StaticResource Body2}" Margin="0,4,16,0" Text="YouTube değiştikçe yt-dlp sık güncellenir. İndirme bozulursa önce güncellemeyi dene." />
               </StackPanel>
             </DockPanel>
+            <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="460" Margin="0,0,0,12" IsChecked="{Binding AutoUpdateYtDlp}"
+                      Content="yt-dlp'yi kendiliğinden güncelle" Tag="Günde en fazla bir kez, kuyruk boşken seçili kanaldan güncellenir" />
             <ItemsControl ItemsSource="{Binding Tools}">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><c:UniformWrapPanel MinItemWidth="220" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
@@ -276,6 +283,20 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- İsteğe bağlı: PO token sağlayıcısı (bgutil, Deno ile betik modu) -->
+            <Border Style="{StaticResource Tile}" Margin="0,0,10,10">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                  <Button Style="{StaticResource BtnSm}" Content="Kur" Margin="8,0,0,0" Command="{Binding InstallPotCommand}"
+                          IsEnabled="{Binding Updating, Converter={StaticResource Not}}" Visibility="{Binding PotInstalled, Converter={StaticResource Vis}, ConverterParameter=!}" />
+                  <Button Style="{StaticResource BtnSm}" Content="Kaldır" Margin="8,0,0,0" Command="{Binding RemovePotCommand}"
+                          IsEnabled="{Binding Updating, Converter={StaticResource Not}}" Visibility="{Binding PotInstalled, Converter={StaticResource Vis}}" />
+                </StackPanel>
+                <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="420" Margin="0" IsChecked="{Binding PoTokenProvider}"
+                          IsEnabled="{Binding Updating, Converter={StaticResource Not}}"
+                          Content="PO token sağlayıcısı (deneysel)" Tag="{Binding PotHint}" />
+              </DockPanel>
+            </Border>
             <TextBox Text="{Binding UpdateLog, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" FontSize="12.5"
                      Height="120" VerticalContentAlignment="Top" Padding="8" Background="{DynamicResource Surface2}" Margin="0,4,0,12"
                      Visibility="{Binding UpdateLog, Converter={StaticResource Vis}}" VerticalScrollBarVisibility="Auto" />

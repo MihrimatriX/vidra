@@ -52,6 +52,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public IReadOnlyList<Choice> RetryChoices => Choices.Retries;
     public IReadOnlyList<Choice> RateLimits => Choices.RateLimits;
     public IReadOnlyList<Choice> UpdateChannels => Choices.Channels;
+    public IReadOnlyList<Choice> PoliteLevels => Choices.PoliteLevels;
     public ObservableCollection<Toggle> SponsorCats { get; } = [];
     public ObservableCollection<ToolStatus> Tools { get; } = [];
 
@@ -133,7 +134,67 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
     }
 
-    public bool PoliteMode { get => S.PoliteMode; set => Set(s => s.PoliteMode = value); }
+    public PoliteLevel Polite
+    {
+        get => S.EffectivePolite;
+        set { Set(s => s.Polite = value); OnPropertyChanged(nameof(PoliteHint)); }
+    }
+
+    public string PoliteHint => S.EffectivePolite switch
+    {
+        PoliteLevel.Off => "Bekleme yok. Tek tük indirmede en hızlısı; toplu indirmede 429 riski yüksek.",
+        PoliteLevel.Safe => "yt-dlp'nin önerisi: videolar arası 10–20 sn, altyazılar arası 5 sn; oturumla aynı anda en fazla 2 iş. Büyük playlist'ler ve hesapla yoğun kullanım için.",
+        _ => "Videolar arası 3–8 sn, altyazılar arası 3 sn bekleme. Analiz ve arama hızlı kalır. YouTube sınırı gelirse Vidra kendiliğinden Güvenli'ye geçer.",
+    };
+
+    public bool AutoUpdateYtDlp { get => S.AutoUpdateYtDlp; set => Set(s => s.AutoUpdateYtDlp = value); }
+
+    // ---- PO token sağlayıcısı (deneysel)
+    public bool PotInstalled => _host.Tools.PotInstalled;
+
+    public string PotHint => PotInstalled
+        ? $"bgutil {Core.Tools.ToolManager.PotVersion} kurulu. YouTube'un istediği PO token'ları Deno ile üretir; 403 ve \"biçim yok\" hatalarını azaltır. Analizi biraz yavaşlatabilir."
+        : "YouTube bazı videolarda PO token ister; yoksa 403 ya da eksik biçim görülür. Açınca bgutil sağlayıcısı ve npm bağımlılıkları Deno ile kurulur.";
+
+    public bool PoTokenProvider
+    {
+        get => S.PoTokenProvider && PotInstalled;
+        set
+        {
+            if (value && !PotInstalled) { _ = InstallPot(); return; }
+            Set(s => s.PoTokenProvider = value);
+        }
+    }
+
+    [RelayCommand]
+    private async Task InstallPot()
+    {
+        Updating = true;
+        var progress = new Progress<SetupProgress>(p => UpdateLog = p.Message);
+        try
+        {
+            await _host.Tools.InstallPotProviderAsync(progress);
+            _host.SettingsStore.Update(s => s.PoTokenProvider = true);
+        }
+        catch (Exception e) { UpdateLog = e.Message; }
+        finally { Updating = false; }
+        NotifyPot();
+    }
+
+    [RelayCommand]
+    private void RemovePot()
+    {
+        _host.SettingsStore.Update(s => s.PoTokenProvider = false);
+        _host.Tools.RemovePotProvider();
+        NotifyPot();
+    }
+
+    private void NotifyPot()
+    {
+        OnPropertyChanged(nameof(PotInstalled));
+        OnPropertyChanged(nameof(PotHint));
+        OnPropertyChanged(nameof(PoTokenProvider));
+    }
 
     // ---- İndirme & dosyalar
     public string OutputDir { get => S.OutputDir; set => Set(s => s.OutputDir = value); }
