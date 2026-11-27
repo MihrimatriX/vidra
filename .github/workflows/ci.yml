@@ -1,0 +1,67 @@
+# Her PR'da ve main'e her push'ta çalışır: Vidra.Core testleri Linux'ta, Vidra.App derlemesi Windows'ta.
+# Yalnızca belge değişen commit'lerde atlanır. Sürüm yayını ayrı: release.yml.
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**/*.md']
+  pull_request:
+    paths-ignore: ['docs/**', '**/*.md']
+
+permissions:
+  contents: read
+
+# Aynı PR'a yeni commit gelince eski çalışma iptal edilir; main'deki çalışmalar sırayla biter.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  test:
+    name: Testler (Vidra.Core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Testleri çalıştır
+        run: >
+          dotnet test tests/Vidra.Core.Tests -c Release
+          --logger "trx;LogFileName=results.trx"
+          --results-directory TestResults
+
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: test-results
+          path: TestResults
+          retention-days: 7
+
+  build-app:
+    name: Derleme (Vidra.App)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
+
+      # Debug: #if DEBUG altındaki kod (ScreenshotTour vb.) da derlensin.
+      - name: Derle (Debug)
+        run: dotnet build src/Vidra.App -c Debug
+
+      # Release: yayındaki ayarlarla (tek dosya, bağımsız, win-x64).
+      - name: Derle (Release, win-x64)
+        run: dotnet build src/Vidra.App -c Release -r win-x64
