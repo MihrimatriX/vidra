@@ -91,8 +91,10 @@ public static partial class OutputParser
             m.Contains("try again later"))
             return ErrorKind.RateLimited;
         // -f her zaman "/b" yedeğiyle verilir; biçim yoksa sorun video değil, YouTube'un akışları vermemesi (eski yt-dlp, PO token)
+        // "Got error: 0 bytes read, N more expected. Giving up after 10 retries": YouTube akışı birkaç MB sonra kesiyor
+        // (PO token / SABR kısıtında format 18'de tipik); ağ kopması değil, aynı istekle tekrar denemek düzeltmez
         if (m.Contains("http error 403") || m.Contains("requested format is not available") || m.Contains("only images are available") ||
-            m.Contains("po token"))
+            m.Contains("po token") || m.Contains("bytes read") || m.Contains("giving up after"))
             return ErrorKind.Forbidden;
         if (m.Contains("video unavailable") || m.Contains("has been removed") || m.Contains("not available"))
             return ErrorKind.Unavailable;
@@ -126,7 +128,7 @@ public static partial class OutputParser
         ErrorKind.Auth => "Bu video giriş veya kanal üyeliği istiyor. Hesabım ekranından giriş yap ya da oturumu yenile.",
         ErrorKind.BotCheck => "YouTube bu bağlantıdan bot doğrulaması istiyor. Hesabım ekranından giriş yap; VPN kullanıyorsan kapatmayı ya da bir süre beklemeyi dene.",
         ErrorKind.RateLimited => "YouTube geçici bir istek sınırı uyguladı. Vidra kuyruğu bir süre bekletip kendiliğinden yeniden dener; sık oluyorsa nazik modu Güvenli yap.",
-        ErrorKind.Forbidden => "YouTube bu videonun akışlarını vermedi (403 / biçim yok). Genelde yt-dlp eskidiğinde olur: yt-dlp'yi güncelle. Sürerse Ayarlar › Bileşenler'den PO token sağlayıcısını aç.",
+        ErrorKind.Forbidden => "YouTube bu videonun akışlarını vermedi ya da indirirken kesti (403 / biçim yok / 0 bayt). Vidra oturumsuz ve taze bilgiyle yeniden dener. Sürerse yt-dlp'yi güncelle, PO token sağlayıcısını aç/kapat ya da bir süre bekle.",
         ErrorKind.Unavailable => "Video kaldırılmış, özel ya da bölgende erişilemiyor.",
         ErrorKind.Ffmpeg => "ffmpeg işlemi başarısız oldu: " + message,
         ErrorKind.Network => "Bağlantı hatası: " + message,

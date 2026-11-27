@@ -415,6 +415,7 @@ public sealed partial class DownloadQueue : ObservableObject
 
         string? lastFormat = null;
         ErrorLine? lastError = null;
+        string? streamCut = null; // "[download] Got error: 0 bytes read…": ERROR satırı boş gelince asıl neden bu
         var formatIssues = new List<FormatIssue>();
         var gotFile = false;
 
@@ -485,6 +486,9 @@ public sealed partial class DownloadQueue : ObservableObject
                     foreach (var issue in FormatDiagnostics.Detect([w.Message]))
                         if (!formatIssues.Contains(issue)) formatIssues.Add(issue);
                     break;
+                case OtherLine o when o.Text.Contains("Got error:", StringComparison.Ordinal) || o.Text.Contains("Giving up after", StringComparison.Ordinal):
+                    streamCut = o.Text.Replace("[download]", "").Trim();
+                    break;
                 case OtherLine o when o.Text.Contains("has already been recorded in the archive", StringComparison.Ordinal):
                     job.Percent = 100;
                     job.Stage = "Daha önce indirilmiş — atlandı";
@@ -531,6 +535,9 @@ public sealed partial class DownloadQueue : ObservableObject
                 why = _intentional.Remove(job.Id, out var w) ? w : null;
             }
             var code = t.IsCompletedSuccessfully ? t.Result : -1;
+            // yt-dlp bazen "ERROR: " satırını boş basar; neden önceki/sonraki satırdadır
+            if (lastError is { Message.Length: 0 } && streamCut is not null) lastError = new ErrorLine(OutputParser.Classify(streamCut), streamCut);
+            else if (lastError is null && code != 0 && streamCut is not null) lastError = new ErrorLine(OutputParser.Classify(streamCut), streamCut);
             Perf.Write("job:total", System.Diagnostics.Stopwatch.GetElapsedTime(started), $"{job.VideoId} exit={code}{(info is null ? "" : " info-json")}");
             lock (_gate) _lastEndNatural = why is null;
             job.Log.Flush();
@@ -572,6 +579,13 @@ public sealed partial class DownloadQueue : ObservableObject
             {
                 // Kendiliğinden yeniden deneme: iş sırada kalır, zamanı gelince .part dosyasından devam eder
                 var at = d == RetryDecision.Cooldown ? Guard.Trip(lastError.Kind) : Guard.Now + RateGuard.JobRetryDelay(job.AutoRetries);
+                // Akış verilmedi/kesildi ve oturumla çıkarılmıştı: oturuma özgü kısıt (SABR deneyi, DRM'li TV akışları) olabilir,
+                // yeniden deneme bu video için çerezsiz çıkarsın (üyelik videosuysa yt-dlp oturum hatası verir, o da sınıflandırılır)
+                if (lastError.Kind == ErrorKind.Forbidden && s.Cookies is not NoCookies && _tools.Fallback.For(job.VideoId) < FallbackStep.NoCookies)
+                {
+                    _tools.Fallback.Remember(job.VideoId, FallbackStep.NoCookies);
+                    AppLog.Write($"Akış kesildi, oturumsuz yeniden denenecek: {job.Title} ({job.Url})", lastError.Message);
+                }
                 job.AutoRetries++;
                 job.ErrorKind = lastError.Kind;
                 job.RetryAt = at;

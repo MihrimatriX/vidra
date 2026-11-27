@@ -161,3 +161,40 @@ public class FormatFallbackTests : IDisposable
         Assert.Equal(FallbackStep.TvClients, f.For("a"));
     }
 }
+
+/// <summary>0.7.0 günlüğü: boş "ERROR:" + "[download] Got error: 0 bytes read" → akış kesildi, oturumsuz yeniden dene.</summary>
+public class StreamCutTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "vidra-sc-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_dir, true); } catch { }
+    }
+
+    [Fact]
+    public async Task Empty_error_line_takes_reason_from_stream_cut_and_retry_goes_cookieless()
+    {
+        Directory.CreateDirectory(_dir);
+        var cookie = Path.Combine(_dir, "c.txt");
+        File.WriteAllText(cookie, "# Netscape HTTP Cookie File\n");
+        var settings = new AppSettings { OutputDir = "/tmp/out", Cookies = new FileCookies(cookie) };
+        var paths = new AppPaths(Path.Combine(_dir, "data"), Path.Combine(_dir, "local"));
+        var runner = new FakeRunner();
+        var tools = new ToolManager(paths, runner, new HttpClient());
+        var queue = new Queue.DownloadQueue(runner, tools, () => settings, paths);
+
+        queue.Enqueue([new Queue.NewJob("https://youtu.be/PeAvKApuAuA", "Ders", new DownloadOptions())]);
+        var p = runner.Started[0];
+        p.Emit($"{YtDlpArgs.MarkDl}downloading|1024|164206791|NA|NA|NA|18");
+        p.Emit("ERROR: ");
+        p.Emit("[download] Got error: 0 bytes read, 10426600 more expected. Giving up after 10 retries");
+        p.Exit(1);
+
+        var job = queue.Jobs[0];
+        for (var i = 0; i < 200 && job.RetryAt is null; i++) await Task.Delay(10);
+        Assert.Equal(ErrorKind.Forbidden, job.ErrorKind);
+        Assert.NotNull(job.RetryAt);
+        Assert.Equal(FallbackStep.NoCookies, tools.Fallback.For("PeAvKApuAuA"));
+    }
+}

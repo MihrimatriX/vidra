@@ -107,6 +107,7 @@ public class OutputParserTests
     [InlineData("unable to download video data: HTTP Error 403: Forbidden", ErrorKind.Forbidden)]
     [InlineData("[youtube] abc: Requested format is not available. Use --list-formats for a list of available formats", ErrorKind.Forbidden)]
     [InlineData("[youtube] abc: Only images are available for download. use --list-formats to see them", ErrorKind.Forbidden)]
+    [InlineData("Got error: 0 bytes read, 10426600 more expected. Giving up after 10 retries", ErrorKind.Forbidden)]
     public void Classify_errors(string msg, ErrorKind kind) => Assert.Equal(kind, OutputParser.Classify(msg));
 
     [Fact]
