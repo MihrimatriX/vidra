@@ -105,16 +105,16 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
             new(title, null, icon, "Sayfa", $"Ctrl+{key}", Sync(() => main.Go(p)), keywords);
 
         yield return Go(Page.Download, "İndir", "I.Download", "1", "bağlantı video analiz getir");
-        yield return Go(Page.Search, "Ara", "I.Search", "2", "youtube arama");
-        yield return Go(Page.Playlist, "Playlist & kanal", "I.Playlist", "3", "liste kanal");
-        yield return Go(Page.Basket, "Sepet", "I.Basket", "4", "toplu");
-        yield return Go(Page.Queue, "Kuyruk & geçmiş", "I.Clock", "5", "indirmeler history");
-        yield return Go(Page.Library, "Kütüphane", "I.Library", "6", "dosyalar indirilenler");
+        yield return Go(Page.Search, "Ara", "I.Search", "9", "youtube arama");
+        yield return Go(Page.Playlist, "Playlist & kanal", "I.Playlist", "2", "liste kanal");
+        yield return Go(Page.Basket, "Sepet", "I.Basket", "3", "toplu");
+        yield return Go(Page.Queue, "Kuyruk & geçmiş", "I.Clock", "4", "indirmeler history");
+        yield return Go(Page.Library, "Kütüphane", "I.Library", "5", "dosyalar indirilenler");
         yield return new("Kütüphane · Kurslarım", "İndirdiğin kurs ve playlistler, izlenme takibi", "I.Course", "Sayfa", null,
             Sync(() => { main.Library.Section = "courses"; main.Go(Page.Library); }), "kurslar playlist ders izlendi");
         yield return Go(Page.Stats, "İstatistik", "I.Chart", "7", "grafik");
         yield return Go(Page.Account, "Hesabım", "I.User", "8", "giriş oturum çerez eklenti takip");
-        yield return Go(Page.Settings, "Ayarlar", "I.Settings", "9", "tercihler klasör tema");
+        yield return Go(Page.Settings, "Ayarlar", "I.Settings", "6", "tercihler klasör tema yoğunluk kompakt");
         yield return new("İndirme günlüğü", "yt-dlp'nin ham çıktısı: takılan ya da hata veren indirmeler için", "I.Terminal", "Sayfa", null,
             Sync(() => main.LogVm.Show(null)), "log günlük çıktı hata ayıklama debug");
 

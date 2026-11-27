@@ -38,11 +38,24 @@ public partial class MainWindow : Window
         RestorePlacement();
         SetupTaskbar();
         SourceInitialized += (_, _) => ThemeService.ApplyTitleBar(this);
+        SizeChanged += (_, _) => UpdateNavMode();
         // Simge durumuna küçültmeden önceki hâl: ekranı kaplıyorken küçültülüp kapatılırsa yine kaplı açılsın
         StateChanged += (_, _) => { if (WindowState != WindowState.Minimized) _lastShownState = WindowState; };
         vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MainViewModel.Progress)) UpdateTaskbar(vm.Progress); };
         vm.Palette.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen)) OnPaletteToggled(vm.Palette.IsOpen); };
     }
+
+    /// <summary>Dar pencerede kenar menüsü yalnızca ikonlara iner; içerik alanı ~140 px kazanır.</summary>
+    private void UpdateNavMode()
+    {
+        var compact = ActualWidth < NavCompactBelow;
+        if (compact == _vm.NavCompact && SideCol.Width.Value > 0) return;
+        _vm.NavCompact = compact;
+        if (compact) SideCol.Width = new GridLength(60);
+        else SideCol.SetResourceReference(ColumnDefinition.WidthProperty, "SideW");
+    }
+
+    private const double NavCompactBelow = 1100;
 
     /// <summary>Kapat düğmesi: ayar açıksa tepsiye küçült (indirmeler sürer), değilse çık.</summary>
     protected override void OnClosing(CancelEventArgs e)

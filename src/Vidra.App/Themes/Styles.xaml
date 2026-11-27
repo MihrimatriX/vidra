@@ -330,6 +330,17 @@
     </Setter>
   </Style>
 
+  <!-- Kenar menüsündeki sayı rozeti (sepet, kuyruk): dar menüde ikonun köşesine biner -->
+  <Style x:Key="NavBadge" TargetType="Border">
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="6,0" />
+    <Setter Property="MinWidth" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="TextElement.FontSize" Value="11.5" />
+  </Style>
+
   <!-- Hap (pill): altyazı dili, SponsorBlock kategorisi, filtre -->
   <Style x:Key="Pill" TargetType="ToggleButton">
     <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />

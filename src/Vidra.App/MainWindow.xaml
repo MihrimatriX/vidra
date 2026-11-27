@@ -31,15 +31,16 @@
   <!-- Genel kısayollar (Ctrl+L, Ctrl+F ve metin kutusu dışında Ctrl+V kod tarafında: odak gerektirir) -->
   <Window.InputBindings>
     <KeyBinding Key="K" Modifiers="Control" Command="{Binding OpenPaletteCommand}" />
+    <!-- Ctrl+1…6 kenar çubuğundaki sırayla; 7–9 menüde olmayan sayfalar -->
     <KeyBinding Key="D1" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Download" />
-    <KeyBinding Key="D2" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Search" />
-    <KeyBinding Key="D3" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Playlist" />
-    <KeyBinding Key="D4" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Basket" />
-    <KeyBinding Key="D5" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Queue" />
-    <KeyBinding Key="D6" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Library" />
+    <KeyBinding Key="D2" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Playlist" />
+    <KeyBinding Key="D3" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Basket" />
+    <KeyBinding Key="D4" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Queue" />
+    <KeyBinding Key="D5" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Library" />
+    <KeyBinding Key="D6" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Settings" />
     <KeyBinding Key="D7" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Stats" />
     <KeyBinding Key="D8" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Account" />
-    <KeyBinding Key="D9" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Settings" />
+    <KeyBinding Key="D9" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Search" />
     <KeyBinding Key="OemComma" Modifiers="Control" Command="{Binding GoToCommand}" CommandParameter="Settings" />
   </Window.InputBindings>
   <Window.Resources>
@@ -80,7 +81,7 @@
 
   <Grid>
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="{DynamicResource SideW}" />
+      <ColumnDefinition x:Name="SideCol" Width="{DynamicResource SideW}" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
     <Grid.RowDefinitions>
@@ -90,6 +91,17 @@
 
     <!-- ============ Kenar menü ============ -->
     <Border Grid.RowSpan="2" Background="{DynamicResource Side}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,1,0" Padding="10,12,10,10">
+      <!-- Dar pencerede (NavCompact) menü yalnızca ikonlara iner: yazılar gizlenir, adlar ipucunda.
+           Rozet sayıları Style="{x:Null}" ile bu kuralın dışında kalır. -->
+      <Border.Resources>
+        <Style TargetType="TextBlock">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding DataContext.NavCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </Border.Resources>
       <DockPanel LastChildFill="False">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,0,0,16">
           <Border Width="26" Height="26" CornerRadius="8" Background="{DynamicResource Accent}">
@@ -103,61 +115,46 @@
                 Foreground="{DynamicResource Muted}" Command="{Binding OpenPaletteCommand}"
                 ToolTip="Komut paleti: sayfalar, eylemler, geçmiş (Ctrl+K)" AutomationProperties.Name="Komut paleti">
           <DockPanel>
-            <Border DockPanel.Dock="Right" Style="{StaticResource Kbd}" Margin="0"><TextBlock Text="Ctrl K" FontSize="11" /></Border>
+            <Border DockPanel.Dock="Right" Style="{StaticResource Kbd}" Margin="0" Visibility="{Binding NavCompact, Converter={StaticResource Vis}, ConverterParameter=!}"><TextBlock Text="Ctrl K" FontSize="11" /></Border>
             <c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Search}" Size="15" Margin="0,0,8,0" VerticalAlignment="Center" />
             <TextBlock Text="Komut ara…" FontSize="13" VerticalAlignment="Center" />
           </DockPanel>
         </Button>
 
+        <!-- Altı ana sayfa. Arama İndir'in kutusunda (bağlantı değilse arar), İstatistik Kütüphane'de, Hesabım alttaki hesap satırında -->
         <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Download}" ToolTip="Ctrl+1">
+                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Download|Search}" ToolTip="İndir · bağlantı ya da arama (Ctrl+1)">
           <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Download}" Margin="0,0,10,0" /><TextBlock Text="İndir" /></StackPanel>
         </RadioButton>
         <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Search}" ToolTip="Ctrl+2">
-          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Search}" Margin="0,0,10,0" /><TextBlock Text="Ara" /></StackPanel>
-        </RadioButton>
-        <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Playlist}" ToolTip="Ctrl+3">
+                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Playlist}" ToolTip="Playlist &amp; kanal (Ctrl+2)">
           <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Playlist}" Margin="0,0,10,0" /><TextBlock Text="Playlist &amp; kanal" /></StackPanel>
         </RadioButton>
         <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Basket}" ToolTip="Ctrl+4">
-          <DockPanel>
-            <Border DockPanel.Dock="Right" Background="{DynamicResource Raised}" CornerRadius="10" Padding="7,1" Margin="8,0,0,0"
-                    Visibility="{Binding Basket.Items.Count, Converter={StaticResource Vis}}">
-              <TextBlock Text="{Binding Basket.Items.Count}" FontSize="12" FontWeight="Bold" />
-            </Border>
+                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Basket}" ToolTip="Sepet (Ctrl+3)">
+          <Grid>
             <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Basket}" Margin="0,0,10,0" /><TextBlock Text="Sepet" /></StackPanel>
-          </DockPanel>
+            <Border Style="{StaticResource NavBadge}" Background="{DynamicResource Raised}" Visibility="{Binding Basket.Items.Count, Converter={StaticResource Vis}}">
+              <TextBlock Style="{x:Null}" Text="{Binding Basket.Items.Count}" FontSize="11.5" FontWeight="Bold" />
+            </Border>
+          </Grid>
         </RadioButton>
         <!-- Günlük kuyruğun alt sayfası: oradayken de seçili görünür; Command, seçiliyken tıklanınca kuyruğa döndürür -->
         <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav" Command="{Binding GoToCommand}" CommandParameter="Queue"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Queue|Log}" ToolTip="Ctrl+5">
-          <DockPanel>
-            <Border DockPanel.Dock="Right" Background="{DynamicResource Accent}" CornerRadius="10" Padding="7,1" Margin="8,0,0,0"
-                    Visibility="{Binding ActiveCount, Converter={StaticResource Vis}}">
-              <TextBlock Text="{Binding ActiveCount}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource AccentInk}" />
+                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Queue|Log}" ToolTip="Kuyruk &amp; geçmiş (Ctrl+4)">
+          <Grid>
+            <DockPanel><c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Clock}" Margin="0,0,10,0" /><TextBlock Text="Kuyruk &amp; geçmiş" TextTrimming="CharacterEllipsis" Margin="0,0,26,0" /></DockPanel>
+            <Border Style="{StaticResource NavBadge}" Background="{DynamicResource Accent}" Visibility="{Binding ActiveCount, Converter={StaticResource Vis}}">
+              <TextBlock Style="{x:Null}" Text="{Binding ActiveCount}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentInk}" />
             </Border>
-            <DockPanel><c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Clock}" Margin="0,0,10,0" /><TextBlock Text="Kuyruk &amp; geçmiş" TextTrimming="CharacterEllipsis" /></DockPanel>
-          </DockPanel>
+          </Grid>
         </RadioButton>
         <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Library}" ToolTip="Ctrl+6">
+                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Library|Stats}" ToolTip="Kütüphane ve istatistik (Ctrl+5)">
           <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Library}" Margin="0,0,10,0" /><TextBlock Text="Kütüphane" /></StackPanel>
         </RadioButton>
-
-        <Border DockPanel.Dock="Top" Height="1" Background="{DynamicResource Line}" Margin="10,10,10,10" />
         <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Stats}" ToolTip="Ctrl+7">
-          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Chart}" Margin="0,0,10,0" /><TextBlock Text="İstatistik" /></StackPanel>
-        </RadioButton>
-        <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Account}" ToolTip="Ctrl+8">
-          <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.User}" Margin="0,0,10,0" /><TextBlock Text="Hesabım" /></StackPanel>
-        </RadioButton>
-        <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav"
-                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Settings}" ToolTip="Ctrl+9">
+                     IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Settings}" ToolTip="Ayarlar (Ctrl+6)">
           <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Settings}" Margin="0,0,10,0" /><TextBlock Text="Ayarlar" /></StackPanel>
         </RadioButton>
 
@@ -177,7 +174,7 @@
           </DockPanel>
           <TextBlock Text="{Binding DiskLabel}" Margin="0,0,0,4" Visibility="{Binding DiskLabel, Converter={StaticResource Vis}}" />
           <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" HorizontalAlignment="Left" HorizontalContentAlignment="Left" Foreground="{DynamicResource Muted}"
-                  Command="{Binding AccountStatusCommand}" ToolTip="Hesabım">
+                  Command="{Binding AccountStatusCommand}" ToolTip="Hesabım: oturum, hesap akışları, takip edilen listeler (Ctrl+8)">
             <StackPanel Orientation="Horizontal">
               <Ellipse Width="7" Height="7" Margin="0,0,7,0">
                 <Ellipse.Style>
@@ -192,6 +189,11 @@
                 </Ellipse.Style>
               </Ellipse>
               <TextBlock Text="{Binding CookieLabel}" FontSize="12.5" FontWeight="Normal" />
+              <!-- Takip edilen listelerden son ziyaretten beri kuyruğa eklenen yeni video sayısı -->
+              <Border Style="{StaticResource NavBadge}" Background="{DynamicResource AccentSoft}" Margin="8,0,0,0"
+                      Visibility="{Binding FollowNew, Converter={StaticResource Vis}}" ToolTip="Takip edilen listelerden gelen yeni videolar">
+                <TextBlock Style="{x:Null}" Foreground="{DynamicResource AccentStrong}" FontSize="11.5" FontWeight="Bold"><Run Text="+" /><Run Text="{Binding FollowNew, Mode=OneWay}" /></TextBlock>
+              </Border>
             </StackPanel>
           </Button>
           <DockPanel Margin="-8,6,0,0">

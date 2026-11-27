@@ -45,6 +45,10 @@
     <DockPanel Margin="0,0,0,12" Visibility="{Binding ShowCourseDetail, Converter={StaticResource Vis}, ConverterParameter=!}">
       <ListBox DockPanel.Dock="Right" Style="{StaticResource Segmented}" ItemsSource="{Binding Sections}" SelectedValue="{Binding Section}"
                VerticalAlignment="Center" AutomationProperties.Name="Kütüphane görünümü" />
+      <Button DockPanel.Dock="Right" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="İndirme istatistikleri (Ctrl+7)"
+              Command="{Binding DataContext.GoToCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Stats">
+        <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Chart}" Size="15" Margin="0,0,8,0" /><TextBlock Text="İstatistik" /></StackPanel>
+      </Button>
       <StackPanel Margin="0,0,16,0">
         <TextBlock Style="{StaticResource H1}" Text="Kütüphane" />
         <TextBlock Style="{StaticResource Small}" HorizontalAlignment="Left" Margin="0,2,0,0"

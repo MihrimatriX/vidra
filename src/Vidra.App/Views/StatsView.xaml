@@ -4,8 +4,14 @@
              xmlns:c="clr-namespace:Vidra.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="{DynamicResource PagePad}" MaxWidth="1440">
-      <TextBlock Style="{StaticResource H1}" Text="İstatistik" />
-      <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,6,0,20"
+      <StackPanel Orientation="Horizontal">
+        <Button Style="{StaticResource BtnGhostIcon}" Margin="-8,0,6,0" VerticalAlignment="Center" ToolTip="Kütüphane'ye dön" AutomationProperties.Name="Kütüphane'ye dön"
+                Command="{Binding DataContext.GoToCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="Library">
+          <c:Icon Data="{StaticResource I.ArrowLeft}" Size="17" />
+        </Button>
+        <TextBlock Style="{StaticResource H1}" Text="İstatistik" VerticalAlignment="Center" />
+      </StackPanel>
+      <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,4,0,16"
                  Text="Tamamlanan indirmelerin özeti (geçmişte tutulan son 1000 kayda göre)." />
 
       <!-- Boş durum -->
