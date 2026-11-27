@@ -291,6 +291,9 @@ public sealed partial class QueueViewModel : ObservableObject
     [RelayCommand] private void IncConcurrency() => Concurrency++;
     [RelayCommand] private void DecConcurrency() => Concurrency--;
     [RelayCommand] private void OpenAccount() => _main.Go(Page.Account);
+
+    /// <summary>Tanınmayan hata: çoğu zaman eski yt-dlp; Ayarlar'ı Bileşenler bölümünde açar.</summary>
+    [RelayCommand] private void OpenComponents() => _main.OpenSettingsSection("SecTools");
     [RelayCommand] private void ShowLog(object? p) => _main.LogVm.Show(p as DownloadJob);
 
     [RelayCommand]

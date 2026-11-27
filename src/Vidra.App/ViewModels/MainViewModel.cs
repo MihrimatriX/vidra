@@ -163,6 +163,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void Go(Page p) => Page = p;
 
+    /// <summary>Ayarlar'ı belirli bir bölümde açar (SettingsView'daki x:Name: SecAccount, SecNet, SecTools…).</summary>
+    public void OpenSettingsSection(string section)
+    {
+        Settings.PendingSection = section;
+        if (Page == Page.Settings) Page = Page.Download; // aynı sayfadaysa görünüm yeniden yüklensin
+        Go(Page.Settings);
+    }
+
     /// <summary>Ctrl+1…9 ve palet: sayfa adıyla geçiş.</summary>
     [RelayCommand]
     private void GoTo(string? page)

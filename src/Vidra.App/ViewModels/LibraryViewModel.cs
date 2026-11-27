@@ -27,7 +27,18 @@ public sealed partial class LibraryViewModel : ObservableObject
         _host = host;
         _main = main;
         host.WatchProgress.Changed += (_, _) => AppHost.Dispatch(Refresh);
+        _listView = host.Settings.LibraryList;
     }
+
+    /// <summary>Dosyalar satır listesi olarak (yoğun görünüm); kart ızgarasıyla aynı sıralı öğeler.</summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowGrid), nameof(ShowList))] private bool _listView;
+    partial void OnListViewChanged(bool value) => _host.SettingsStore.Update(s => s.LibraryList = value);
+    public bool ShowGrid => ShowFiles && !ListView;
+    public bool ShowList => ShowFiles && ListView;
+    [RelayCommand] private void SetListView(string? mode) => ListView = mode == "list";
+
+    /// <summary>Liste görünümünün öğeleri (Cards ile aynı sıra).</summary>
+    [ObservableProperty] private IReadOnlyList<HistoryEntry> _items = [];
 
     public CardGrid Cards { get; } = new();
     public ObservableCollection<CourseGroup> Courses { get; } = [];
@@ -40,7 +51,7 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// <summary>Kart düğmeleri ve sağ tık menüsü için: oynat, klasör, sil… (Kuyruk ekranı komutları).</summary>
     public QueueViewModel Actions => _main.QueueVm;
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsCourses), nameof(ShowFiles), nameof(ShowCourseGrid), nameof(ShowCourseDetail))] private string _section = "files";
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsCourses), nameof(ShowFiles), nameof(ShowCourseGrid), nameof(ShowCourseDetail), nameof(ShowGrid), nameof(ShowList))] private string _section = "files";
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowCourseGrid), nameof(ShowCourseDetail))] private CourseGroup? _selectedCourse;
 
     public bool IsCourses => Section == "courses";
@@ -90,6 +101,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         Count = list.Count;
         TotalSize = list.Sum(h => h.Size ?? 0);
         Cards.SetItems(list);
+        Items = list;
 
         // Kurslar & Listeler görünümü
         var watched = _host.WatchProgress.Snapshot();

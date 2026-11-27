@@ -45,6 +45,7 @@ public static class ThemeService
         var old = dicts.FirstOrDefault(d => d.Source?.OriginalString is { } o && o.Contains("Density.", StringComparison.OrdinalIgnoreCase));
         if (old is not null) dicts[dicts.IndexOf(old)] = next;
         else dicts.Insert(Math.Min(1, dicts.Count), next);
+        ViewModels.CardGrid.MinCard = density == UiDensity.Comfortable ? 250 : 210;
     }
 
     /// <summary>Windows 10 1809+ / 11'de başlık çubuğunu temaya uydurur.</summary>

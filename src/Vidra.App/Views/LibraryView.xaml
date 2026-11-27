@@ -3,6 +3,37 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:Vidra.App.Controls"
              x:Name="Root">
+  <UserControl.Resources>
+    <!-- Dosya menüsü: kart ve liste satırı paylaşır. Ayrı görsel ağaçta; komutlar hedefin Tag'indeki (Kuyruk ekranı) görünüm modelinden -->
+    <ContextMenu x:Key="FileMenu" x:Shared="False">
+        <MenuItem Header="Oynat" CommandParameter="{Binding}"
+                  Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+          <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Klasörde göster" CommandParameter="{Binding}"
+                  Command="{Binding PlacementTarget.Tag.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+          <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Header="Farklı kalitede indir…" CommandParameter="{Binding}"
+                  Command="{Binding PlacementTarget.Tag.ReopenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+          <MenuItem.Icon><c:Icon Data="{StaticResource I.Video}" Size="15" /></MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
+                  Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+          <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
+                  Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+          <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Header="Geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
+                  Command="{Binding PlacementTarget.Tag.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+          <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
+        </MenuItem>
+    </ContextMenu>
+  </UserControl.Resources>
   <Grid Margin="{DynamicResource PagePadFill}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -16,8 +47,8 @@
                VerticalAlignment="Center" AutomationProperties.Name="Kütüphane görünümü" />
       <StackPanel Margin="0,0,16,0">
         <TextBlock Style="{StaticResource H1}" Text="Kütüphane" />
-        <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,4,0,0"
-                   Text="İndirdiğin ve hâlâ diskte duran dosyalar. Kurslar &amp; Listeler sekmesinde ders sırasını ve izlenme durumunu takip edebilirsin." />
+        <TextBlock Style="{StaticResource Small}" HorizontalAlignment="Left" Margin="0,2,0,0"
+                   Text="Diskte duran indirmeler. Çift tık oynatır, sağ tık tüm işlemler." />
       </StackPanel>
     </DockPanel>
 
@@ -34,6 +65,19 @@
                Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}" />
       <ComboBox Width="150" ItemsSource="{Binding Sorts}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Sort}" Margin="0,0,12,8"
                 Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}" ToolTip="Sıralama" AutomationProperties.Name="Sıralama" />
+      <Border BorderBrush="{DynamicResource Line2}" BorderThickness="1" CornerRadius="10" Margin="0,0,12,8" VerticalAlignment="Center"
+              Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}">
+        <StackPanel Orientation="Horizontal">
+          <ToggleButton Style="{StaticResource IconToggle}" ToolTip="Kart ızgarası" AutomationProperties.Name="Kart ızgarası"
+                        IsChecked="{Binding ListView, Converter={StaticResource Not}, Mode=OneWay}" Command="{Binding SetListViewCommand}" CommandParameter="grid">
+            <c:Icon Data="{StaticResource I.Grid}" Size="15" />
+          </ToggleButton>
+          <ToggleButton Style="{StaticResource IconToggle}" ToolTip="Satır listesi" AutomationProperties.Name="Satır listesi"
+                        IsChecked="{Binding ListView, Mode=OneWay}" Command="{Binding SetListViewCommand}" CommandParameter="list">
+            <c:Icon Data="{StaticResource I.Rows}" Size="15" />
+          </ToggleButton>
+        </StackPanel>
+      </Border>
       <TextBlock Style="{StaticResource Small}" VerticalAlignment="Center" Margin="0,0,0,8" Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}">
         <Run Text="{Binding Count, Mode=OneWay}" /> dosya · <Run Text="{Binding TotalSize, Mode=OneWay, Converter={StaticResource Bytes}}" />
       </TextBlock>
@@ -44,7 +88,56 @@
 
     <!-- ============ 1. Dosyalar ızgarası ============ -->
     <Grid Grid.Row="2" Visibility="{Binding ShowFiles, Converter={StaticResource Vis}}">
-      <ItemsControl ItemsSource="{Binding Cards.Rows}" Style="{StaticResource VirtualList}" SizeChanged="Cards_SizeChanged">
+      <!-- Satır listesi: kapak küçük, tek satır; aynı menü ve çift tık davranışı -->
+      <ItemsControl ItemsSource="{Binding Items}" Style="{StaticResource VirtualList}" Visibility="{Binding ShowList, Converter={StaticResource Vis}}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border x:Name="Row" Padding="8,5" CornerRadius="8" Background="Transparent" Tag="{Binding DataContext.Actions, ElementName=Root}"
+                    ContextMenu="{StaticResource FileMenu}"
+                    PreviewMouseLeftButtonDown="Card_PreviewMouseLeftButtonDown" MouseMove="Card_MouseMove">
+              <Border.InputBindings>
+                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.Actions.OpenOrRevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
+              </Border.InputBindings>
+              <DockPanel>
+                <StackPanel x:Name="RowActions" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Hidden" Margin="8,0,0,0">
+                  <Button Style="{StaticResource BtnGhostIcon}" ToolTip="Oynat" AutomationProperties.Name="Oynat" CommandParameter="{Binding}"
+                          Command="{Binding DataContext.Actions.OpenCommand, ElementName=Root}">
+                    <c:Icon Data="{StaticResource I.Play}" Size="15" />
+                  </Button>
+                  <Button Style="{StaticResource BtnGhostIcon}" ToolTip="Klasörde göster" AutomationProperties.Name="Klasörde göster" CommandParameter="{Binding}"
+                          Command="{Binding DataContext.Actions.RevealCommand, ElementName=Root}">
+                    <c:Icon Data="{StaticResource I.Folder}" Size="15" />
+                  </Button>
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Mono}" FontSize="12" VerticalAlignment="Center" Width="64" TextAlignment="Right"
+                           Text="{Binding Size, Converter={StaticResource Bytes}}" />
+                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Mono}" FontSize="12" VerticalAlignment="Center" Width="56" TextAlignment="Right"
+                           Text="{Binding Duration, Converter={StaticResource Dur}}" />
+                <Grid DockPanel.Dock="Left" Width="64" Height="36" Margin="0,0,12,0">
+                  <Border x:Name="RowMask" CornerRadius="5" Background="{DynamicResource ThumbBg}" />
+                  <Image Source="{Binding ThumbUrl, Converter={StaticResource Thumb}, ConverterParameter=128}" Stretch="UniformToFill">
+                    <Image.OpacityMask><VisualBrush Visual="{Binding ElementName=RowMask}" /></Image.OpacityMask>
+                  </Image>
+                </Grid>
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                  <TextBlock Style="{StaticResource Small}" FontSize="12" TextTrimming="CharacterEllipsis">
+                    <Run Text="{Binding Channel, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Options, Mode=OneWay, Converter={StaticResource Desc}}" /><Run Text=" · " /><Run Text="{Binding FinishedAt, Mode=OneWay, Converter={StaticResource Rel}}" />
+                  </TextBlock>
+                </StackPanel>
+              </DockPanel>
+            </Border>
+            <DataTemplate.Triggers>
+              <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
+                <Setter TargetName="Row" Property="Background" Value="{DynamicResource Surface2}" />
+                <Setter TargetName="RowActions" Property="Visibility" Value="Visible" />
+              </Trigger>
+            </DataTemplate.Triggers>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <ItemsControl ItemsSource="{Binding Cards.Rows}" Style="{StaticResource VirtualList}" SizeChanged="Cards_SizeChanged"
+                    Visibility="{Binding ShowGrid, Converter={StaticResource Vis}}">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
             <ItemsControl ItemsSource="{Binding}">
@@ -53,8 +146,9 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Border Margin="0,0,16,16" Padding="10" CornerRadius="14" BorderThickness="1" Background="{DynamicResource Surface}"
+                  <Border x:Name="CardRoot" Margin="0,0,16,16" Padding="10" CornerRadius="14" BorderThickness="1" Background="{DynamicResource Surface}"
                           Tag="{Binding DataContext.Actions, ElementName=Root}"
+                          ContextMenu="{StaticResource FileMenu}"
                           PreviewMouseLeftButtonDown="Card_PreviewMouseLeftButtonDown" MouseMove="Card_MouseMove">
                     <Border.Style>
                       <Style TargetType="Border">
@@ -68,36 +162,6 @@
                       <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DataContext.Actions.OpenOrRevealCommand, ElementName=Root}" CommandParameter="{Binding}" />
                     </Border.InputBindings>
                     <!-- Menü ayrı bir görsel ağaçta: komutlara kartın Tag'indeki (Kuyruk ekranı) görünüm modeli üzerinden ulaşılır -->
-                    <Border.ContextMenu>
-                      <ContextMenu>
-                        <MenuItem Header="Oynat" CommandParameter="{Binding}"
-                                  Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Play}" Size="15" /></MenuItem.Icon>
-                        </MenuItem>
-                        <MenuItem Header="Klasörde göster" CommandParameter="{Binding}"
-                                  Command="{Binding PlacementTarget.Tag.RevealCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Folder}" Size="15" /></MenuItem.Icon>
-                        </MenuItem>
-                        <Separator />
-                        <MenuItem Header="Farklı kalitede indir…" CommandParameter="{Binding}"
-                                  Command="{Binding PlacementTarget.Tag.ReopenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Video}" Size="15" /></MenuItem.Icon>
-                        </MenuItem>
-                        <MenuItem Header="Bağlantıyı kopyala" CommandParameter="{Binding}"
-                                  Command="{Binding PlacementTarget.Tag.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Link}" Size="15" /></MenuItem.Icon>
-                        </MenuItem>
-                        <MenuItem Header="YouTube'da aç" CommandParameter="{Binding}"
-                                  Command="{Binding PlacementTarget.Tag.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                          <MenuItem.Icon><c:Icon Data="{StaticResource I.External}" Size="15" /></MenuItem.Icon>
-                        </MenuItem>
-                        <Separator />
-                        <MenuItem Header="Geri dönüşüm kutusuna taşı" Style="{StaticResource MenuDanger}" CommandParameter="{Binding}"
-                                  Command="{Binding PlacementTarget.Tag.DeleteFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
-                          <MenuItem.Icon><c:Icon Data="{StaticResource I.Trash}" Size="15" /></MenuItem.Icon>
-                        </MenuItem>
-                      </ContextMenu>
-                    </Border.ContextMenu>
                     <StackPanel>
                       <Grid Height="{Binding DataContext.Cards.ThumbHeight, ElementName=Root}">
                         <Border x:Name="Mask" CornerRadius="8" Background="{DynamicResource ThumbBg}" />
@@ -112,6 +176,21 @@
                                 Visibility="{Binding Options.Mode, Converter={StaticResource EqVis}, ConverterParameter=Audio}">
                           <c:Icon Data="{StaticResource I.Music}" Size="14" Foreground="White" />
                         </Border>
+                        <!-- Üzerine gelince: oynat / klasör / YouTube (çift tık oynatır, sağ tık tüm işlemler) -->
+                        <StackPanel x:Name="HoverActions" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Hidden">
+                          <Button Style="{StaticResource BtnIcon}" Margin="0,0,6,0" ToolTip="Oynat" AutomationProperties.Name="Oynat" CommandParameter="{Binding}"
+                                  Command="{Binding DataContext.Actions.OpenCommand, ElementName=Root}">
+                            <c:Icon Data="{StaticResource I.Play}" Size="15" />
+                          </Button>
+                          <Button Style="{StaticResource BtnIcon}" Margin="0,0,6,0" ToolTip="Klasörde göster" AutomationProperties.Name="Klasörde göster" CommandParameter="{Binding}"
+                                  Command="{Binding DataContext.Actions.RevealCommand, ElementName=Root}">
+                            <c:Icon Data="{StaticResource I.Folder}" Size="15" />
+                          </Button>
+                          <Button Style="{StaticResource BtnIcon}" ToolTip="YouTube'da aç" AutomationProperties.Name="YouTube'da aç" CommandParameter="{Binding Url}"
+                                  Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <c:Icon Data="{StaticResource I.External}" Size="15" />
+                          </Button>
+                        </StackPanel>
                       </Grid>
                       <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Height="32"
                                  LineHeight="16" LineStackingStrategy="BlockLineHeight" Margin="2,8,2,0" ToolTip="{Binding Title}" />
@@ -121,16 +200,13 @@
                       <TextBlock Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" Margin="2,2,2,0">
                         <Run Text="{Binding Options, Mode=OneWay, Converter={StaticResource Desc}}" /><Run Text=" · " /><Run Text="{Binding FinishedAt, Mode=OneWay, Converter={StaticResource Rel}}" />
                       </TextBlock>
-                      <WrapPanel Margin="0,8,0,0">
-                        <Button Style="{StaticResource BtnSm}" Content="Oynat" Margin="0,0,6,0" CommandParameter="{Binding}"
-                                Command="{Binding DataContext.Actions.OpenCommand, ElementName=Root}" />
-                        <Button Style="{StaticResource BtnSm}" Content="Klasör" Margin="0,0,6,0" CommandParameter="{Binding}"
-                                Command="{Binding DataContext.Actions.RevealCommand, ElementName=Root}" />
-                        <Button Style="{StaticResource BtnSm}" Content="YouTube" CommandParameter="{Binding Url}"
-                                Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
-                      </WrapPanel>
                     </StackPanel>
                   </Border>
+                  <DataTemplate.Triggers>
+                    <Trigger SourceName="CardRoot" Property="IsMouseOver" Value="True">
+                      <Setter TargetName="HoverActions" Property="Visibility" Value="Visible" />
+                    </Trigger>
+                  </DataTemplate.Triggers>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>

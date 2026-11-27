@@ -7,10 +7,10 @@
     <!-- Durum rozeti renkleri -->
     <Style x:Key="StatusPill" TargetType="Border">
       <Setter Property="CornerRadius" Value="12" />
-      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="Padding" Value="8,2" />
       <Setter Property="Background" Value="{DynamicResource Raised}" />
       <Setter Property="TextElement.Foreground" Value="{DynamicResource Text2}" />
-      <Setter Property="TextElement.FontSize" Value="12.5" />
+      <Setter Property="TextElement.FontSize" Value="12" />
       <Setter Property="TextElement.FontWeight" Value="SemiBold" />
       <Style.Triggers>
         <DataTrigger Binding="{Binding Status}" Value="Running">
@@ -39,9 +39,9 @@
       </Style.Triggers>
     </Style>
     <Style x:Key="JobCard" TargetType="Border" BasedOn="{StaticResource Card}">
-      <Setter Property="CornerRadius" Value="14" />
-      <Setter Property="Padding" Value="16,12" />
-      <Setter Property="Margin" Value="0,0,0,10" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Margin" Value="0,0,0,6" />
       <Style.Triggers>
         <DataTrigger Binding="{Binding Status}" Value="Error">
           <Setter Property="BorderBrush" Value="{DynamicResource WarnLine}" />
@@ -73,7 +73,7 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="{DynamicResource Raised}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
-      <Setter Property="Padding" Value="16,10" />
+      <Setter Property="Padding" Value="12,6" />
       <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Surface2}" /></Trigger>
       </Style.Triggers>
@@ -291,46 +291,43 @@
                       <c:Icon Data="{StaticResource I.More}" Size="18" Thickness="3" />
                     </Button>
                   </StackPanel>
-                  <Border DockPanel.Dock="Left" Width="96" Height="54" CornerRadius="8" Background="{DynamicResource ThumbBg}" Margin="0,0,14,0">
-                    <Border.Clip><RectangleGeometry Rect="0,0,96,54" RadiusX="8" RadiusY="8" /></Border.Clip>
-                    <Image Source="{Binding Thumbnail, Converter={StaticResource Thumb}, ConverterParameter=192}" Stretch="UniformToFill" />
+                  <Border DockPanel.Dock="Left" Width="72" Height="40" CornerRadius="6" Background="{DynamicResource ThumbBg}" Margin="0,0,12,0" VerticalAlignment="Center">
+                    <Border.Clip><RectangleGeometry Rect="0,0,72,40" RadiusX="6" RadiusY="6" /></Border.Clip>
+                    <Image Source="{Binding Thumbnail, Converter={StaticResource Thumb}, ConverterParameter=144}" Stretch="UniformToFill" />
                   </Border>
-                  <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
-                    <!-- Kaynak (ör. "Playlist: …") yalnızca varsa: boşken ayraç da görünmesin -->
-                    <DockPanel Margin="0,4,0,0">
-                      <TextBlock DockPanel.Dock="Left" Text="{Binding Options, Converter={StaticResource Desc}}" Style="{StaticResource Mono}" VerticalAlignment="Center" />
-                      <TextBlock Text="{Binding Source, StringFormat='  ·  {0}'}" Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                  <!-- Tek satırlık iş: başlık; altında biçim/kaynak ve sağda ilerleme rakamları; en altta ince şerit -->
+                  <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                    <DockPanel Margin="0,2,0,0">
+                      <StackPanel x:Name="Stats" DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center"
+                                  TextElement.FontFamily="{StaticResource MonoFont}" TextElement.FontSize="12" TextElement.Foreground="{DynamicResource Text2}">
+                        <TextBlock Text="{Binding Percent, StringFormat={}%{0:0}}" Margin="0,0,12,0" />
+                        <TextBlock Margin="0,0,12,0"><Run Text="{Binding Downloaded, Mode=OneWay, Converter={StaticResource Bytes}}" /> / <Run Text="{Binding Total, Mode=OneWay, Converter={StaticResource Bytes}}" /></TextBlock>
+                        <TextBlock Text="{Binding Speed, Converter={StaticResource Bytes}, ConverterParameter=speed}" Margin="0,0,12,0" />
+                        <TextBlock Visibility="{Binding Eta, Converter={StaticResource Vis}}"><Run Text="kalan" /> <Run Text="{Binding Eta, Mode=OneWay, Converter={StaticResource Dur}}" /></TextBlock>
+                      </StackPanel>
+                      <!-- Kaynak (ör. "Playlist: …") yalnızca varsa: boşken ayraç da görünmesin -->
+                      <TextBlock DockPanel.Dock="Left" Text="{Binding Options, Converter={StaticResource Desc}}" Style="{StaticResource Mono}" FontSize="12" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding Source, StringFormat='  ·  {0}'}" Style="{StaticResource Small}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                  Visibility="{Binding Source, Converter={StaticResource Vis}}" />
                     </DockPanel>
+                    <ProgressBar x:Name="Bar" Style="{StaticResource JobBar}" Height="4" Margin="0,6,0,0" Maximum="100" Value="{Binding Percent, Mode=OneWay}" />
                   </StackPanel>
                 </DockPanel>
 
-                <!-- İlerleme -->
-                <StackPanel Margin="0,12,0,0">
-                  <StackPanel.Style>
-                    <Style TargetType="StackPanel">
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </StackPanel.Style>
-                  <ProgressBar Style="{StaticResource JobBar}" Maximum="100" Value="{Binding Percent, Mode=OneWay}" />
-                  <WrapPanel Margin="0,6,0,0" TextElement.FontFamily="{StaticResource MonoFont}" TextElement.FontSize="12.5" TextElement.Foreground="{DynamicResource Text2}">
-                    <TextBlock Text="{Binding Percent, StringFormat={}%{0:0}}" Margin="0,0,18,0" />
-                    <TextBlock Margin="0,0,18,0"><Run Text="{Binding Downloaded, Mode=OneWay, Converter={StaticResource Bytes}}" /> / <Run Text="{Binding Total, Mode=OneWay, Converter={StaticResource Bytes}}" /></TextBlock>
-                    <TextBlock Text="{Binding Speed, Converter={StaticResource Bytes}, ConverterParameter=speed}" Margin="0,0,18,0" />
-                    <TextBlock Visibility="{Binding Eta, Converter={StaticResource Vis}}"><Run Text="kalan" /> <Run Text="{Binding Eta, Mode=OneWay, Converter={StaticResource Dur}}" /></TextBlock>
-                  </WrapPanel>
-                </StackPanel>
-
                 <!-- Hata -->
-                <Border Style="{StaticResource Notice}" Margin="0,12,0,0" Padding="12,10" Visibility="{Binding ErrorMessage, Converter={StaticResource Vis}}">
+                <Border Style="{StaticResource Notice}" Margin="0,8,0,0" Padding="10,6" Visibility="{Binding ErrorMessage, Converter={StaticResource Vis}}">
                   <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                       <Button Style="{StaticResource BtnSm}" Content="Hesabım" Margin="0,0,8,0" Command="{Binding DataContext.OpenAccountCommand, ElementName=Root}">
                         <Button.Visibility>
-                          <Binding Path="ErrorKind" Converter="{StaticResource EqVis}" ConverterParameter="Auth" />
+                          <Binding Path="ErrorKind" Converter="{StaticResource EqVis}" ConverterParameter="Auth|BotCheck" />
+                        </Button.Visibility>
+                      </Button>
+                      <Button Style="{StaticResource BtnSm}" Content="yt-dlp'yi güncelle" Margin="0,0,8,0" ToolTip="Ayarlar › Bileşenler: YouTube değişince çoğu hata güncellemeyle düzelir"
+                              Command="{Binding DataContext.OpenComponentsCommand, ElementName=Root}">
+                        <Button.Visibility>
+                          <Binding Path="ErrorKind" Converter="{StaticResource EqVis}" ConverterParameter="Unknown" />
                         </Button.Visibility>
                       </Button>
                       <Button Style="{StaticResource BtnSm}" Content="Günlük" Margin="0,0,8,0" ToolTip="yt-dlp'nin bu işteki çıktısı"
@@ -342,6 +339,12 @@
                 </Border>
               </StackPanel>
             </Border>
+            <DataTemplate.Triggers>
+              <DataTrigger Binding="{Binding Status}" Value="Error">
+                <Setter TargetName="Bar" Property="Visibility" Value="Collapsed" />
+                <Setter TargetName="Stats" Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
+            </DataTemplate.Triggers>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

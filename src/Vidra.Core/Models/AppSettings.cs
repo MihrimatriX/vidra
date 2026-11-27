@@ -67,6 +67,9 @@ public sealed class AppSettings
     /// <summary>Playlist/kanal ekranında kart ızgarası (false: satır listesi).</summary>
     public bool PlaylistCards { get; set; } = true;
 
+    /// <summary>Kütüphane dosyaları satır listesi olarak (false: kart ızgarası).</summary>
+    public bool LibraryList { get; set; }
+
     /// <summary>Eklenti çerez gönderince oturumsuz Vidra kendiliğinden eklenti oturumuna geçsin. Eklenti oturumundan çıkış kapatır.</summary>
     public bool ExtensionSync { get; set; } = true;
 

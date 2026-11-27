@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -101,10 +102,11 @@ public sealed class EqualsConverter : IValueConverter
 }
 
 /// <summary>Değer parametreye eşitse Visible (sekme içerikleri için).</summary>
+/// <summary>Değer parametreye eşitse görünür; parametre "A|B" biçiminde birden çok değer alabilir.</summary>
 public sealed class EqualsVisConverter : IValueConverter
 {
     public object Convert(object? value, Type t, object? p, CultureInfo c) =>
-        string.Equals(value?.ToString(), p?.ToString(), StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
+        value?.ToString() is { } v && (p?.ToString() ?? "").Split('|').Contains(v, StringComparer.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
 
     public object ConvertBack(object? value, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
 }

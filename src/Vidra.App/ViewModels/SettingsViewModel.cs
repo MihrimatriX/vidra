@@ -68,6 +68,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     ];
 
     [ObservableProperty] private string? _notice;
+
+    /// <summary>Ayarlar açılınca kaydırılacak bölüm (ör. "SecTools"); görünüm okuyup temizler.</summary>
+    public string? PendingSection { get; set; }
     [ObservableProperty] private string? _updateLog;
     [ObservableProperty] private bool _updating;
 
