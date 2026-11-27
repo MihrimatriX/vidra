@@ -71,6 +71,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>Ayarlar açılınca kaydırılacak bölüm (ör. "SecTools"); görünüm okuyup temizler.</summary>
     public string? PendingSection { get; set; }
+
+    /// <summary>Ayarlar'da gelişmiş bölümler (Ağ &amp; performans, Bileşenler) açık mı; oturum boyunca hatırlanır.</summary>
+    public bool ShowAdvanced { get; set; }
     [ObservableProperty] private string? _updateLog;
     [ObservableProperty] private bool _updating;
 

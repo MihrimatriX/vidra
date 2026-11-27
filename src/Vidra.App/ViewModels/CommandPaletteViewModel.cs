@@ -196,7 +196,7 @@ public sealed partial class CommandPaletteViewModel(AppHost host, MainViewModel 
     {
         if (!main.CookieActive)
         {
-            main.ShowToast("Hesap akışları için önce giriş yapmalısın", "Giriş yap", () => main.AccountStatusCommand.Execute(null));
+            main.ShowToast("Hesap akışları için önce giriş yapmalısın", "Giriş yap", () => main.Account.SignInCommand.Execute(null));
             return;
         }
         await main.Account.OpenFeedCommand.ExecuteAsync(f);
