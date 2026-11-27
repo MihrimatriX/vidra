@@ -283,6 +283,20 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- İsteğe bağlı: PO token sağlayıcısı (bgutil, Deno ile betik modu) -->
+            <Border Style="{StaticResource Tile}" Margin="0,0,10,10">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                  <Button Style="{StaticResource BtnSm}" Content="Kur" Margin="8,0,0,0" Command="{Binding InstallPotCommand}"
+                          IsEnabled="{Binding Updating, Converter={StaticResource Not}}" Visibility="{Binding PotInstalled, Converter={StaticResource Vis}, ConverterParameter=!}" />
+                  <Button Style="{StaticResource BtnSm}" Content="Kaldır" Margin="8,0,0,0" Command="{Binding RemovePotCommand}"
+                          IsEnabled="{Binding Updating, Converter={StaticResource Not}}" Visibility="{Binding PotInstalled, Converter={StaticResource Vis}}" />
+                </StackPanel>
+                <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="420" Margin="0" IsChecked="{Binding PoTokenProvider}"
+                          IsEnabled="{Binding Updating, Converter={StaticResource Not}}"
+                          Content="PO token sağlayıcısı (deneysel)" Tag="{Binding PotHint}" />
+              </DockPanel>
+            </Border>
             <TextBox Text="{Binding UpdateLog, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" FontSize="12.5"
                      Height="120" VerticalContentAlignment="Top" Padding="8" Background="{DynamicResource Surface2}" Margin="0,4,0,12"
                      Visibility="{Binding UpdateLog, Converter={StaticResource Vis}}" VerticalScrollBarVisibility="Auto" />

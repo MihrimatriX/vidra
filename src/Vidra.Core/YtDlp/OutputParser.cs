@@ -126,7 +126,7 @@ public static partial class OutputParser
         ErrorKind.Auth => "Bu video giriş veya kanal üyeliği istiyor. Hesabım ekranından giriş yap ya da oturumu yenile.",
         ErrorKind.BotCheck => "YouTube bu bağlantıdan bot doğrulaması istiyor. Hesabım ekranından giriş yap; VPN kullanıyorsan kapatmayı ya da bir süre beklemeyi dene.",
         ErrorKind.RateLimited => "YouTube geçici bir istek sınırı uyguladı. Vidra kuyruğu bir süre bekletip kendiliğinden yeniden dener; sık oluyorsa nazik modu Güvenli yap.",
-        ErrorKind.Forbidden => "YouTube bu videonun akışlarını vermedi (403 / biçim yok). Genelde yt-dlp eskidiğinde olur: yt-dlp'yi güncelle. Sürerse PO token sağlayıcısını aç.",
+        ErrorKind.Forbidden => "YouTube bu videonun akışlarını vermedi (403 / biçim yok). Genelde yt-dlp eskidiğinde olur: yt-dlp'yi güncelle. Sürerse Ayarlar › Bileşenler'den PO token sağlayıcısını aç.",
         ErrorKind.Unavailable => "Video kaldırılmış, özel ya da bölgende erişilemiyor.",
         ErrorKind.Ffmpeg => "ffmpeg işlemi başarısız oldu: " + message,
         ErrorKind.Network => "Bağlantı hatası: " + message,

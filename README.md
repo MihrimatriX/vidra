@@ -168,6 +168,10 @@ yalnızca şu durumlarda olur ve indirme ekranında yazar: ses MP3/FLAC/WAV'a d�
 - **YouTube sınırları:** 429, "try again later" ya da bot doğrulaması gelince Vidra kuyruğu bekletir (5 → 15 → 45 → 60 dk),
   süre dolunca işleri kendiliğinden yeniden dener ve bir süre tek tek indirir; kenar çubuğundaki **YouTube durumu** geri sayımı gösterir.
   Ağ ve 403 hatalarında yalnızca o iş 30 sn / 2 dk sonra yeniden denenir. yt-dlp günde bir kez, kuyruk boşken kendiliğinden güncellenir.
+- **PO token (deneysel):** YouTube bazı videolarda PO token ister; yoksa 403 ya da "Requested format is not available" görülür.
+  Ayarlar › Bileşenler'den [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) 2.0.2
+  kurulabilir: eklenti `yt-dlp-plugins` klasörüne, betik `bgutil-pot/server` klasörüne iner ve token'lar Vidra'nın Deno'suyla
+  (betik modu, ayrı sunucu yok) üretilir; `mweb` istemcisi varsayılanlara eklenir. Varsayılan kapalı.
 - **Hesap riski:** yt-dlp ekibi, çerezle yoğun indirmenin hesabın/IP'nin işaretlenmesine yol açabileceği konusunda uyarıyor.
   Nazik mod (Kapalı / **Dengeli** / Güvenli) istekler arasına bekleme ekler; saatlik sınıra yaklaşınca kendiliğinden Güvenli'ye geçer.
   Mümkünse ikincil bir hesap kullan.

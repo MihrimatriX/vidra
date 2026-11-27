@@ -288,3 +288,57 @@ public class YtDlpFreshnessTests
     [InlineData("yt-dlp is up to date (stable@2026.11.20 from yt-dlp/yt-dlp)", null)]
     public void Parses_update_output(string output, string? version) => Assert.Equal(version, Vidra.Core.Tools.YtDlpFreshness.UpdatedTo(output));
 }
+
+public class PoTokenTests
+{
+    private static readonly ToolPaths Plain = new("y", "b", "d", "a");
+    private static readonly ToolPaths WithPot = new("y", "b", "d", "a", @"C:\v\bgutil-pot\server", @"C:\v\yt-dlp-plugins");
+
+    [Fact]
+    public void Provider_args_only_when_enabled_and_installed()
+    {
+        var on = new AppSettings { PoTokenProvider = true };
+        Assert.Empty(YtDlpArgs.PoToken(on, Plain));
+        Assert.Empty(YtDlpArgs.PoToken(new AppSettings(), WithPot));
+        var a = YtDlpArgs.PoToken(on, WithPot);
+        Assert.Equal(@"C:\v\yt-dlp-plugins", a[a.IndexOf("--plugin-dirs") + 1]);
+        Assert.Contains(@"youtubepot-bgutilscript:server_home=C:\v\bgutil-pot\server", a);
+        Assert.Contains("youtube:player_client=default,mweb", a);
+        // Hem analizde hem indirmede
+        Assert.Contains("--plugin-dirs", YtDlpArgs.Probe("u", LinkKind.Video, on, WithPot));
+    }
+
+    [Fact]
+    public void Extracts_server_subtree_and_rejects_zip_slip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "vidra-pot-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var zip = Path.Combine(dir, "src.zip");
+            using (var z = System.IO.Compression.ZipFile.Open(zip, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                void Add(string name, string text)
+                {
+                    using var w = new StreamWriter(z.CreateEntry(name).Open());
+                    w.Write(text);
+                }
+                z.CreateEntry("repo-2.0.2/server/");
+                Add("repo-2.0.2/server/src/generate_once.ts", "x");
+                Add("repo-2.0.2/server/package.json", "{}");
+                Add("repo-2.0.2/plugin/x.py", "no");
+            }
+            var dest = Path.Combine(dir, "out", "server");
+            Vidra.Core.Tools.ToolManager.ExtractSubtree(zip, "server/", dest);
+            Assert.True(File.Exists(Path.Combine(dest, "src", "generate_once.ts")));
+            Assert.True(File.Exists(Path.Combine(dest, "package.json")));
+            Assert.False(Directory.Exists(Path.Combine(dir, "out", "plugin")));
+
+            var bad = Path.Combine(dir, "bad.zip");
+            using (var z = System.IO.Compression.ZipFile.Open(bad, System.IO.Compression.ZipArchiveMode.Create))
+                z.CreateEntry("repo/server/../../evil.txt");
+            Assert.Throws<InvalidDataException>(() => Vidra.Core.Tools.ToolManager.ExtractSubtree(bad, "server/", Path.Combine(dir, "o2", "server")));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+}

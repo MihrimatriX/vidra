@@ -4,7 +4,9 @@ using Vidra.Core.Models;
 namespace Vidra.Core.YtDlp;
 
 /// <summary>Bileşenlerin yeri. ffmpeg/ffprobe/deno aynı klasörde olmak zorunda değil ama genelde öyledir.</summary>
-public sealed record ToolPaths(string YtDlp, string FfmpegDir, string Deno, string ArchiveFile);
+/// <param name="PotServerHome">Kuruluysa bgutil PO token betiğinin klasörü (server_home).</param>
+/// <param name="PluginDir">yt-dlp eklenti klasörü (--plugin-dirs).</param>
+public sealed record ToolPaths(string YtDlp, string FfmpegDir, string Deno, string ArchiveFile, string? PotServerHome = null, string? PluginDir = null);
 
 /// <summary>
 /// Saf fonksiyonlar: ayarlar + seçim → yt-dlp argüman listesi.
@@ -224,11 +226,23 @@ public static class YtDlpArgs
             "--js-runtimes", $"deno:{t.Deno}",
         };
         if (!string.IsNullOrWhiteSpace(s.Proxy)) a.AddRange(["--proxy", s.Proxy.Trim()]);
+        a.AddRange(PoToken(s, t));
         a.AddRange(Cookies(s.Cookies));
         // Analiz/arama hızlı kalsın: yalnızca Güvenli modda ve oturumla (hesap işaretlenme riski) istekler arası bekleme
         if (s.EffectivePolite == PoliteLevel.Safe && s.Cookies is not NoCookies) a.AddRange(["--sleep-requests", "0.75"]);
         return a;
     }
+
+    /// <summary>
+    /// PO token sağlayıcısı (deneysel): bgutil eklentisi betik modunda, Vidra'nın Deno'suyla (--js-runtimes) token üretir.
+    /// yt-dlp wiki'sinin önerisi: GVS token'ı sağlanan mweb istemcisini varsayılanlara ekle.
+    /// </summary>
+    public static List<string> PoToken(AppSettings s, ToolPaths t) =>
+        s.PoTokenProvider && t.PotServerHome is { } home && t.PluginDir is { } dir
+            ? ["--plugin-dirs", dir,
+               "--extractor-args", $"youtubepot-bgutilscript:server_home={home}",
+               "--extractor-args", "youtube:player_client=default,mweb"]
+            : [];
 
     /// <summary>
     /// İndirmede istekler arası bekleme. Altyazı istekleri (timedtext) 429'un en sık kaynağı olduğu için

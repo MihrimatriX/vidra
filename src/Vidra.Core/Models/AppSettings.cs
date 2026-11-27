@@ -46,6 +46,9 @@ public sealed class AppSettings
 
     /// <summary>yt-dlp günde bir kez, kuyruk boşken kendiliğinden güncellenir (YouTube değişikliklerine karşı en etkili önlem).</summary>
     public bool AutoUpdateYtDlp { get; set; } = true;
+
+    /// <summary>Deneysel: bgutil PO token sağlayıcısı kuruluysa kullanılır (403 / "biçim yok" hatalarına karşı).</summary>
+    public bool PoTokenProvider { get; set; }
     public DateTimeOffset? LastYtDlpUpdateCheck { get; set; }
 
     public bool UseArchive { get; set; } = true;
