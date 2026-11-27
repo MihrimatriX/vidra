@@ -8,6 +8,3 @@
 ### Yenilikler
 
 ### Düzeltmeler
-
-- İndirmenin "0 bytes read … Giving up after 10 retries" ile düşmesi: yt-dlp'nin boş bıraktığı hata satırı yerine asıl neden gösterilir; YouTube akışı keserse iş oturumsuz ve taze bilgiyle kendiliğinden yeniden denenir.
-- Altyazı indirmede 429 hatası: nazik mod kapalıyken de altyazı istekleri arasında kısa bekleme var.
