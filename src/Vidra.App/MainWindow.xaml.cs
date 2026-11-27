@@ -51,7 +51,7 @@ public partial class MainWindow : Window
         var compact = ActualWidth < NavCompactBelow;
         if (compact == _vm.NavCompact && SideCol.Width.Value > 0) return;
         _vm.NavCompact = compact;
-        if (compact) SideCol.Width = new GridLength(60);
+        if (compact) SideCol.Width = new GridLength(64);
         else SideCol.SetResourceReference(ColumnDefinition.WidthProperty, "SideW");
     }
 

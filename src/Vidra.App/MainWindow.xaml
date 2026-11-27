@@ -92,7 +92,7 @@
     <!-- ============ Kenar menü ============ -->
     <Border Grid.RowSpan="2" Background="{DynamicResource Side}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,1,0" Padding="10,12,10,10">
       <!-- Dar pencerede (NavCompact) menü yalnızca ikonlara iner: yazılar gizlenir, adlar ipucunda.
-           Rozet sayıları Style="{x:Null}" ile bu kuralın dışında kalır. -->
+           Rozet sayıları açık BadgeText stiliyle bu kuralın dışında kalır (x:Null örtük stile geri düşer). -->
       <Border.Resources>
         <Style TargetType="TextBlock">
           <Style.Triggers>
@@ -135,7 +135,7 @@
           <Grid>
             <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Basket}" Margin="0,0,10,0" /><TextBlock Text="Sepet" /></StackPanel>
             <Border Style="{StaticResource NavBadge}" Background="{DynamicResource Raised}" Visibility="{Binding Basket.Items.Count, Converter={StaticResource Vis}}">
-              <TextBlock Style="{x:Null}" Text="{Binding Basket.Items.Count}" FontSize="11.5" FontWeight="Bold" />
+              <TextBlock Style="{StaticResource BadgeText}" Text="{Binding Basket.Items.Count}" FontSize="11.5" FontWeight="Bold" />
             </Border>
           </Grid>
         </RadioButton>
@@ -145,7 +145,7 @@
           <Grid>
             <DockPanel><c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Clock}" Margin="0,0,10,0" /><TextBlock Text="Kuyruk &amp; geçmiş" TextTrimming="CharacterEllipsis" Margin="0,0,26,0" /></DockPanel>
             <Border Style="{StaticResource NavBadge}" Background="{DynamicResource Accent}" Visibility="{Binding ActiveCount, Converter={StaticResource Vis}}">
-              <TextBlock Style="{x:Null}" Text="{Binding ActiveCount}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentInk}" />
+              <TextBlock Style="{StaticResource BadgeText}" Text="{Binding ActiveCount}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentInk}" />
             </Border>
           </Grid>
         </RadioButton>
@@ -195,7 +195,7 @@
               <!-- Takip edilen listelerden son ziyaretten beri kuyruğa eklenen yeni video sayısı -->
               <Border Style="{StaticResource NavBadge}" Background="{DynamicResource AccentSoft}" Margin="8,0,0,0"
                       Visibility="{Binding FollowNew, Converter={StaticResource Vis}}" ToolTip="Takip edilen listelerden gelen yeni videolar">
-                <TextBlock Style="{x:Null}" Foreground="{DynamicResource AccentStrong}" FontSize="11.5" FontWeight="Bold"><Run Text="+" /><Run Text="{Binding FollowNew, Mode=OneWay}" /></TextBlock>
+                <TextBlock Style="{StaticResource BadgeText}" Foreground="{DynamicResource AccentStrong}" FontSize="11.5" FontWeight="Bold"><Run Text="+" /><Run Text="{Binding FollowNew, Mode=OneWay}" /></TextBlock>
               </Border>
             </StackPanel>
           </Button>
