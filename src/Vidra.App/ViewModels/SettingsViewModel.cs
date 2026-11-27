@@ -52,6 +52,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public IReadOnlyList<Choice> RetryChoices => Choices.Retries;
     public IReadOnlyList<Choice> RateLimits => Choices.RateLimits;
     public IReadOnlyList<Choice> UpdateChannels => Choices.Channels;
+    public IReadOnlyList<Choice> PoliteLevels => Choices.PoliteLevels;
     public ObservableCollection<Toggle> SponsorCats { get; } = [];
     public ObservableCollection<ToolStatus> Tools { get; } = [];
 
@@ -133,7 +134,20 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
     }
 
-    public bool PoliteMode { get => S.PoliteMode; set => Set(s => s.PoliteMode = value); }
+    public PoliteLevel Polite
+    {
+        get => S.EffectivePolite;
+        set { Set(s => s.Polite = value); OnPropertyChanged(nameof(PoliteHint)); }
+    }
+
+    public string PoliteHint => S.EffectivePolite switch
+    {
+        PoliteLevel.Off => "Bekleme yok. Tek tük indirmede en hızlısı; toplu indirmede 429 riski yüksek.",
+        PoliteLevel.Safe => "yt-dlp'nin önerisi: videolar arası 10–20 sn, altyazılar arası 5 sn; oturumla aynı anda en fazla 2 iş. Büyük playlist'ler ve hesapla yoğun kullanım için.",
+        _ => "Videolar arası 3–8 sn, altyazılar arası 3 sn bekleme. Analiz ve arama hızlı kalır. YouTube sınırı gelirse Vidra kendiliğinden Güvenli'ye geçer.",
+    };
+
+    public bool AutoUpdateYtDlp { get => S.AutoUpdateYtDlp; set => Set(s => s.AutoUpdateYtDlp = value); }
 
     // ---- İndirme & dosyalar
     public string OutputDir { get => S.OutputDir; set => Set(s => s.OutputDir = value); }

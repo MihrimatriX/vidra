@@ -13,7 +13,8 @@ public sealed class ProbeException(string message, ErrorKind kind) : Exception(m
 public sealed record SessionTestResult(bool Ok, string Message, ErrorKind? Kind = null);
 
 /// <summary>Kısa ömürlü yt-dlp çağrıları: bilgi alma (probe) ve oturum testi.</summary>
-public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings)
+/// <param name="guard">Verilirse analizde alınan YouTube sınırı (429, bot doğrulaması) kuyruğu da soğumaya sokar.</param>
+public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings, Queue.RateGuard? guard = null)
 {
     public async Task<object> ProbeAsync(string rawUrl, ChannelTab tab = ChannelTab.Videos, int? limit = null, CancellationToken ct = default)
     {
@@ -78,6 +79,7 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
             var err = LastError(r.StdErr);
             if (OutputParser.MissingTab(err) is { } tab) throw new ProbeException($"Bu kanalda {tab.Label()} sekmesi yok.", ErrorKind.Unavailable);
             var k = OutputParser.Classify(err);
+            if (k is ErrorKind.RateLimited or ErrorKind.BotCheck) guard?.Trip(k);
             throw new ProbeException(OutputParser.FriendlyError(k, string.IsNullOrWhiteSpace(err) ? "Video bilgisi alınamadı." : err), k);
         }
         return JsonDocument.Parse(json);

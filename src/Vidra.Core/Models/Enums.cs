@@ -20,7 +20,11 @@ public enum UpdateChannel { Stable, Nightly }
 public enum JobStatus { Queued, Running, Processing, Paused, Done, Error, Canceled }
 
 /// <summary>Upcoming: canlı yayın/prömiyer henüz başlamadı (beklenerek indirilebilir).</summary>
-public enum ErrorKind { Auth, BotCheck, Unavailable, Network, Ffmpeg, RateLimited, Unknown, Upcoming }
+/// Forbidden: YouTube akışa erişimi reddetti (403) ya da istenen biçimi sunmadı — genelde eski yt-dlp veya eksik PO token.
+public enum ErrorKind { Auth, BotCheck, Unavailable, Network, Ffmpeg, RateLimited, Unknown, Upcoming, Forbidden }
+
+/// <summary>Nazik mod: istekler arasına konan bekleme. Dengeli varsayılandır; Güvenli yt-dlp'nin "-t sleep" önerisidir.</summary>
+public enum PoliteLevel { Off, Balanced, Safe }
 
 public enum LinkKind { Video, Playlist, Channel, Feed }
 
@@ -29,6 +33,13 @@ public enum ChannelTab { Videos, Shorts, Streams, Membership, Playlists, Courses
 
 public static class EnumText
 {
+    public static string Label(this PoliteLevel p) => p switch
+    {
+        PoliteLevel.Off => "Kapalı",
+        PoliteLevel.Safe => "Güvenli",
+        _ => "Dengeli",
+    };
+
     /// <summary>Original için uzantı akışlara göre belirlenir: bkz. Conversion.PredictExt.</summary>
     public static string Ext(this ContainerFormat c) => c.ToString().ToLowerInvariant();
     public static string Ext(this AudioFormat a) => a.ToString().ToLowerInvariant();

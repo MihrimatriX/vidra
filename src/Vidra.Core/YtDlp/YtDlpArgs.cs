@@ -225,15 +225,27 @@ public static class YtDlpArgs
         };
         if (!string.IsNullOrWhiteSpace(s.Proxy)) a.AddRange(["--proxy", s.Proxy.Trim()]);
         a.AddRange(Cookies(s.Cookies));
-        // Oturumla yoğun istek hesabın/IP'nin işaretlenmesine yol açabilir: araya bekleme koy
-        if (s.PoliteMode && s.Cookies is not NoCookies)
-            a.AddRange(["--sleep-requests", "1", "--sleep-interval", "2", "--max-sleep-interval", "6"]);
+        // Analiz/arama hızlı kalsın: yalnızca Güvenli modda ve oturumla (hesap işaretlenme riski) istekler arası bekleme
+        if (s.EffectivePolite == PoliteLevel.Safe && s.Cookies is not NoCookies) a.AddRange(["--sleep-requests", "0.75"]);
         return a;
     }
 
-    public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null)
+    /// <summary>
+    /// İndirmede istekler arası bekleme. Altyazı istekleri (timedtext) 429'un en sık kaynağı olduğu için
+    /// --sleep-subtitles her seviyede var. Güvenli = yt-dlp'nin "-t sleep" ön ayarı.
+    /// </summary>
+    public static List<string> PoliteArgs(PoliteLevel level) => level switch
+    {
+        PoliteLevel.Balanced => ["--sleep-requests", "0.75", "--sleep-subtitles", "3", "--sleep-interval", "3", "--max-sleep-interval", "8"],
+        PoliteLevel.Safe => ["--sleep-requests", "0.75", "--sleep-subtitles", "5", "--sleep-interval", "10", "--max-sleep-interval", "20"],
+        _ => [],
+    };
+
+    /// <param name="polite">Kuyruğun o anki nazik mod seviyesi (bkz. RateGuard); verilmezse ayardaki.</param>
+    public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null, PoliteLevel? polite = null)
     {
         var a = Base(s, t);
+        a.AddRange(PoliteArgs(polite ?? s.EffectivePolite));
         a.AddRange([
             "--newline",
             "--progress", // --print, --quiet'i ima eder; ilerlemeyi yine de istiyoruz

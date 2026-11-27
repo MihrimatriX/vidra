@@ -194,6 +194,28 @@
               <TextBlock Text="{Binding CookieLabel}" FontSize="12.5" FontWeight="Normal" />
             </StackPanel>
           </Button>
+          <!-- YouTube durumu: soğuma geri sayımı, saatlik sınır, yt-dlp yaşı; tıklayınca ilgili çözüm -->
+          <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" HorizontalAlignment="Left" HorizontalContentAlignment="Left" Foreground="{DynamicResource Muted}"
+                  Command="{Binding HealthActionCommand}" ToolTip="{Binding HealthTip}" AutomationProperties.Name="YouTube durumu">
+            <StackPanel Orientation="Horizontal">
+              <Ellipse Width="7" Height="7" Margin="0,0,7,0">
+                <Ellipse.Style>
+                  <Style TargetType="Ellipse">
+                    <Setter Property="Fill" Value="{DynamicResource Ok}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding HealthLevel}" Value="warn">
+                        <Setter Property="Fill" Value="{DynamicResource Warn}" />
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding HealthLevel}" Value="bad">
+                        <Setter Property="Fill" Value="{DynamicResource Danger}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Ellipse.Style>
+              </Ellipse>
+              <TextBlock Text="{Binding HealthLabel}" FontSize="12.5" FontWeight="Normal" />
+            </StackPanel>
+          </Button>
           <DockPanel Margin="-8,6,0,0">
             <Button DockPanel.Dock="Left" Style="{StaticResource BtnGhostIcon}" Width="30" Height="30" MinHeight="30"
                     Command="{Binding ToggleThemeCommand}" ToolTip="Açık / koyu tema" AutomationProperties.Name="Temayı değiştir">

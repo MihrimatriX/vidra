@@ -48,6 +48,15 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _activeCount;
     [ObservableProperty] private string _speedLabel = "";
 
+    /// <summary>"YouTube durumu": soğuma, saatlik bütçe, yt-dlp yaşı. Level: ok / warn / bad.</summary>
+    [ObservableProperty] private string _healthLabel = "YouTube: normal";
+    [ObservableProperty] private string _healthLevel = "ok";
+    [ObservableProperty] private string _healthTip = "";
+    private string? _ytDlpVersion;
+    private DateTimeOffset _lastAuthToast = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastSessionCheck = DateTimeOffset.Now;
+    private bool _updatingYtDlp;
+
     /// <summary>Pano izleme: kopyalanan bağlantı için üstte çıkan şerit.</summary>
     [ObservableProperty] private string? _clipboardLink;
 
@@ -102,10 +111,130 @@ public sealed partial class MainViewModel : ObservableObject
             QueueVm.CheckSchedule();
             RefreshStatus(); // duraklat/hata gibi durum değişiklikleri koleksiyon olayı üretmez
             RefreshProgress();
+            if (_host.Guard.InCooldown || HealthLevel == "bad" || QueueVm.CooldownText is not null) RefreshHealth(); // geri sayım ve soğuma bitişi
+            _ = MaybeCheckSessionAsync();
         };
         _timer.Start();
         RefreshStatus();
         if (host.Settings.CheckAppUpdates) _ = CheckUpdatesLaterAsync();
+
+        // Oturum düştüyse her işte ayrı ayrı değil, en fazla 10 dakikada bir söyle
+        host.Queue.AuthFailed += (_, _) => System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            if (DateTimeOffset.Now - _lastAuthToast < TimeSpan.FromMinutes(10)) return;
+            _lastAuthToast = DateTimeOffset.Now;
+            ShowToast(CookieActive ? "Oturum düşmüş olabilir: üyelik/giriş isteyen videolar inmiyor" : "Bu video giriş istiyor",
+                CookieActive ? "Yeniden giriş" : "Giriş yap", () => Go(Page.Account));
+        });
+        host.Guard.Changed += (_, _) => System.Windows.Application.Current?.Dispatcher.BeginInvoke(RefreshHealth);
+        host.Queue.Drained += (_, _) => System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => _ = MaybeUpdateYtDlpAsync());
+        _ = StartHealthAsync();
+    }
+
+    private async Task StartHealthAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(20)); // açılışı yavaşlatmasın; kurulum ekranı da bitmiş olsun
+        await RefreshYtDlpVersionAsync();
+        await MaybeUpdateYtDlpAsync();
+    }
+
+    private async Task RefreshYtDlpVersionAsync()
+    {
+        try
+        {
+            var st = await _host.Tools.StatusAsync();
+            _ytDlpVersion = st.FirstOrDefault(t => t.Id == Core.Tools.ToolId.YtDlp)?.Version;
+        }
+        catch { /* bileşen yoksa kurulum ekranı ilgilenir */ }
+        RefreshHealth();
+    }
+
+    /// <summary>
+    /// yt-dlp'yi günde en fazla bir kez, yalnızca kuyruk boşken günceller (çalışan exe Windows'ta değiştirilemez).
+    /// YouTube değişikliklerine karşı en etkili önlem budur.
+    /// </summary>
+    public async Task MaybeUpdateYtDlpAsync(bool force = false)
+    {
+        var s = _host.Settings;
+        if (_updatingYtDlp || !_host.Tools.AllInstalled) return;
+        if (!force && (!s.AutoUpdateYtDlp || !Core.Tools.YtDlpFreshness.IsCheckDue(s.LastYtDlpUpdateCheck, DateTimeOffset.Now))) return;
+        if (_host.Queue.ActiveCount > 0)
+        {
+            if (force) ShowToast("İndirmeler sürerken yt-dlp güncellenemez; kuyruk boşalınca kendiliğinden güncellenir");
+            return;
+        }
+        _updatingYtDlp = true;
+        try
+        {
+            var r = await _host.Tools.UpdateYtDlpAsync(s.UpdateChannel);
+            _host.SettingsStore.Update(x => x.LastYtDlpUpdateCheck = DateTimeOffset.Now);
+            if (Core.Tools.YtDlpFreshness.UpdatedTo(r.StdOut + "\n" + r.StdErr) is { } v) ShowToast($"yt-dlp güncellendi ({v})");
+            else if (force) ShowToast(r.ExitCode == 0 ? "yt-dlp zaten güncel" : "yt-dlp güncellenemedi: " + (r.StdErr.Trim() is { Length: > 0 } e ? e : "bilinmeyen hata"));
+        }
+        catch (Exception e) when (force) { ShowToast("yt-dlp güncellenemedi: " + e.Message); }
+        catch { /* sessiz deneme; bir sonraki açılışta yine denenir */ }
+        finally { _updatingYtDlp = false; }
+        await RefreshYtDlpVersionAsync();
+    }
+
+    /// <summary>Oturum açıkken 12 saatte bir hafif oturum testi; düştüyse kullanıcı indirme hata vermeden önce öğrenir.</summary>
+    private async Task MaybeCheckSessionAsync()
+    {
+        if (!CookieActive || _host.Guard.InCooldown || DateTimeOffset.Now - _lastSessionCheck < TimeSpan.FromHours(12)) return;
+        _lastSessionCheck = DateTimeOffset.Now;
+        try
+        {
+            var r = await _host.YtDlp.TestSessionAsync();
+            if (!r.Ok && r.Kind == ErrorKind.Auth)
+                ShowToast("YouTube oturumunun süresi dolmuş", "Yeniden giriş", () => Go(Page.Account));
+        }
+        catch { /* ağ yoksa sonraki turda */ }
+    }
+
+    public void RefreshHealth()
+    {
+        QueueVm.RefreshCooldown();
+        var signedIn = _host.Settings.Cookies is not NoCookies;
+        var st = _host.Guard.State(signedIn);
+        var now = DateTimeOffset.Now;
+        var age = Core.Tools.YtDlpFreshness.AgeDays(_ytDlpVersion, now);
+        var waiting = _host.Queue.WaitingCount;
+        var budget = $"Son 1 saatte {st.StartsLastHour} indirme başlatıldı (YouTube'un yaklaşık sınırı: {st.HourlyBudget}/saat {(signedIn ? "hesapla" : "girişsiz")}).";
+        var ver = _ytDlpVersion is null ? "" : $"\nyt-dlp {_ytDlpVersion}{(age is { } d ? $" · {d} gün önce" : "")}";
+        if (st.CooldownUntil is { } until)
+        {
+            HealthLevel = "bad";
+            HealthLabel = $"YouTube sınırı · {until.ToLocalTime():HH:mm}'e kadar";
+            HealthTip = $"YouTube {(st.CooldownReason == ErrorKind.BotCheck ? "bot doğrulaması istedi" : "istek sınırı uyguladı")}. " +
+                        $"Sınırı uzatmamak için yeni indirme başlatılmıyor; {waiting} iş bekliyor ve süre dolunca kendiliğinden yeniden denenecek.\n{budget}{ver}\nTıkla: kuyruğu aç";
+        }
+        else if (st.Recovering || st.NearBudget)
+        {
+            HealthLevel = "warn";
+            HealthLabel = st.NearBudget ? $"YouTube: yavaşlatıldı ({st.StartsLastHour}/{st.HourlyBudget})" : "YouTube: toparlanıyor";
+            HealthTip = (st.NearBudget ? "Saatlik sınıra yaklaşıldı: " : "Yakın zamanda sınıra takıldı: ") +
+                        $"indirmeler tek tek ve Güvenli nazik modla sürüyor.\n{budget}{ver}";
+        }
+        else if (Core.Tools.YtDlpFreshness.IsStale(_ytDlpVersion, now))
+        {
+            HealthLevel = "warn";
+            HealthLabel = $"yt-dlp {age} gün eski";
+            HealthTip = $"Eski yt-dlp YouTube'da 403, bot doğrulaması ve \"biçim yok\" hatalarının en yaygın sebebi.{ver}\nTıkla: şimdi güncelle";
+        }
+        else
+        {
+            HealthLevel = "ok";
+            HealthLabel = "YouTube: normal";
+            HealthTip = $"{budget}{ver}\nNazik mod: {_host.Guard.EffectivePolite(_host.Settings).Label()}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task HealthAction()
+    {
+        if (HealthLevel == "bad") Go(Page.Queue);
+        else if (Core.Tools.YtDlpFreshness.IsStale(_ytDlpVersion, DateTimeOffset.Now)) await MaybeUpdateYtDlpAsync(force: true);
+        else Go(Page.Settings);
     }
 
     private async Task CheckUpdatesLaterAsync()

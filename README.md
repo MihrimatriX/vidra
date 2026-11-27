@@ -165,8 +165,12 @@ yalnızca şu durumlarda olur ve indirme ekranında yazar: ses MP3/FLAC/WAV'a d�
 
 - **Bot doğrulaması / 429:** veri merkezi ve VPN IP'lerinde YouTube "Sign in to confirm you're not a bot" der; uygulama
   bunu ayrı bir hata türü olarak gösterir ve girişe yönlendirir. Ev bağlantısında genelde sorun olmaz.
+- **YouTube sınırları:** 429, "try again later" ya da bot doğrulaması gelince Vidra kuyruğu bekletir (5 → 15 → 45 → 60 dk),
+  süre dolunca işleri kendiliğinden yeniden dener ve bir süre tek tek indirir; kenar çubuğundaki **YouTube durumu** geri sayımı gösterir.
+  Ağ ve 403 hatalarında yalnızca o iş 30 sn / 2 dk sonra yeniden denenir. yt-dlp günde bir kez, kuyruk boşken kendiliğinden güncellenir.
 - **Hesap riski:** yt-dlp ekibi, çerezle yoğun indirmenin hesabın/IP'nin işaretlenmesine yol açabileceği konusunda uyarıyor.
-  Nazik mod (varsayılan açık) oturumla istekler arasına bekleme ekler; mümkünse ikincil bir hesap kullan.
+  Nazik mod (Kapalı / **Dengeli** / Güvenli) istekler arasına bekleme ekler; saatlik sınıra yaklaşınca kendiliğinden Güvenli'ye geçer.
+  Mümkünse ikincil bir hesap kullan.
 - **Chromium tarayıcı çerezleri:** Windows'ta Chrome/Edge açıkken çerez veritabanını kilitleyebilir; Firefox ya da uygulama içi giriş daha güvenilir.
 - `Playlistlerim` (`feed/playlists`) akışının yt-dlp desteği sürüme göre değişebilir; boş dönerse yt-dlp'yi güncelle.
 - **Üyeler sekmesi:** yt-dlp kanalın `/membership` sekmesini okuyamadığı için Vidra kanal kimliğinden (`UC…`) üyelere özel

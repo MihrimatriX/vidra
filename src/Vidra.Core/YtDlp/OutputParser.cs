@@ -86,13 +86,19 @@ public static partial class OutputParser
         if (m.Contains("members") || m.Contains("join this channel") || m.Contains("sign in to confirm") ||
             m.Contains("cookies") || m.Contains("private video") || m.Contains("login required") || m.Contains("sign in"))
             return ErrorKind.Auth;
-        if (m.Contains("http error 429") || m.Contains("too many requests") || m.Contains("rate-limited") || m.Contains("rate limited"))
+        // "This content isn't available, try again later": yt-dlp wiki'sine göre oturum/IP hız sınırının işareti
+        if (m.Contains("http error 429") || m.Contains("too many requests") || m.Contains("rate-limited") || m.Contains("rate limited") ||
+            m.Contains("try again later"))
             return ErrorKind.RateLimited;
+        // -f her zaman "/b" yedeğiyle verilir; biçim yoksa sorun video değil, YouTube'un akışları vermemesi (eski yt-dlp, PO token)
+        if (m.Contains("http error 403") || m.Contains("requested format is not available") || m.Contains("only images are available") ||
+            m.Contains("po token"))
+            return ErrorKind.Forbidden;
         if (m.Contains("video unavailable") || m.Contains("has been removed") || m.Contains("not available"))
             return ErrorKind.Unavailable;
         if (m.Contains("ffmpeg") || m.Contains("postprocessing"))
             return ErrorKind.Ffmpeg;
-        if (m.Contains("timed out") || m.Contains("connection") || m.Contains("http error 5") || m.Contains("getaddrinfo") || m.Contains("http error 403"))
+        if (m.Contains("timed out") || m.Contains("connection") || m.Contains("http error 5") || m.Contains("getaddrinfo"))
             return ErrorKind.Network;
         return ErrorKind.Unknown;
     }
@@ -119,7 +125,8 @@ public static partial class OutputParser
     {
         ErrorKind.Auth => "Bu video giriş veya kanal üyeliği istiyor. Hesabım ekranından giriş yap ya da oturumu yenile.",
         ErrorKind.BotCheck => "YouTube bu bağlantıdan bot doğrulaması istiyor. Hesabım ekranından giriş yap; VPN kullanıyorsan kapatmayı ya da bir süre beklemeyi dene.",
-        ErrorKind.RateLimited => "YouTube çok fazla istek algıladı (429). Biraz bekleyip tekrar dene; Ayarlar'da nazik modu açık tut.",
+        ErrorKind.RateLimited => "YouTube geçici bir istek sınırı uyguladı. Vidra kuyruğu bir süre bekletip kendiliğinden yeniden dener; sık oluyorsa nazik modu Güvenli yap.",
+        ErrorKind.Forbidden => "YouTube bu videonun akışlarını vermedi (403 / biçim yok). Genelde yt-dlp eskidiğinde olur: yt-dlp'yi güncelle. Sürerse PO token sağlayıcısını aç.",
         ErrorKind.Unavailable => "Video kaldırılmış, özel ya da bölgende erişilemiyor.",
         ErrorKind.Ffmpeg => "ffmpeg işlemi başarısız oldu: " + message,
         ErrorKind.Network => "Bağlantı hatası: " + message,

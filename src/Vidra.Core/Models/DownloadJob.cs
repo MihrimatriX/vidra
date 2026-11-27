@@ -38,6 +38,12 @@ public sealed partial class DownloadJob : ObservableObject
     [ObservableProperty] private ErrorKind? _errorKind;
     [ObservableProperty] private string? _errorMessage;
 
+    /// <summary>Sınır/ağ hatasından sonra kendiliğinden yeniden deneme zamanı; doluyken iş sırada bekler, başlatılmaz.</summary>
+    [ObservableProperty] private DateTimeOffset? _retryAt;
+
+    /// <summary>Kendiliğinden yapılan yeniden deneme sayısı (elle "Tekrar dene" sıfırlar).</summary>
+    public int AutoRetries { get; set; }
+
     /// <summary>Dosya indi ama yan adımlardan biri (ör. altyazı) başarısız oldu.</summary>
     [ObservableProperty] private string? _warning;
     [ObservableProperty] private string? _filePath;
