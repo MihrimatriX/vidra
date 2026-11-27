@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Vidra.Core.Models;
+using Vidra.Core.Playlists;
 
 namespace Vidra.App.ViewModels;
 
@@ -53,24 +54,24 @@ public static class Choices
         [new(0, "Kapalı"), new(1, "Saatte bir"), new(6, "6 saatte bir"), new(12, "12 saatte bir"), new(24, "Günde bir")];
 
     public static readonly IReadOnlyList<Choice> DurationBuckets =
-        [new("all", "Hepsi"), new("short", "< 4 dk"), new("mid", "4–20 dk"), new("long", "> 20 dk")];
+        [new(DurationBucket.All, "Hepsi"), new(DurationBucket.Short, "< 4 dk"), new(DurationBucket.Mid, "4–20 dk"), new(DurationBucket.Long, "> 20 dk")];
 
     public static readonly IReadOnlyList<Choice> VideoSorts =
     [
-        new("list", "Liste sırası"),
-        new("reverse", "Ters sıra (eskiden yeniye)"),
-        new("newest", "En yeni tarih"),
-        new("longest", "En uzun süre"),
-        new("views", "En çok izlenen"),
+        new(VideoSort.List, "Liste sırası"),
+        new(VideoSort.Reverse, "Ters sıra (eskiden yeniye)"),
+        new(VideoSort.Newest, "En yeni tarih"),
+        new(VideoSort.Longest, "En uzun süre"),
+        new(VideoSort.Views, "En çok izlenen"),
     ];
 
     public static readonly IReadOnlyList<Choice> ListSorts =
     [
-        new("default", "Varsayılan sıra"),
-        new("members", "Üyelere özel önce"),
-        new("missing", "Eksik videosu olanlar önce"),
-        new("count", "En çok video"),
-        new("name", "Ada göre"),
+        new(ListSort.Default, "Varsayılan sıra"),
+        new(ListSort.Members, "Üyelere özel önce"),
+        new(ListSort.Missing, "Eksik videosu olanlar önce"),
+        new(ListSort.Count, "En çok video"),
+        new(ListSort.Name, "Ada göre"),
     ];
 }
 
