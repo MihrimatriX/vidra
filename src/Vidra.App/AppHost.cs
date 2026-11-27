@@ -34,14 +34,19 @@ public sealed class AppHost : IAsyncDisposable
     public AppHost()
     {
         Paths = new AppPaths();
+        Core.Perf.LogFile = Paths.PerfLogFile;
+        ThumbConverter.DiskDir = Paths.ThumbCacheDir;
+        _ = Task.Run(() => ThumbnailDiskCache.Prune(Paths.ThumbCacheDir));
         Runner = new ProcessRunner(Paths.CookieCopyDir);
         SettingsStore = new SettingsStore(Paths);
         SettingsStore.Load();
         Http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
         Http.DefaultRequestHeaders.UserAgent.ParseAdd($"Vidra/{typeof(AppHost).Assembly.GetName().Version?.ToString(3)} (+https://github.com/yt-dlp/yt-dlp)");
         Tools = new ToolManager(Paths, Runner, Http);
-        YtDlp = new YtDlpService(Runner, Tools, () => SettingsStore.Current);
-        Queue = new DownloadQueue(Runner, Tools, () => SettingsStore.Current, Paths, Dispatch);
+        var info = new InfoJsonCache(Paths.InfoJsonDir);
+        _ = Task.Run(info.Prune);
+        YtDlp = new YtDlpService(Runner, Tools, () => SettingsStore.Current, info);
+        Queue = new DownloadQueue(Runner, Tools, () => SettingsStore.Current, Paths, Dispatch, info);
         Follow = new FollowService(YtDlp, Queue, Paths, () => SettingsStore.Current, Dispatch);
         Account = new AccountService(Paths, SettingsStore);
         ListCache = new ListCacheStore(Paths.ListCacheFile);

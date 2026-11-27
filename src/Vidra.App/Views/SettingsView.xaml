@@ -69,7 +69,7 @@
                          Text="Windows'ta Chromium tabanlı tarayıcılar açıkken çerez veritabanını kilitleyebilir. İndirme başlamadan tarayıcıyı kapatman gerekebilir — Firefox ya da uygulama içi giriş daha güvenilir." />
             </Border>
             <CheckBox Style="{StaticResource SwitchCard}" HorizontalAlignment="Left" MinWidth="460" Margin="0" IsChecked="{Binding PoliteMode}"
-                      Content="Nazik mod" Tag="Oturum açıkken istekler arasına bekleme ekler (--sleep-requests / --sleep-interval)" />
+                      Content="Nazik mod" Tag="Oturum açıkken playlist, kanal ve toplu indirmelerde istekler arasına bekleme ekler. Tek video bekletilmez." />
           </StackPanel>
         </Border>
 

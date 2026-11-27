@@ -15,6 +15,9 @@ public static class JsonStore
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
+    /// <summary>Büyük, elle okunmayan dosyalar (liste önbelleği) için girintisiz yazım: dosya ~%40 küçülür, okuma hızlanır.</summary>
+    public static readonly JsonSerializerOptions Compact = new(Options) { WriteIndented = false };
+
     private static readonly SemaphoreSlim WriteGate = new(1, 1);
 
     public static T? Read<T>(string path)
@@ -33,14 +36,16 @@ public static class JsonStore
         }
     }
 
-    public static async Task WriteAsync<T>(string path, T value, CancellationToken ct = default)
+    public static Task WriteAsync<T>(string path, T value, CancellationToken ct = default) => WriteAsync(path, value, Options, ct);
+
+    public static async Task WriteAsync<T>(string path, T value, JsonSerializerOptions options, CancellationToken ct = default)
     {
         await WriteGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var tmp = path + ".tmp";
             await using (var fs = File.Create(tmp))
-                await JsonSerializer.SerializeAsync(fs, value, Options, ct).ConfigureAwait(false);
+                await JsonSerializer.SerializeAsync(fs, value, options, ct).ConfigureAwait(false);
             File.Move(tmp, path, overwrite: true);
         }
         finally

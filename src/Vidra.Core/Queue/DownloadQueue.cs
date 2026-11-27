@@ -30,6 +30,7 @@ public sealed record NewJob(
 public sealed partial class DownloadQueue : ObservableObject
 {
     private const int HistoryLimit = 1000;
+    private const long ProgressLogInterval = 5000;
 
     private readonly IProcessRunner _runner;
     private readonly ToolManager _tools;
@@ -57,8 +58,13 @@ public sealed partial class DownloadQueue : ObservableObject
 
     [ObservableProperty] private double _totalSpeed;
 
-    public DownloadQueue(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings, AppPaths paths, Action<Action>? dispatch = null)
+    private readonly InfoJsonCache? _infoCache;
+
+    /// <param name="infoCache">Analizde saklanan video bilgisi; verilirse ilk denemede çıkarım atlanır.</param>
+    public DownloadQueue(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings, AppPaths paths, Action<Action>? dispatch = null,
+        InfoJsonCache? infoCache = null)
     {
+        _infoCache = infoCache;
         _runner = runner;
         _tools = tools;
         _settings = settings;
@@ -287,7 +293,8 @@ public sealed partial class DownloadQueue : ObservableObject
             idle = toStart.Count == 0 && _running.Count == 0;
             if (!idle) _wasBusy = true;
         }
-        foreach (var j in toStart) Start(j);
+        var busy = jobs.Count(j => j.Status is JobStatus.Queued or JobStatus.Running or JobStatus.Processing);
+        foreach (var j in toStart) Start(j, busy);
         // Yalnızca gerçek bitişte tetikle: son iş kendiliğinden bitti (duraklatma/iptal değil), bekleyen ya da duraklatılmış iş yok
         if (idle && _wasBusy && _lastEndNatural && !_shuttingDown &&
             jobs.All(j => j.Status is not (JobStatus.Queued or JobStatus.Running or JobStatus.Processing or JobStatus.Paused)))
@@ -297,10 +304,15 @@ public sealed partial class DownloadQueue : ObservableObject
         }
     }
 
-    private void Start(DownloadJob job)
+    /// <param name="busy">Başlatma anında sırada ya da çalışmakta olan iş sayısı (bu iş dahil).</param>
+    private void Start(DownloadJob job, int busy)
     {
         var s = _settings();
-        var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate);
+        // Canlı bekleme ve ek argümanlar (ör. --extractor-args) analizdekinden farklı formatlar verebilir: o durumda adresle çıkar
+        var info = !job.Options.WaitForLive && string.IsNullOrWhiteSpace(s.ExtraArgs) ? _infoCache?.TryGetFresh(job.VideoId) : null;
+        // Nazik mod beklemeleri art arda çok indirme varken (playlist, kanal, toplu yapıştırma) anlamlı; tek video bekletilmez
+        var bulk = job.Options.Playlist is not null || busy > 1;
+        var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate, info, bulk);
         job.LastArgs = args;
         job.ErrorKind = null;
         job.ErrorMessage = null;
@@ -313,6 +325,9 @@ public sealed partial class DownloadQueue : ObservableObject
         var gotFile = false;
 
         var lineGate = new Lock(); // stdout ve stderr farklı thread'lerden aynı anda gelir
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        long lastProgressLog = 0;
+        var firstProgress = true;
 
         void OnLine(string raw)
         {
@@ -321,8 +336,21 @@ public sealed partial class DownloadQueue : ObservableObject
 
         void HandleLine(string raw)
         {
-            job.Log.Add(raw);
-            switch (OutputParser.Parse(raw))
+            var line = OutputParser.Parse(raw);
+            // İlerleme satırları 300 satırlık tamponu doldurup asıl uyarıları/hataları dışarı itmesin: 5 sn'de bir yeter
+            if (line is DownloadLine)
+            {
+                var now = Environment.TickCount64;
+                if (now - lastProgressLog >= ProgressLogInterval) { lastProgressLog = now; job.Log.Add(raw); }
+                if (firstProgress)
+                {
+                    firstProgress = false;
+                    // Süreç açılışı + YouTube çıkarımı: "indirme neden geç başlıyor" sorusunun cevabı
+                    Perf.Write("job:first-byte", System.Diagnostics.Stopwatch.GetElapsedTime(started), $"{job.VideoId}{(info is null ? "" : " info-json")}");
+                }
+            }
+            else job.Log.Add(raw);
+            switch (line)
             {
                 case DownloadLine d when d.FormatId is not null:
                     // bv*+ba: önce video sonra ses akışı iner; format_id değişimi = yeni akış
@@ -396,6 +424,7 @@ public sealed partial class DownloadQueue : ObservableObject
                 why = _intentional.Remove(job.Id, out var w) ? w : null;
             }
             var code = t.IsCompletedSuccessfully ? t.Result : -1;
+            Perf.Write("job:total", System.Diagnostics.Stopwatch.GetElapsedTime(started), $"{job.VideoId} exit={code}{(info is null ? "" : " info-json")}");
             lock (_gate) _lastEndNatural = why is null;
             job.Log.Flush();
             job.Speed = null;
@@ -413,6 +442,8 @@ public sealed partial class DownloadQueue : ObservableObject
             }
             else if (code == 0 || gotFile)
             {
+                // Bilgi dosyası oturum çerezlerini de taşıyabilir: işi bitince bırakma
+                if (info is not null) _infoCache?.Invalidate(job.VideoId);
                 job.Status = JobStatus.Done;
                 job.Percent = 100;
                 job.Stage = "Tamamlandı";
@@ -424,6 +455,8 @@ public sealed partial class DownloadQueue : ObservableObject
             }
             else
             {
+                // Saklanan bilgi bayatlamış olabilir (ör. 403): yeniden denemede adresle taze çıkarım yapılsın
+                if (info is not null) _infoCache?.Invalidate(job.VideoId);
                 job.ErrorKind = lastError?.Kind ?? ErrorKind.Unknown;
                 job.ErrorMessage = lastError is not null
                     ? OutputParser.FriendlyError(lastError.Kind, lastError.Message)

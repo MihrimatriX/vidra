@@ -213,7 +213,11 @@ public static class YtDlpArgs
     }
 
     /// <summary>Hem indirme hem probe için ortak: kodlama, bileşen yolları, ağ ve oturum.</summary>
-    public static List<string> Base(AppSettings s, ToolPaths t)
+    /// <param name="polite">
+    /// Nazik mod beklemeleri bu çağrıda uygulansın mı. Tek bir videonun analizi/indirmesi birkaç istektir; --sleep-requests 1
+    /// orada her analize 5-10 sn ekliyordu. Beklemeler hesabı asıl yoran toplu işler (playlist, kanal, toplu yapıştırma) içindir.
+    /// </param>
+    public static List<string> Base(AppSettings s, ToolPaths t, bool polite = true)
     {
         var a = new List<string>
         {
@@ -226,19 +230,24 @@ public static class YtDlpArgs
         if (!string.IsNullOrWhiteSpace(s.Proxy)) a.AddRange(["--proxy", s.Proxy.Trim()]);
         a.AddRange(Cookies(s.Cookies));
         // Oturumla yoğun istek hesabın/IP'nin işaretlenmesine yol açabilir: araya bekleme koy
-        if (s.PoliteMode && s.Cookies is not NoCookies)
+        if (polite && s.PoliteMode && s.Cookies is not NoCookies)
             a.AddRange(["--sleep-requests", "1", "--sleep-interval", "2", "--max-sleep-interval", "6"]);
         return a;
     }
 
-    public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null)
+    /// <param name="infoJson">Analizde saklanan video bilgisi: verilirse çıkarım atlanır (--load-info-json), adres kullanılmaz.</param>
+    /// <param name="bulk">Toplu işin parçası (playlist, kanal, toplu yapıştırma, takip): nazik mod beklemeleri uygulanır.</param>
+    public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null, string? infoJson = null,
+        bool bulk = true)
     {
-        var a = Base(s, t);
+        var a = Base(s, t, polite: bulk);
         a.AddRange([
             "--newline",
             "--progress", // --print, --quiet'i ima eder; ilerlemeyi yine de istiyoruz
             "--progress-template", $"download:{ProgressTemplate}",
             "--progress-template", $"postprocess:{PpTemplate}",
+            // Varsayılanda yt-dlp her blokta satır basar (saniyede onlarca); arayüz için yarım saniyede bir yeter
+            "--progress-delta", "0.5",
             "--print", $"after_move:{MarkDone}%(filepath)s",
             // before_dl: --print'in --simulate'i ima etmemesi için "video"dan sonraki bir aşama
             "--print", $"before_dl:{MarkMeta}%(channel,uploader|)s|%(title)s",
@@ -260,13 +269,15 @@ public static class YtDlpArgs
         a.AddRange(Extras(o, s));
         // Ayarlardaki ek argümanlar en sonda: aynı bayrağı tekrar verirse yt-dlp sonrakini kullanır (ör. -f)
         if (ExtraArgs.Parse(s.ExtraArgs) is { Error: null } extra) a.AddRange(extra.Args);
-        a.AddRange(["--", url]);
+        if (infoJson is not null) a.AddRange(["--load-info-json", infoJson]);
+        else a.AddRange(["--", url]);
         return a;
     }
 
     public static List<string> Probe(string url, LinkKind kind, AppSettings s, ToolPaths t, int? limit = null)
     {
-        var a = Base(s, t);
+        // Tek video analizi kullanıcıyı bekletir ve az istek yapar; liste/kanal sayfalarında beklemeler kalır
+        var a = Base(s, t, polite: kind != LinkKind.Video);
         a.Add("-J");
         if (kind == LinkKind.Video) a.Add("--no-playlist");
         else a.Add("--flat-playlist");
