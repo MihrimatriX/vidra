@@ -339,6 +339,18 @@
     <Setter Property="MinWidth" Value="18" />
     <Setter Property="Height" Value="18" />
     <Setter Property="TextElement.FontSize" Value="11.5" />
+    <Style.Triggers>
+      <!-- Dar menü: ikonun sağ üst köşesine küçük rozet -->
+      <DataTrigger Binding="{Binding DataContext.NavCompact, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Margin" Value="11,-7,0,0" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="MinWidth" Value="15" />
+        <Setter Property="Height" Value="15" />
+        <Setter Property="CornerRadius" Value="7.5" />
+      </DataTrigger>
+    </Style.Triggers>
   </Style>
 
   <!-- Hap (pill): altyazı dili, SponsorBlock kategorisi, filtre -->

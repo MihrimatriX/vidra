@@ -168,11 +168,14 @@
               <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Lock}" Size="13" Margin="0,0,6,0" /><TextBlock Text="Gizli mod" /></StackPanel>
             </Button>
           </Border>
-          <DockPanel Margin="0,0,8,6" Visibility="{Binding SpeedLabel, Converter={StaticResource Vis}}">
-            <TextBlock Text="{Binding SpeedLabel}" DockPanel.Dock="Right" Style="{StaticResource Mono}" Foreground="{DynamicResource Text}" />
-            <TextBlock Text="İndiriliyor" />
-          </DockPanel>
-          <TextBlock Text="{Binding DiskLabel}" Margin="0,0,0,4" Visibility="{Binding DiskLabel, Converter={StaticResource Vis}}" />
+          <!-- Hız ve disk: dar menüde yer yok, gizlenir (görev çubuğu ve kuyruk aynı bilgiyi verir) -->
+          <StackPanel Visibility="{Binding NavCompact, Converter={StaticResource Vis}, ConverterParameter=!}">
+            <DockPanel Margin="0,0,8,6" Visibility="{Binding SpeedLabel, Converter={StaticResource Vis}}">
+              <TextBlock Text="{Binding SpeedLabel}" DockPanel.Dock="Right" Style="{StaticResource Mono}" Foreground="{DynamicResource Text}" />
+              <TextBlock Text="İndiriliyor" />
+            </DockPanel>
+            <TextBlock Text="{Binding DiskLabel}" Margin="0,0,0,4" Visibility="{Binding DiskLabel, Converter={StaticResource Vis}}" />
+          </StackPanel>
           <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" HorizontalAlignment="Left" HorizontalContentAlignment="Left" Foreground="{DynamicResource Muted}"
                   Command="{Binding AccountStatusCommand}" ToolTip="Hesabım: oturum, hesap akışları, takip edilen listeler (Ctrl+8)">
             <StackPanel Orientation="Horizontal">
@@ -201,7 +204,7 @@
                     Command="{Binding ToggleThemeCommand}" ToolTip="Açık / koyu tema" AutomationProperties.Name="Temayı değiştir">
               <c:Icon Data="{StaticResource I.Sun}" Size="16" />
             </Button>
-            <Grid HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
+            <Grid HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding NavCompact, Converter={StaticResource Vis}, ConverterParameter=!}">
               <TextBlock Text="{Binding Version}" FontSize="11.5" VerticalAlignment="Center" Visibility="{Binding Update, Converter={StaticResource Vis}, ConverterParameter=!}" />
               <Button Style="{StaticResource BtnLink}" Padding="0" MinHeight="22" FontSize="12" Command="{Binding OpenUpdateCommand}"
                       Visibility="{Binding Update, Converter={StaticResource Vis}}" ToolTip="Yeni sürümün sayfasını aç">

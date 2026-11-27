@@ -55,7 +55,7 @@ public partial class MainWindow : Window
         else SideCol.SetResourceReference(ColumnDefinition.WidthProperty, "SideW");
     }
 
-    private const double NavCompactBelow = 1100;
+    private const double NavCompactBelow = 1000; // 1366 px / %125 ölçekli dizüstünde (~1093) tam menü kalsın
 
     /// <summary>Kapat düğmesi: ayar açıksa tepsiye küçült (indirmeler sürer), değilse çık.</summary>
     protected override void OnClosing(CancelEventArgs e)
