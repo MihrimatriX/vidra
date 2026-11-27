@@ -30,6 +30,7 @@ public sealed record NewJob(
 public sealed partial class DownloadQueue : ObservableObject
 {
     private const int HistoryLimit = 1000;
+    private const long ProgressLogInterval = 5000;
 
     private readonly IProcessRunner _runner;
     private readonly ToolManager _tools;
@@ -69,9 +70,14 @@ public sealed partial class DownloadQueue : ObservableObject
 
     [ObservableProperty] private double _totalSpeed;
 
-    public DownloadQueue(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings, AppPaths paths, Action<Action>? dispatch = null, RateGuard? guard = null)
+    private readonly InfoJsonCache? _infoCache;
+
+    /// <param name="infoCache">Analizde saklanan video bilgisi; verilirse ilk denemede çıkarım atlanır.</param>
+    public DownloadQueue(IProcessRunner runner, ToolManager tools, Func<AppSettings> settings, AppPaths paths, Action<Action>? dispatch = null, RateGuard? guard = null,
+        InfoJsonCache? infoCache = null)
     {
         Guard = guard ?? new RateGuard();
+        _infoCache = infoCache;
         _runner = runner;
         _tools = tools;
         _settings = settings;
@@ -394,7 +400,9 @@ public sealed partial class DownloadQueue : ObservableObject
         }
         var s = _settings();
         Guard.RecordStart();
-        var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate, Guard.EffectivePolite(s));
+        // Canlı bekleme ve ek argümanlar (ör. --extractor-args) analizdekinden farklı formatlar verebilir: o durumda adresle çıkar
+        var info = !job.Options.WaitForLive && string.IsNullOrWhiteSpace(s.ExtraArgs) ? _infoCache?.TryGetFresh(job.VideoId) : null;
+        var args = YtDlpArgs.Download(job.Url, job.Options, s, _tools.Paths, job.OutputTemplate, Guard.EffectivePolite(s), info);
         job.LastArgs = args;
         job.ErrorKind = null;
         job.ErrorMessage = null;
@@ -407,6 +415,9 @@ public sealed partial class DownloadQueue : ObservableObject
         var gotFile = false;
 
         var lineGate = new Lock(); // stdout ve stderr farklı thread'lerden aynı anda gelir
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        long lastProgressLog = 0;
+        var firstProgress = true;
 
         void OnLine(string raw)
         {
@@ -415,8 +426,21 @@ public sealed partial class DownloadQueue : ObservableObject
 
         void HandleLine(string raw)
         {
-            job.Log.Add(raw);
-            switch (OutputParser.Parse(raw))
+            var line = OutputParser.Parse(raw);
+            // İlerleme satırları 300 satırlık tamponu doldurup asıl uyarıları/hataları dışarı itmesin: 5 sn'de bir yeter
+            if (line is DownloadLine)
+            {
+                var now = Environment.TickCount64;
+                if (now - lastProgressLog >= ProgressLogInterval) { lastProgressLog = now; job.Log.Add(raw); }
+                if (firstProgress)
+                {
+                    firstProgress = false;
+                    // Süreç açılışı + YouTube çıkarımı: "indirme neden geç başlıyor" sorusunun cevabı
+                    Perf.Write("job:first-byte", System.Diagnostics.Stopwatch.GetElapsedTime(started), $"{job.VideoId}{(info is null ? "" : " info-json")}");
+                }
+            }
+            else job.Log.Add(raw);
+            switch (line)
             {
                 case DownloadLine d when d.FormatId is not null:
                     // bv*+ba: önce video sonra ses akışı iner; format_id değişimi = yeni akış
@@ -498,10 +522,15 @@ public sealed partial class DownloadQueue : ObservableObject
                 why = _intentional.Remove(job.Id, out var w) ? w : null;
             }
             var code = t.IsCompletedSuccessfully ? t.Result : -1;
+            Perf.Write("job:total", System.Diagnostics.Stopwatch.GetElapsedTime(started), $"{job.VideoId} exit={code}{(info is null ? "" : " info-json")}");
             lock (_gate) _lastEndNatural = why is null;
             job.Log.Flush();
             job.Speed = null;
             job.Eta = null;
+
+            // Saklanan bilgi bir kez kullanılır: başarıda çerez taşıyabileceği için, hatada bayatlamış olabileceği (ör. 403) için
+            // silinir; otomatik ya da elle yeniden deneme adresle taze çıkarım yapar. Duraklatma/iptalde kalır.
+            if (info is not null && why is null) _infoCache?.Invalidate(job.VideoId);
 
             if (why == JobStatus.Paused)
             {

@@ -256,7 +256,9 @@ public static class YtDlpArgs
     };
 
     /// <param name="polite">Kuyruğun o anki nazik mod seviyesi (bkz. RateGuard); verilmezse ayardaki.</param>
-    public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null, PoliteLevel? polite = null)
+    /// <param name="infoJson">Analizde saklanan video bilgisi: verilirse çıkarım atlanır (--load-info-json), adres kullanılmaz.</param>
+    public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null, PoliteLevel? polite = null,
+        string? infoJson = null)
     {
         var a = Base(s, t);
         a.AddRange(PoliteArgs(polite ?? s.EffectivePolite));
@@ -265,6 +267,8 @@ public static class YtDlpArgs
             "--progress", // --print, --quiet'i ima eder; ilerlemeyi yine de istiyoruz
             "--progress-template", $"download:{ProgressTemplate}",
             "--progress-template", $"postprocess:{PpTemplate}",
+            // Varsayılanda yt-dlp her blokta satır basar (saniyede onlarca); arayüz için yarım saniyede bir yeter
+            "--progress-delta", "0.5",
             "--print", $"after_move:{MarkDone}%(filepath)s",
             // before_dl: --print'in --simulate'i ima etmemesi için "video"dan sonraki bir aşama
             "--print", $"before_dl:{MarkMeta}%(channel,uploader|)s|%(title)s",
@@ -286,7 +290,8 @@ public static class YtDlpArgs
         a.AddRange(Extras(o, s));
         // Ayarlardaki ek argümanlar en sonda: aynı bayrağı tekrar verirse yt-dlp sonrakini kullanır (ör. -f)
         if (ExtraArgs.Parse(s.ExtraArgs) is { Error: null } extra) a.AddRange(extra.Args);
-        a.AddRange(["--", url]);
+        if (infoJson is not null) a.AddRange(["--load-info-json", infoJson]);
+        else a.AddRange(["--", url]);
         return a;
     }
 

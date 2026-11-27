@@ -57,6 +57,9 @@ public sealed partial class PlaylistViewModel : ObservableObject
     private readonly MainViewModel _main;
     private readonly Stack<string> _back = new();
     private readonly Action _coalescedFilter;
+    private readonly Action _debouncedFilter;
+    /// <summary>Büyük liste/kanal açılırken önce gösterilen ilk sayfanın boyutu.</summary>
+    private const int PreviewSize = 60;
     private List<PlaylistRow> _all = [];
     private PlaylistRow? _anchorRow;
     private bool _bulk;
@@ -70,6 +73,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
         _host = host;
         _main = main;
         _coalescedFilter = Ui.Coalesce(ApplyFilter);
+        _debouncedFilter = Ui.Debounce(ApplyFilter, TimeSpan.FromMilliseconds(200));
         var d = host.Settings.Defaults;
         _mode = d.Mode;
         _height = d.Height ?? 0;
@@ -144,7 +148,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
     [ObservableProperty] private VideoSort _videoSort;
     [ObservableProperty] private ListSort _listSort;
 
-    public ObservableCollection<PlaylistRow> Rows { get; } = [];
+    public BulkObservableCollection<PlaylistRow> Rows { get; } = [];
     public CardGrid Cards { get; } = new();
 
     public bool CardView
@@ -210,11 +214,12 @@ public sealed partial class PlaylistViewModel : ObservableObject
         }
     }
 
-    partial void OnRangeChanged(string value) => ApplyFilter();
-    partial void OnDateFromChanged(string value) => ApplyFilter();
-    partial void OnDateToChanged(string value) => ApplyFilter();
+    // Yazılan alanlar: her tuşta değil, yazma durunca süz
+    partial void OnRangeChanged(string value) => _debouncedFilter();
+    partial void OnDateFromChanged(string value) => _debouncedFilter();
+    partial void OnDateToChanged(string value) => _debouncedFilter();
     partial void OnBucketChanged(DurationBucket value) => ApplyFilter();
-    partial void OnQueryChanged(string value) => ApplyFilter();
+    partial void OnQueryChanged(string value) => _debouncedFilter();
     partial void OnOnlyNewChanged(bool value) => ApplyFilter();
     partial void OnOnlyMembersChanged(bool value) => ApplyFilter();
     partial void OnVideoSortChanged(VideoSort value) => ApplyFilter();
@@ -253,12 +258,46 @@ public sealed partial class PlaylistViewModel : ObservableObject
         ErrorIsAuth = false;
         try
         {
-            var r = await _host.YtDlp.ProbeAsync(url, ChannelTab, ct: cts.Token);
+            // Büyük kanal/listede tam liste (-J) her sayfa okunana kadar boş ekran demekti (binlerce videoda 30 sn+).
+            // İlk sayfa paralel okunur ve hemen gösterilir; tam liste gelince yerine geçer. Liste ilk sayfadan kısaysa zaten tamdır.
+            var kind = YouTubeUrl.Classify(url);
+            using var fullCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+            using var previewCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+            var full = _host.YtDlp.ProbeAsync(url, ChannelTab, ct: fullCts.Token);
+            var preview = kind is LinkKind.Playlist or LinkKind.Channel && ChannelTab != ChannelTab.Membership
+                ? PreviewAsync(url, ChannelTab, previewCts.Token) : null;
+            object? r = null;
+            var shownPreview = false;
+            if (preview is not null && await Task.WhenAny(preview, full) == preview && await preview is { } pv && !cts.IsCancellationRequested)
+            {
+                if (pv.Entries.Count < PreviewSize)
+                {
+                    fullCts.Cancel();
+                    r = pv;
+                }
+                else
+                {
+                    Show(pv, url, keepHistory);
+                    shownPreview = true;
+                    BusyText = $"İlk {pv.Entries.Count} video gösteriliyor, listenin tamamı okunuyor…";
+                }
+            }
+            // Tam liste önce geldiyse ilk sayfa sürecini boşuna çalıştırma
+            if (r is null && full.IsCompleted) previewCts.Cancel();
+            try { r ??= await full; }
+            catch (Exception) when (shownPreview && !cts.IsCancellationRequested)
+            {
+                // İlk sayfa ekranda: tam liste okunamadıysa onu bırakma, yalnızca eksik olduğunu söyle
+                BusyText = null;
+                Error = "Listenin tamamı okunamadı; yalnızca ilk sayfa gösteriliyor. Yenile ile tekrar dene.";
+                return;
+            }
             if (cts.IsCancellationRequested) return;
+            if (shownPreview) BusyText = null;
             if (r is PlaylistInfo p)
             {
                 if (p.Kind == LinkKind.Playlist) _host.ListCache.Put(url, p);
-                Show(p, url, keepHistory);
+                Show(p, url, keepHistory || shownPreview, refresh: shownPreview);
             }
             // Video döndüyse tekrar analiz ettirme (OpenLinkAsync ↔ LoadAsync döngüsü): bilgiyi doğrudan göster
             else if (r is VideoInfo v) { _main.Download.Url = url; _main.Download.ShowVideo(v); _main.Go(Page.Download); }
@@ -276,8 +315,22 @@ public sealed partial class PlaylistViewModel : ObservableObject
         }
     }
 
-    public void Show(PlaylistInfo p, string url, bool keepHistory = false)
+    private async Task<PlaylistInfo?> PreviewAsync(string url, ChannelTab tab, CancellationToken ct)
     {
+        // Hata/iptal sessiz: asıl hatayı tam liste bildirir
+        try { return await _host.YtDlp.ProbeAsync(url, tab, limit: PreviewSize, ct: ct) as PlaylistInfo; }
+        catch (Exception) { return null; }
+    }
+
+    /// <param name="refresh">İlk sayfanın yerine tam liste geliyor: arama, filtreler ve kullanıcının seçimleri korunur.</param>
+    public void Show(PlaylistInfo p, string url, bool keepHistory = false, bool refresh = false)
+    {
+        Dictionary<string, bool>? previousSelection = null;
+        if (refresh)
+        {
+            previousSelection = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var r in _all) previousSelection.TryAdd(r.Entry.Url, r.IsSelected);
+        }
         if (!keepHistory)
         {
             _back.Clear();
@@ -292,6 +345,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
         _all = p.Entries.Select((e, i) =>
         {
             var row = new PlaylistRow(e, i + 1, archived.Contains(e.Id));
+            if (previousSelection is not null && previousSelection.TryGetValue(e.Url, out var sel) && row.Selectable) row.IsSelected = sel;
             if (e.IsList)
             {
                 row.IsListFollowed = _host.Follow.IsFollowed(e.Url);
@@ -314,13 +368,16 @@ public sealed partial class PlaylistViewModel : ObservableObject
         var secs = _all.Sum(r => r.Entry.Duration ?? 0);
         MetaLine = PlaylistSummary.MetaLine(channelTitle ? null : p.Channel, _all.Count, IsListOfLists, secs);
         IsFollowed = _host.Follow.IsFollowed(url, ChannelTab);
-        MoreFilters = false;
-        // Yeni sayfada eski arama/filtre kalmasın (kullanıcı başka sekmeye/listeye geçti)
-        _suppressFilter = true;
-        try { Query = ""; OnlyNew = false; OnlyMembers = false; }
-        finally { _suppressFilter = false; }
+        if (!refresh)
+        {
+            MoreFilters = false;
+            // Yeni sayfada eski arama/filtre kalmasın (kullanıcı başka sekmeye/listeye geçti)
+            _suppressFilter = true;
+            try { Query = ""; OnlyNew = false; OnlyMembers = false; }
+            finally { _suppressFilter = false; }
+            RecordRecent(p, url);
+        }
         RefreshPinState();
-        RecordRecent(p, url);
         ApplyFilter();
         _ = LoadListStatsAsync(IsListOfLists ? _all.Where(r => r.Selectable).ToList() : [], archived);
     }
@@ -398,8 +455,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
         _anchorRow = null;
         var visible = PlaylistFilter.Apply(_all, Criteria(), IsListOfLists);
 
-        Rows.Clear();
-        foreach (var r in visible) Rows.Add(r);
+        Rows.ReplaceAll(visible);
         Cards.SetItems(Rows);
         UpdateSelection();
     }

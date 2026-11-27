@@ -19,21 +19,33 @@ public sealed class ListCacheStore
 
     private readonly string _path;
     private readonly Lock _gate = new();
-    private readonly Dictionary<string, CachedList> _items;
+    private readonly Task<Dictionary<string, CachedList>> _load;
     private CancellationTokenSource? _pendingSave;
 
+    /// <summary>
+    /// Dosya arka planda okunur: 300 listelik önbellek onlarca MB olabilir ve açılışta arayüz thread'ini bekletirdi.
+    /// İlk erişim (genellikle bir playlist açılınca) okuma bitmediyse yalnızca kalan süre kadar bekler.
+    /// </summary>
     public ListCacheStore(string path)
     {
         _path = path;
-        var raw = JsonStore.Read<Dictionary<string, CachedList>>(path);
-        _items = raw is not null
-            ? new Dictionary<string, CachedList>(raw, StringComparer.OrdinalIgnoreCase)
-            : new Dictionary<string, CachedList>(StringComparer.OrdinalIgnoreCase);
+        _load = Task.Run(() =>
+        {
+            var raw = JsonStore.Read<Dictionary<string, CachedList>>(path);
+            return raw is not null
+                ? new Dictionary<string, CachedList>(raw, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, CachedList>(StringComparer.OrdinalIgnoreCase);
+        });
     }
+
+    /// <summary>Arka plandaki ilk okuma (testler ve ısınma için).</summary>
+    public Task Loaded => _load;
+
+    private Dictionary<string, CachedList> Items => _load.GetAwaiter().GetResult();
 
     public int Count
     {
-        get { lock (_gate) return _items.Count; }
+        get { lock (_gate) return Items.Count; }
     }
 
     public PlaylistInfo? TryGet(string url, TimeSpan? maxAge = null)
@@ -42,7 +54,7 @@ public sealed class ListCacheStore
         var ttl = maxAge ?? DefaultTtl;
         lock (_gate)
         {
-            if (!_items.TryGetValue(key, out var c)) return null;
+            if (!Items.TryGetValue(key, out var c)) return null;
             if (DateTimeOffset.Now - c.CachedAt > ttl) return null;
             return c.Info;
         }
@@ -53,11 +65,11 @@ public sealed class ListCacheStore
         var key = Key(url);
         lock (_gate)
         {
-            _items[key] = new CachedList(info, DateTimeOffset.Now);
-            if (_items.Count > MaxEntries)
+            Items[key] = new CachedList(info, DateTimeOffset.Now);
+            if (Items.Count > MaxEntries)
             {
-                var drop = _items.OrderBy(kv => kv.Value.CachedAt).Take(_items.Count - MaxEntries).Select(kv => kv.Key).ToList();
-                foreach (var k in drop) _items.Remove(k);
+                var drop = Items.OrderBy(kv => kv.Value.CachedAt).Take(Items.Count - MaxEntries).Select(kv => kv.Key).ToList();
+                foreach (var k in drop) Items.Remove(k);
             }
         }
         ScheduleSave();
@@ -67,7 +79,7 @@ public sealed class ListCacheStore
     {
         var key = Key(url);
         bool removed;
-        lock (_gate) removed = _items.Remove(key);
+        lock (_gate) removed = Items.Remove(key);
         if (removed) ScheduleSave();
     }
 
@@ -76,21 +88,21 @@ public sealed class ListCacheStore
         var changed = false;
         lock (_gate)
             foreach (var u in urls)
-                changed |= _items.Remove(Key(u));
+                changed |= Items.Remove(Key(u));
         if (changed) ScheduleSave();
     }
 
     public void Clear()
     {
-        lock (_gate) _items.Clear();
+        lock (_gate) Items.Clear();
         _ = SaveNowAsync();
     }
 
     public Task SaveNowAsync()
     {
         Dictionary<string, CachedList> snapshot;
-        lock (_gate) snapshot = new Dictionary<string, CachedList>(_items, StringComparer.OrdinalIgnoreCase);
-        return JsonStore.WriteAsync(_path, snapshot);
+        lock (_gate) snapshot = new Dictionary<string, CachedList>(Items, StringComparer.OrdinalIgnoreCase);
+        return JsonStore.WriteAsync(_path, snapshot, JsonStore.Compact);
     }
 
     private void ScheduleSave()

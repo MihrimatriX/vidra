@@ -1,11 +1,13 @@
 using System;
-using System.Collections.Concurrent;
 using System.Globalization;
+using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Vidra.Core;
+using Vidra.Core.Storage;
 using Vidra.Core.YtDlp;
 
 namespace Vidra.App;
@@ -67,27 +69,86 @@ public sealed class RelativeTimeConverter : IValueConverter
 /// </summary>
 public sealed class ThumbConverter : IValueConverter
 {
-    private static readonly ConcurrentDictionary<string, ImageSource> Cache = new();
+    // Ekranda aynı anda ~100 kapak olur; 800 ile geri kaydırınca da bellekte kalırlar
+    private static readonly LruCache<string, ImageSource> Cache = new(800);
+
+    /// <summary>Disk önbelleği klasörü; açılışta AppHost ayarlar. Null ise yalnızca bellek önbelleği.</summary>
+    public static string? DiskDir { get; set; }
 
     public object? Convert(object? value, Type t, object? p, CultureInfo c)
     {
         if (value is not string url || !Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
         var width = p is string s && int.TryParse(s, out var w) ? w : 320;
-        // Binlerce satırlık kanallarda sınırsız büyümesin
-        if (Cache.Count > 600) Cache.Clear();
-        return Cache.GetOrAdd($"{url}|{width}", _ =>
+        var key = $"{url}|{width}";
+        return Cache.GetOrAdd(key, _ => FromDisk(url, width) ?? FromNetwork(uri, url, width, key));
+    }
+
+    /// <summary>Daha önce inmiş kapak: küçük yerel JPEG, ağ beklemesi yok.</summary>
+    private static BitmapImage? FromDisk(string url, int width)
+    {
+        if (DiskDir is not { } dir) return null;
+        var path = ThumbnailDiskCache.PathFor(dir, url, width);
+        if (!File.Exists(path)) return null;
+        try
         {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             var bmp = new BitmapImage();
             bmp.BeginInit();
-            bmp.UriSource = uri;
-            bmp.DecodePixelWidth = width;
-            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.StreamSource = fs;
+            bmp.CacheOption = BitmapCacheOption.OnLoad; // akış kapanmadan çöz
             bmp.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
             bmp.EndInit();
-            // Başarısız indirme önbellekte kalmasın; bir sonraki görüntülemede yeniden denenir
-            bmp.DownloadFailed += (s2, e2) => Cache.TryRemove($"{url}|{width}", out ImageSource? _);
+            bmp.Freeze();
             return bmp;
-        });
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException)
+        {
+            // Yarım/bozuk dosya: sil, ağdan yeniden insin
+            try { File.Delete(path); } catch (Exception) { /* yoksay */ }
+            return null;
+        }
+    }
+
+    private static BitmapImage FromNetwork(Uri uri, string url, int width, string key)
+    {
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.UriSource = uri;
+        bmp.DecodePixelWidth = width;
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+        bmp.EndInit();
+        // Başarısız indirme önbellekte kalmasın; bir sonraki görüntülemede yeniden denenir
+        bmp.DownloadFailed += (_, _) => Cache.Remove(key);
+        bmp.DownloadCompleted += (_, _) => SaveToDisk(bmp, url, width);
+        return bmp;
+    }
+
+    /// <summary>Küçültülmüş hâli JPEG olarak yazar: kapak başına birkaç KB.</summary>
+    private static void SaveToDisk(BitmapSource bmp, string url, int width)
+    {
+        if (DiskDir is not { } dir) return;
+        try
+        {
+            var enc = new JpegBitmapEncoder { QualityLevel = 85 };
+            enc.Frames.Add(BitmapFrame.Create(bmp));
+            using var ms = new MemoryStream();
+            enc.Save(ms);
+            var bytes = ms.ToArray();
+            var path = ThumbnailDiskCache.PathFor(dir, url, width);
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    Directory.CreateDirectory(dir);
+                    var tmp = path + ".tmp";
+                    File.WriteAllBytes(tmp, bytes);
+                    File.Move(tmp, path, overwrite: true);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* önbellek yazılamazsa ağdan iner */ }
+            });
+        }
+        catch (Exception e) when (e is IOException or NotSupportedException or InvalidOperationException) { /* kodlanamadı: yalnızca bellekte kalır */ }
     }
 
     public object ConvertBack(object? value, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
