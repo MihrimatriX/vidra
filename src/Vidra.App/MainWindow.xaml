@@ -143,7 +143,8 @@
         <RadioButton DockPanel.Dock="Top" Style="{StaticResource NavItem}" GroupName="nav" Command="{Binding GoToCommand}" CommandParameter="Queue"
                      IsChecked="{Binding Page, Converter={StaticResource EnumBool}, ConverterParameter=Queue|Log}" ToolTip="Kuyruk &amp; geçmiş (Ctrl+4)">
           <Grid>
-            <DockPanel><c:Icon DockPanel.Dock="Left" Data="{StaticResource I.Clock}" Margin="0,0,10,0" /><TextBlock Text="Kuyruk &amp; geçmiş" TextTrimming="CharacterEllipsis" Margin="0,0,26,0" /></DockPanel>
+            <c:Icon Data="{StaticResource I.Clock}" HorizontalAlignment="Left" />
+            <TextBlock Text="Kuyruk &amp; geçmiş" TextTrimming="CharacterEllipsis" Margin="28,0,26,0" VerticalAlignment="Center" />
             <Border Style="{StaticResource NavBadge}" Background="{DynamicResource Accent}" Visibility="{Binding ActiveCount, Converter={StaticResource Vis}}">
               <TextBlock Style="{StaticResource BadgeText}" Text="{Binding ActiveCount}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentInk}" />
             </Border>
