@@ -97,7 +97,7 @@ public sealed partial class CardGrid : ObservableObject
     private const double MinCard = 250;
     private IReadOnlyList<object> _items = [];
 
-    public System.Collections.ObjectModel.ObservableCollection<object[]> Rows { get; } = [];
+    public Vidra.Core.BulkObservableCollection<object[]> Rows { get; } = [];
     [ObservableProperty] private int _columns = 4;
     /// <summary>16:9 kapak yüksekliği; kart genişliğinden (iç boşluk ve aralık düşülerek) hesaplanır.</summary>
     [ObservableProperty] private double _thumbHeight = 124;
@@ -120,13 +120,33 @@ public sealed partial class CardGrid : ObservableObject
 
     private void Rebuild()
     {
-        Rows.Clear();
-        foreach (var r in _items.Chunk(Columns)) Rows.Add(r);
+        Rows.ReplaceAll(_items.Chunk(Columns));
     }
 }
 
 public static class Ui
 {
+    /// <summary>
+    /// Son çağrıdan <paramref name="delay"/> sonra bir kez çalıştırır (yazarken filtre: her tuşta binlerce satırı
+    /// yeniden süzmek yerine yazma durunca). Uygulama dışında (testler) doğrudan çağırır.
+    /// </summary>
+    public static Action Debounce(Action action, TimeSpan delay)
+    {
+        System.Windows.Threading.DispatcherTimer? timer = null;
+        return () =>
+        {
+            var d = System.Windows.Application.Current?.Dispatcher;
+            if (d is null) { action(); return; }
+            if (timer is null)
+            {
+                timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background, d) { Interval = delay };
+                timer.Tick += (_, _) => { timer.Stop(); action(); };
+            }
+            timer.Stop();
+            timer.Start();
+        };
+    }
+
     /// <summary>
     /// Aynı arayüz turunda gelen çağrıları tek çağrıya indirir (ör. koleksiyona art arda 1000 ekleme → bir yenileme).
     /// Uygulama dışında (testler) doğrudan çağırır.

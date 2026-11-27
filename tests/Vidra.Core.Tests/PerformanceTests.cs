@@ -304,4 +304,18 @@ public class PerformanceTests : IDisposable
         Assert.Contains("1234 ms", line);
         Assert.EndsWith("detay", line);
     }
+
+    // ================= Toplu koleksiyon =================
+
+    [Fact]
+    public void Replace_all_raises_a_single_reset()
+    {
+        var c = new BulkObservableCollection<int> { 1, 2 };
+        var events = new List<System.Collections.Specialized.NotifyCollectionChangedAction>();
+        c.CollectionChanged += (_, e) => events.Add(e.Action);
+        c.ReplaceAll(Enumerable.Range(0, 1000));
+        Assert.Equal([System.Collections.Specialized.NotifyCollectionChangedAction.Reset], events);
+        Assert.Equal(1000, c.Count);
+        Assert.Equal(999, c[^1]);
+    }
 }
