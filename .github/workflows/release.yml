@@ -1,11 +1,20 @@
-# Sürüm yayınlar: Directory.Build.props'taki sürümle Windows'ta Vidra-Setup.exe ve Vidra-Portable.exe derlenir,
-# testler ve açılış denemesi geçerse v<sürüm> etiketiyle GitHub sürümü açılır. Notlar docs/releases/v<sürüm>.md'den.
-# Başlatma: Actions › Sürüm yayınla › Run workflow (main üzerinde) ya da v<sürüm> etiketini push'la.
-# Kurulumu ya da sürümü değiştiren PR'larda kuru çalışır: her şey derlenip denenir, yalnızca yayın adımı atlanır.
+# Sürüm yayınlar. Başlatma: Actions › Sürüm yayınla › Run workflow (main üzerinde), "artır" seçilir.
+#  1. installer/prepare-release.ps1 sürümü son v* etiketinden otomatik artırır, Directory.Build.props'a yazar ve
+#     docs/releases/next.md'den docs/releases/v<sürüm>.md notunu üretir (elle: props'taki sürüm ve hazır not).
+#  2. Windows'ta testler, Vidra-Setup.exe + Vidra-Portable.exe derlemesi ve açılış denemesi.
+#  3. Hepsi geçerse sürüm commit'i main'e push'lanır ve v<sürüm> etiketiyle GitHub sürümü bu commit'ten açılır.
+# v<sürüm> etiketini push'lamak da çalışır (props'taki sürümle aynı olmalı; commit atılmaz).
+# Kurulumu ya da sürümü değiştiren PR'larda kuru çalışır: sürüm hesaplanır, derlenip denenir; commit ve yayın atlanır.
 name: Sürüm yayınla
 
 on:
   workflow_dispatch:
+    inputs:
+      artir:
+        description: "Sürümün hangi parçası artsın? minor: 0.6.0 → 0.7.0, patch: 0.6.1, major: 1.0.0, elle: Directory.Build.props'taki"
+        type: choice
+        options: [minor, patch, major, elle]
+        default: minor
   push:
     tags: ['v*']
   pull_request:
@@ -25,28 +34,35 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      # Varsayılan persist-credentials, sürüm commit'ini main'e push'lamaya yeter (permissions: contents: write)
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      - name: Sürümü belirle
+      - name: Sürümü belirle ve hazırla
         id: ver
         shell: pwsh
+        env:
+          ARTIR: ${{ github.event_name == 'workflow_dispatch' && inputs.artir || (github.ref_type == 'tag' && 'elle' || 'minor') }}
         run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -and $env:GITHUB_REF -ne 'refs/heads/main') {
+            throw "Sürüm yalnızca main'den yayınlanır (şu an: $env:GITHUB_REF)"
+          }
+          ./installer/prepare-release.ps1 -Bump $env:ARTIR
           $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
           $tag = "v$version"
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $tag) {
             throw "Etiket ($env:GITHUB_REF_NAME) Directory.Build.props sürümüyle ($tag) uyuşmuyor"
           }
-          if (-not (Test-Path "docs/releases/$tag.md")) { throw "Sürüm notu yok: docs/releases/$tag.md" }
           if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
             gh release view $tag --json tagName 2>$null | Out-Null
-            if ($LASTEXITCODE -eq 0) { throw "$tag zaten yayınlanmış; önce Directory.Build.props'ta sürümü artır" }
+            if ($LASTEXITCODE -eq 0) { throw "$tag zaten yayınlanmış" }
           }
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host '--- Sürüm notu ---'
+          Get-Content "docs/releases/$tag.md"
+          git status --short
           exit 0
 
       - name: Testler
@@ -80,6 +96,29 @@ jobs:
           path: dist/*.exe
           retention-days: 7
 
+      # Derlenen dosyalar bu commit'in içeriğiyle aynı: önce derlenip denendi, sonra commit'lendi.
+      # main bu arada ilerlediyse push reddedilir ve hiçbir şey yayınlanmaz; workflow'u yeniden çalıştır.
+      - name: Sürüm commit'i
+        id: commit
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.ver.outputs.tag }}'
+          git add Directory.Build.props docs/releases
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            "sha=$env:GITHUB_SHA" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { throw "Etiketten yayında commit atılmaz; $tag için props ve not hazır olmalı" }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -q -m "Vidra ${{ steps.ver.outputs.version }}: sürüm numarası ve sürüm notu"
+          if ($LASTEXITCODE) { throw 'git commit başarısız' }
+          git push origin HEAD:refs/heads/main
+          if ($LASTEXITCODE) { throw "main'e push edilemedi (main ilerlemiş ya da korumalı olabilir); yayın yapılmadı" }
+          "sha=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
+
       - name: GitHub sürümünü aç
         if: github.event_name != 'pull_request'
         shell: pwsh
@@ -87,4 +126,4 @@ jobs:
           $tag = '${{ steps.ver.outputs.tag }}'
           gh release create $tag dist/Vidra-Setup.exe dist/Vidra-Portable.exe `
             --title "Vidra ${{ steps.ver.outputs.version }}" --notes-file "docs/releases/$tag.md" `
-            --target $env:GITHUB_SHA --latest
+            --target '${{ steps.commit.outputs.sha }}' --latest
