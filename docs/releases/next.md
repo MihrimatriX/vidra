@@ -6,9 +6,5 @@
 -->
 
 ### Yenilikler
-- **Uygulama içi güncelleme:** Yeni sürüm çıkınca kenar çubuğundan indir; dosya sha256 ile doğrulanır, tek tıkla kurulup Vidra yeniden açılır (kurulu ve taşınabilir sürümde).
-- **YouTube sınırlarına uyum:** Sınıra takılınca tüm kuyruk birlikte bekler ve otomatik yeniden dener; YouTube durumu görünür, PO token desteği.
-- **Daha sade arayüz:** Kompakt yoğunluk, 6 sayfalık menü ve sabit İndir çubuğu.
-- **Daha hızlı:** Açılış, önbellekler, analiz bilgisinin yeniden kullanımı; playlistlerde ilk sayfa hemen görünür.
 
 ### Düzeltmeler
