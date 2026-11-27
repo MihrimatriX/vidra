@@ -272,7 +272,8 @@ public static class YtDlpArgs
     {
         PoliteLevel.Balanced => ["--sleep-requests", "0.75", "--sleep-subtitles", "3", "--sleep-interval", "3", "--max-sleep-interval", "8"],
         PoliteLevel.Safe => ["--sleep-requests", "0.75", "--sleep-subtitles", "5", "--sleep-interval", "10", "--max-sleep-interval", "20"],
-        _ => [],
+        // Kapalıyken de altyazılar arasında kısa bekleme: art arda iki dil isteği bile 429 alabiliyor
+        _ => ["--sleep-subtitles", "2"],
     };
 
     /// <param name="polite">Kuyruğun o anki nazik mod seviyesi (bkz. RateGuard); verilmezse ayardaki.</param>
