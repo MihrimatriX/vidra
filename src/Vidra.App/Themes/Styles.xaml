@@ -65,6 +65,27 @@
     <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
     <Setter Property="Padding" Value="{DynamicResource TilePad}" />
   </Style>
+  <!-- Hata ayrıntısı: salt okunur, seçilip kopyalanabilen yt-dlp çıktısı (çerçevesiz, eşaralıklı, en çok ~6 satır) -->
+  <Style x:Key="DetailText" TargetType="TextBox">
+    <Setter Property="IsReadOnly" Value="True" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="MaxHeight" Value="110" />
+    <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <ScrollViewer x:Name="PART_ContentHost" Background="{TemplateBinding Background}" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style x:Key="Notice" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource WarnSoft}" />
     <Setter Property="BorderBrush" Value="{DynamicResource WarnLine}" />

@@ -5,9 +5,11 @@ using Vidra.Core.Tools;
 
 namespace Vidra.Core.YtDlp;
 
-public sealed class ProbeException(string message, ErrorKind kind) : Exception(message)
+/// <param name="detail">yt-dlp stderr'inin son satırları: kısa açıklamanın altında "ayrıntı" olarak gösterilir.</param>
+public sealed class ProbeException(string message, ErrorKind kind, string? detail = null) : Exception(message)
 {
     public ErrorKind Kind { get; } = kind;
+    public string? Detail { get; } = detail;
 }
 
 public sealed record SessionTestResult(bool Ok, string Message, ErrorKind? Kind = null);
@@ -38,19 +40,66 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
             url = YouTubeUrl.MembersPlaylistUrl(id);
         }
 
-        var (doc, json) = await RunJsonRawAsync(YtDlpArgs.Probe(url, kind, settings(), tools.Paths, limit), ct).ConfigureAwait(false);
-        using (doc)
+        var videoId = kind == LinkKind.Video ? YouTubeUrl.VideoId(url) : null;
+        var step = tools.Fallback.For(videoId);
+        var first = await RunJsonRawAsync(YtDlpArgs.Probe(url, kind, settings(), tools.Paths, limit, step), ct).ConfigureAwait(false);
+        using (first.Doc)
         {
-            var root = doc.RootElement;
-            if (kind == LinkKind.Video || !ProbeParser.IsPlaylist(root))
-            {
-                var v = ProbeParser.ParseVideo(root);
-                // Canlı yayının format adresleri kısa ömürlü ve değişken: yeniden kullanma
-                if (!v.Live) infoCache?.Save(v.Id, json);
-                return v;
-            }
-            return ProbeParser.ParsePlaylist(root, kind);
+            var root = first.Doc.RootElement;
+            if (kind != LinkKind.Video && ProbeParser.IsPlaylist(root)) return ProbeParser.ParsePlaylist(root, kind);
+            return await VideoWithFallbackAsync(url, ProbeParser.ParseVideo(root), first.Json, first.Warnings, step, ct).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// YouTube yalnızca 360p (çoğu zaman tek birleşik format 18) verdiyse sırayla başka yolları dener: TV istemcileri,
+    /// sonra (oturum varsa ve video üyelik istemiyorsa) çerezsiz. En yüksek kaliteyi veren sonuç kullanılır ve hatırlanır;
+    /// hiçbiri işe yaramazsa neden kullanıcıya ve günlüğe yazılır.
+    /// </summary>
+    private async Task<VideoInfo> VideoWithFallbackAsync(string url, VideoInfo v, string json, IReadOnlyList<string> warnings, FallbackStep step,
+        CancellationToken ct)
+    {
+        var issues = FormatDiagnostics.Detect(warnings);
+        var best = (Info: v, Json: json, Step: step);
+        if (FormatDiagnostics.LooksLimited(v, issues))
+        {
+            AppLog.Write($"Kısıtlı biçim listesi: {url} · en yüksek {FormatDiagnostics.MaxHeight(v)}p · yol {step}",
+                warnings.Count > 0 ? string.Join(Environment.NewLine, warnings) : "(uyarı yok)");
+            var s = settings();
+            foreach (var next in new[] { FallbackStep.TvClients, FallbackStep.NoCookies })
+            {
+                if (next <= step) continue;
+                // Üyelik/özel videoda çerezsiz deneme anlamsız; oturum yoksa zaten çerezsizdi
+                if (next == FallbackStep.NoCookies && (s.Cookies is NoCookies || v.MembersOnly)) continue;
+                try
+                {
+                    var r = await RunJsonRawAsync(YtDlpArgs.Probe(url, LinkKind.Video, s, tools.Paths, null, next), ct).ConfigureAwait(false);
+                    using (r.Doc)
+                    {
+                        var alt = ProbeParser.ParseVideo(r.Doc.RootElement);
+                        AppLog.Write($"Kısıt yolu {next}: en yüksek {FormatDiagnostics.MaxHeight(alt)}p", r.Warnings.Count > 0 ? string.Join(Environment.NewLine, r.Warnings) : null);
+                        if (FormatDiagnostics.MaxHeight(alt) > FormatDiagnostics.MaxHeight(best.Info)) best = (alt, r.Json, next);
+                        if (!FormatDiagnostics.LooksLimited(alt, FormatDiagnostics.Detect(r.Warnings))) break;
+                    }
+                }
+                catch (ProbeException e)
+                {
+                    AppLog.Write($"Kısıt yolu {next} başarısız: {e.Message}", e.Detail);
+                }
+            }
+            if (best.Step != step) tools.Fallback.Remember(best.Info.Id, best.Step);
+        }
+
+        var result = best.Info;
+        if (FormatDiagnostics.MaxHeight(result) <= FormatDiagnostics.MaxHeight(v) && FormatDiagnostics.LooksLimited(v, issues))
+            result = result with
+            {
+                FormatNote = FormatDiagnostics.Note(FormatDiagnostics.MaxHeight(result), issues),
+                FormatDetail = warnings.Count > 0 ? string.Join(Environment.NewLine, warnings) : null,
+            };
+        // Canlı yayının format adresleri kısa ömürlü ve değişken: yeniden kullanma
+        if (!result.Live) infoCache?.Save(result.Id, best.Json);
+        return result;
     }
 
     private async Task<string?> ResolveChannelIdAsync(string rawUrl, CancellationToken ct)
@@ -83,7 +132,7 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
     private async Task<JsonDocument> RunJsonAsync(List<string> args, CancellationToken ct) =>
         (await RunJsonRawAsync(args, ct).ConfigureAwait(false)).Doc;
 
-    private async Task<(JsonDocument Doc, string Json)> RunJsonRawAsync(List<string> args, CancellationToken ct)
+    private async Task<(JsonDocument Doc, string Json, IReadOnlyList<string> Warnings)> RunJsonRawAsync(List<string> args, CancellationToken ct)
     {
         ProcessResult r;
         using (Perf.Measure("probe", args[^1]))
@@ -93,13 +142,20 @@ public sealed class YtDlpService(IProcessRunner runner, ToolManager tools, Func<
         if (json.Length == 0 || json == "null" || json[0] != '{')
         {
             var err = LastError(r.StdErr);
-            if (OutputParser.MissingTab(err) is { } tab) throw new ProbeException($"Bu kanalda {tab.Label()} sekmesi yok.", ErrorKind.Unavailable);
+            var detail = AppLog.Tail(r.StdErr);
+            if (OutputParser.MissingTab(err) is { } tab) throw new ProbeException($"Bu kanalda {tab.Label()} sekmesi yok.", ErrorKind.Unavailable, detail);
             var k = OutputParser.Classify(err);
             if (k is ErrorKind.RateLimited or ErrorKind.BotCheck) guard?.Trip(k);
-            throw new ProbeException(OutputParser.FriendlyError(k, string.IsNullOrWhiteSpace(err) ? "Video bilgisi alınamadı." : err), k);
+            var friendly = OutputParser.FriendlyError(k, string.IsNullOrWhiteSpace(err) ? "Video bilgisi alınamadı." : err);
+            AppLog.Write($"Analiz hatası ({k}, çıkış {r.ExitCode}): {friendly}",
+                "Komut: " + YtDlpArgs.ToCommandLine("yt-dlp", args, CookiePath(args)) + Environment.NewLine + (detail.Length > 0 ? detail : "(stderr boş)"));
+            throw new ProbeException(friendly, k, detail.Length > 0 ? detail : null);
         }
-        return (JsonDocument.Parse(json), json);
+        return (JsonDocument.Parse(json), json, FormatDiagnostics.Warnings(r.StdErr));
     }
+
+    /// <summary>Günlüğe yazılan komutta çerez dosyasının yolu gizlenir.</summary>
+    private static string? CookiePath(List<string> args) => args.IndexOf("--cookies") is var i and >= 0 && i + 1 < args.Count ? args[i + 1] : null;
 
     public async Task<SessionTestResult> TestSessionAsync(CancellationToken ct = default)
     {

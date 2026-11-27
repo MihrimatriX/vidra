@@ -70,7 +70,12 @@
                   Visibility="{Binding UpcomingUrl, Converter={StaticResource Vis}}" ToolTip="Kuyruğa alınır; yt-dlp yayının başlamasını bekleyip indirir">
             <StackPanel Orientation="Horizontal"><c:Icon Data="{StaticResource I.Bell}" Size="13" Margin="0,0,6,0" /><TextBlock Text="Başlayınca indir" /></StackPanel>
           </Button>
-          <TextBlock Text="{Binding Error}" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="14" />
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{Binding Error}" TextWrapping="Wrap" FontSize="14" />
+            <!-- Ham yt-dlp çıktısı: seçilip kopyalanabilir; tamamı vidra.log'da -->
+            <TextBox Style="{StaticResource DetailText}" Margin="0,6,0,0" Text="{Binding ErrorDetail, Mode=OneWay}"
+                     Visibility="{Binding ErrorDetail, Converter={StaticResource Vis}}" ToolTip="yt-dlp'nin çıktısı · tamamı %LOCALAPPDATA%\Vidra\vidra.log" />
+          </StackPanel>
         </DockPanel>
       </Border>
 
@@ -183,6 +188,15 @@
               </StackPanel>
             </StackPanel>
           </DockPanel>
+
+          <!-- YouTube bazı kaliteleri vermedi (ör. yalnızca 360p): neden ve yt-dlp uyarıları -->
+          <Border Style="{StaticResource Notice}" Margin="18,12,18,0" Visibility="{Binding Info.FormatNote, Converter={StaticResource Vis}}">
+            <StackPanel>
+              <TextBlock Text="{Binding Info.FormatNote}" TextWrapping="Wrap" FontSize="13.5" />
+              <TextBox Style="{StaticResource DetailText}" Margin="0,6,0,0" Text="{Binding Info.FormatDetail, Mode=OneWay}"
+                       Visibility="{Binding Info.FormatDetail, Converter={StaticResource Vis}}" ToolTip="yt-dlp uyarıları · %LOCALAPPDATA%\Vidra\vidra.log" />
+            </StackPanel>
+          </Border>
 
           <!-- Seçim: üst satırda video/ses ve biçim, altında kalite ya da ses biçimi kartları -->
           <StackPanel Margin="18,14,18,14">

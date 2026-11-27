@@ -215,7 +215,8 @@ public static class YtDlpArgs
     }
 
     /// <summary>Hem indirme hem probe için ortak: kodlama, bileşen yolları, ağ ve oturum.</summary>
-    public static List<string> Base(AppSettings s, ToolPaths t)
+    /// <param name="fallback">YouTube akışları kısıtladığında denenen yol (bkz. FormatFallback).</param>
+    public static List<string> Base(AppSettings s, ToolPaths t, FallbackStep fallback = FallbackStep.None)
     {
         var a = new List<string>
         {
@@ -227,9 +228,28 @@ public static class YtDlpArgs
         };
         if (!string.IsNullOrWhiteSpace(s.Proxy)) a.AddRange(["--proxy", s.Proxy.Trim()]);
         a.AddRange(PoToken(s, t));
-        a.AddRange(Cookies(s.Cookies));
+        a.AddRange(Fallback(fallback, s, t));
+        var cookies = fallback == FallbackStep.NoCookies ? new NoCookies() : s.Cookies;
+        a.AddRange(Cookies(cookies));
         // Analiz/arama hızlı kalsın: yalnızca Güvenli modda ve oturumla (hesap işaretlenme riski) istekler arası bekleme
-        if (s.EffectivePolite == PoliteLevel.Safe && s.Cookies is not NoCookies) a.AddRange(["--sleep-requests", "0.75"]);
+        if (s.EffectivePolite == PoliteLevel.Safe && cookies is not NoCookies) a.AddRange(["--sleep-requests", "0.75"]);
+        return a;
+    }
+
+    /// <summary>
+    /// Kısıt yolu argümanları. Her iki yolda da çözücü betik (yt-dlp-ejs) eksik/eskiyse yt-dlp onu GitHub'dan alabilir
+    /// (yalnızca gerektiğinde indirir). TV istemcileri PO token istemez ve çerezle çalışır; "default" varsayılanları da tutar.
+    /// PO token sağlayıcısı açıksa mweb listede kalır (aynı anahtarı sonraki --extractor-args ezer).
+    /// </summary>
+    public static List<string> Fallback(FallbackStep step, AppSettings s, ToolPaths t)
+    {
+        if (step == FallbackStep.None) return [];
+        var a = new List<string> { "--remote-components", "ejs:github" };
+        if (step == FallbackStep.TvClients)
+        {
+            var pot = PoToken(s, t).Count > 0 ? ",mweb" : "";
+            a.AddRange(["--extractor-args", $"youtube:player_client=tv,tv_downgraded,default{pot}"]);
+        }
         return a;
     }
 
@@ -257,10 +277,11 @@ public static class YtDlpArgs
 
     /// <param name="polite">Kuyruğun o anki nazik mod seviyesi (bkz. RateGuard); verilmezse ayardaki.</param>
     /// <param name="infoJson">Analizde saklanan video bilgisi: verilirse çıkarım atlanır (--load-info-json), adres kullanılmaz.</param>
+    /// <param name="fallback">Analizde işe yarayan kısıt yolu: indirme de aynı istemcilerle çıkarsın.</param>
     public static List<string> Download(string url, DownloadOptions o, AppSettings s, ToolPaths t, string? outputTemplate = null, PoliteLevel? polite = null,
-        string? infoJson = null)
+        string? infoJson = null, FallbackStep fallback = FallbackStep.None)
     {
-        var a = Base(s, t);
+        var a = Base(s, t, fallback);
         a.AddRange(PoliteArgs(polite ?? s.EffectivePolite));
         a.AddRange([
             "--newline",
@@ -295,9 +316,9 @@ public static class YtDlpArgs
         return a;
     }
 
-    public static List<string> Probe(string url, LinkKind kind, AppSettings s, ToolPaths t, int? limit = null)
+    public static List<string> Probe(string url, LinkKind kind, AppSettings s, ToolPaths t, int? limit = null, FallbackStep fallback = FallbackStep.None)
     {
-        var a = Base(s, t);
+        var a = Base(s, t, fallback);
         a.Add("-J");
         if (kind == LinkKind.Video) a.Add("--no-playlist");
         else a.Add("--flat-playlist");

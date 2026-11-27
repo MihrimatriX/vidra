@@ -38,6 +38,9 @@ public sealed partial class DownloadJob : ObservableObject
     [ObservableProperty] private ErrorKind? _errorKind;
     [ObservableProperty] private string? _errorMessage;
 
+    /// <summary>Hatanın ham hâli (yt-dlp'nin ERROR satırı ve son satırları): kısa açıklamanın altında ayrıntı olarak.</summary>
+    [ObservableProperty] private string? _errorDetail;
+
     /// <summary>Sınır/ağ hatasından sonra kendiliğinden yeniden deneme zamanı; doluyken iş sırada bekler, başlatılmaz.</summary>
     [ObservableProperty] private DateTimeOffset? _retryAt;
 
