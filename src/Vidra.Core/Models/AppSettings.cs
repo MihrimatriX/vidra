@@ -56,6 +56,7 @@ public sealed class AppSettings
     public List<string> SponsorCategories { get; set; } = ["sponsor", "selfpromo", "interaction"];
 
     public ThemeMode Theme { get; set; } = ThemeMode.Dark;
+    public UiDensity Density { get; set; } = UiDensity.Compact;
     public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
 
     public bool WatchClipboard { get; set; } = true;
@@ -78,6 +79,9 @@ public sealed class AppSettings
 
     /// <summary>Playlist/kanal ekranında kart ızgarası (false: satır listesi).</summary>
     public bool PlaylistCards { get; set; } = true;
+
+    /// <summary>Kütüphane dosyaları satır listesi olarak (false: kart ızgarası).</summary>
+    public bool LibraryList { get; set; }
 
     /// <summary>Eklenti çerez gönderince oturumsuz Vidra kendiliğinden eklenti oturumuna geçsin. Eklenti oturumundan çıkış kapatır.</summary>
     public bool ExtensionSync { get; set; } = true;

@@ -69,6 +69,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     ];
 
     [ObservableProperty] private string? _notice;
+
+    /// <summary>Ayarlar açılınca kaydırılacak bölüm (ör. "SecTools"); görünüm okuyup temizler.</summary>
+    public string? PendingSection { get; set; }
+
+    /// <summary>Ayarlar'da gelişmiş bölümler (Ağ &amp; performans, Bileşenler) açık mı; oturum boyunca hatırlanır.</summary>
+    public bool ShowAdvanced { get; set; }
     [ObservableProperty] private string? _updateLog;
     [ObservableProperty] private bool _updating;
 
@@ -295,6 +301,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         get => S.Theme;
         set { Set(s => s.Theme = value); ThemeService.Apply(value); }
+    }
+
+    public IReadOnlyList<Choice> Densities { get; } = [new(UiDensity.Compact, "Kompakt"), new(UiDensity.Comfortable, "Rahat")];
+
+    public UiDensity Density
+    {
+        get => S.Density;
+        set { Set(s => s.Density = value); ThemeService.ApplyDensity(value); }
     }
 
     public bool WatchClipboard

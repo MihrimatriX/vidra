@@ -29,7 +29,7 @@
     </Style>
   </UserControl.Resources>
 
-  <Grid Margin="{StaticResource PagePadFill}">
+  <Grid Margin="{DynamicResource PagePadFill}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
@@ -51,7 +51,7 @@
     </DockPanel>
 
     <!-- Kuyruk boş -->
-    <Border Grid.Row="1" Style="{StaticResource Tile}" Padding="18" VerticalAlignment="Top"
+    <Border Grid.Row="1" Style="{StaticResource Tile}" Padding="{DynamicResource CardPad}" VerticalAlignment="Top"
             Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}, ConverterParameter=!}">
       <TextBlock Style="{StaticResource Body2}" Text="Kuyrukta iş yok. Bir indirme başlayınca günlüğü burada görünür." />
     </Border>
@@ -76,7 +76,7 @@
       </ListBox>
 
       <!-- Seçili işin günlüğü -->
-      <Border Grid.Column="1" Style="{StaticResource Card}" Padding="18" DataContext="{Binding Selected}"
+      <Border Grid.Column="1" Style="{StaticResource Card}" Padding="{DynamicResource CardPad}" DataContext="{Binding Selected}"
               Visibility="{Binding Converter={StaticResource Vis}}">
         <DockPanel>
           <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">

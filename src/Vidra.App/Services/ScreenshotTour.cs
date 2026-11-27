@@ -131,6 +131,10 @@ internal static class ScreenshotTour
         await Settle(3500);
         await Save(w, $"{theme}-10-kutuphane");
         await SaveMenu(w, b => b.DataContext is HistoryEntry && b.ContextMenu is not null, $"{theme}-11-kutuphane-menusu", 120, 90);
+        vm.Library.ListView = true;
+        await Settle(1200);
+        await Save(w, $"{theme}-10b-kutuphane-liste");
+        vm.Library.ListView = false;
 
         // Sürükle-bırak katmanı
         w.DropLayer.Visibility = Visibility.Visible;
@@ -143,6 +147,7 @@ internal static class ScreenshotTour
         vm.Update = new AppRelease(new Version(0, 4, 0), "v0.4.0", "https://github.com/MihrimatriX/vidra/releases", null);
         vm.Incognito = true;
         vm.DismissToastCommand.Execute(null);
+        vm.Settings.ShowAdvanced = true; // Ağ & performans gelişmiş bölümde
         vm.Go(Page.Settings);
         await Settle(1200);
         if (Find(w.PageHost, "SecNet") is { } net) net.BringIntoView(new Rect(0, 0, 10, 600));
@@ -163,6 +168,16 @@ internal static class ScreenshotTour
         // Kanal › Kurslar: liste kartlarında video sayısı ve üyelere özel rozeti
         await ShowCourses(vm);
         await Save(w, $"{theme}-15-kanal-kurslar");
+
+        // Dar pencere: kenar menüsü yalnızca ikon
+        w.Width = 960;
+        vm.Go(Page.Queue);
+        vm.ClipboardLink = "https://www.youtube.com/watch?v=aqz-KE-bpKQ"; // pano şeridi: Hemen indir
+        await Settle(1500);
+        await Save(w, $"{theme}-16-dar-pencere");
+        vm.ClipboardLink = null;
+        w.Width = 1280;
+        await Settle(600);
     }
 
     /// <summary>

@@ -5,8 +5,8 @@
              x:Name="Root">
   <UserControl.Resources>
     <Style x:Key="Section" TargetType="Border" BasedOn="{StaticResource Card}">
-      <Setter Property="Padding" Value="26" />
-      <Setter Property="Margin" Value="0,0,0,20" />
+      <Setter Property="Padding" Value="{DynamicResource CardPad}" />
+      <Setter Property="Margin" Value="{DynamicResource SectionGap}" />
     </Style>
     <Style x:Key="SectionLink" TargetType="Button" BasedOn="{StaticResource Btn}">
       <Setter Property="Background" Value="Transparent" />
@@ -14,31 +14,39 @@
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="FontWeight" Value="Normal" />
       <Setter Property="Foreground" Value="{DynamicResource Text2}" />
-      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="MinHeight" Value="{DynamicResource NavH}" />
       <Setter Property="Padding" Value="12,0" />
     </Style>
   </UserControl.Resources>
 
-  <Grid Margin="32,18,32,0">
+  <Grid Margin="{DynamicResource PagePadFill}">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="220" />
-      <ColumnDefinition Width="32" />
+      <ColumnDefinition Width="200" />
+      <ColumnDefinition Width="24" />
       <ColumnDefinition Width="*" MaxWidth="1000" />
     </Grid.ColumnDefinitions>
 
     <!-- Bölüm menüsü -->
     <StackPanel>
-      <TextBlock Style="{StaticResource H1}" Text="Ayarlar" Margin="0,0,0,14" />
+      <TextBlock Style="{StaticResource H1}" Text="Ayarlar" Margin="0,0,0,12" />
+      <!-- Ayarlarda ara: bölümlerin tüm yazılarında (başlık, açıklama, seçenek adları) geçen bölümler kalır -->
+      <TextBox x:Name="FilterBox" Tag="Ayarlarda ara  (Ctrl+F)" Margin="0,0,0,10" TextChanged="Filter_Changed"
+               AutomationProperties.Name="Ayarlarda ara" />
       <Button Style="{StaticResource SectionLink}" Content="Hesap &amp; çerezler" Click="Jump_Click" CommandParameter="SecAccount" />
       <Button Style="{StaticResource SectionLink}" Content="İndirme &amp; dosyalar" Click="Jump_Click" CommandParameter="SecFiles" />
       <Button Style="{StaticResource SectionLink}" Content="Format varsayılanları" Click="Jump_Click" CommandParameter="SecFormat" />
-      <Button Style="{StaticResource SectionLink}" Content="Ağ &amp; performans" Click="Jump_Click" CommandParameter="SecNet" />
       <Button Style="{StaticResource SectionLink}" Content="Davranış &amp; görünüm" Click="Jump_Click" CommandParameter="SecLook" />
+      <Button Style="{StaticResource SectionLink}" Content="Ağ &amp; performans" Click="Jump_Click" CommandParameter="SecNet" />
       <Button Style="{StaticResource SectionLink}" Content="Bileşenler" Click="Jump_Click" CommandParameter="SecTools" />
+      <!-- Gelişmiş: ağ/performans (-N, -R, proxy, ek argümanlar) ve bileşenler. Arama bunları da bulur. -->
+      <CheckBox x:Name="AdvancedBox" Content="Gelişmiş ayarları göster" Margin="12,14,0,0" Click="Filter_Changed"
+                ToolTip="Ağ &amp; performans ve Bileşenler bölümleri" />
     </StackPanel>
 
     <ScrollViewer x:Name="Scroller" Grid.Column="2" VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="0,0,8,48">
+        <TextBlock x:Name="NoMatch" Style="{StaticResource Body2}" Margin="4,0,0,16" Visibility="Collapsed"
+                   Text="Bu aramayla eşleşen ayar yok." />
         <Border Style="{StaticResource Notice}" Margin="0,0,0,16" Visibility="{Binding Notice, Converter={StaticResource Vis}}">
           <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="14" />
         </Border>
@@ -182,6 +190,31 @@
           </StackPanel>
         </Border>
 
+        <!-- Davranış -->
+        <Border x:Name="SecLook" Style="{StaticResource Section}">
+          <StackPanel>
+            <TextBlock Style="{StaticResource H2}" Text="Davranış &amp; görünüm" Margin="0,0,0,16" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+              <TextBlock Text="Tema" Width="80" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource Text2}" />
+              <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Themes}" SelectedValue="{Binding Theme}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+              <TextBlock Text="Yoğunluk" Width="80" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource Text2}" />
+              <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Densities}" SelectedValue="{Binding Density}" />
+              <TextBlock Style="{StaticResource Small}" VerticalAlignment="Center" Margin="12,0,0,0" Text="Kompakt: ekrana daha çok iş, kart ve ayar sığar" />
+            </StackPanel>
+            <c:UniformWrapPanel MinItemWidth="240">
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding WatchClipboard}" Content="Pano izleme" Tag="Kopyalanan YouTube bağlantısını yakala" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding Notifications}" Content="Bildirimler" Tag="İndirme bitince ya da yeni takip videosu gelince" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding MinimizeToTray}" Content="Sistem tepsisi" Tag="Kapatınca arka planda devam et" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding KeepAwake}" Content="Uyumayı engelle" Tag="İndirme sürerken ve zamanlanmış başlangıç beklenirken" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding CheckAppUpdates}" Content="Güncelleme denetimi" Tag="Açılışta yeni Vidra sürümü var mı bak" />
+              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding AutoDownloadAppUpdates}" Content="Güncellemeyi kendiliğinden indir"
+                        Tag="Yeni sürüm arka planda insin; kurulum için yine sorulur" IsEnabled="{Binding CheckAppUpdates}" />
+            </c:UniformWrapPanel>
+          </StackPanel>
+        </Border>
+
         <!-- Ağ -->
         <Border x:Name="SecNet" Style="{StaticResource Section}">
           <StackPanel>
@@ -213,26 +246,6 @@
                        Text="{Binding ExtraArgsError}" Visibility="{Binding ExtraArgsError, Converter={StaticResource Vis}}" />
             <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap"
                        Text="Her indirmenin sonuna eklenir; aynı bayrak iki kez verilirse yt-dlp sonrakini kullanır. Çıktı yolu, ilerleme ve playlist bayrakları Vidra'da kalır." />
-          </StackPanel>
-        </Border>
-
-        <!-- Davranış -->
-        <Border x:Name="SecLook" Style="{StaticResource Section}">
-          <StackPanel>
-            <TextBlock Style="{StaticResource H2}" Text="Davranış &amp; görünüm" Margin="0,0,0,16" />
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-              <TextBlock Text="Tema" Width="80" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource Text2}" />
-              <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Themes}" SelectedValue="{Binding Theme}" />
-            </StackPanel>
-            <c:UniformWrapPanel MinItemWidth="240">
-              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding WatchClipboard}" Content="Pano izleme" Tag="Kopyalanan YouTube bağlantısını yakala" />
-              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding Notifications}" Content="Bildirimler" Tag="İndirme bitince ya da yeni takip videosu gelince" />
-              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding MinimizeToTray}" Content="Sistem tepsisi" Tag="Kapatınca arka planda devam et" />
-              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding KeepAwake}" Content="Uyumayı engelle" Tag="İndirme sürerken ve zamanlanmış başlangıç beklenirken" />
-              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding CheckAppUpdates}" Content="Güncelleme denetimi" Tag="Açılışta yeni Vidra sürümü var mı bak" />
-              <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding AutoDownloadAppUpdates}" Content="Güncellemeyi kendiliğinden indir"
-                        Tag="Yeni sürüm arka planda insin; kurulum için yine sorulur" IsEnabled="{Binding CheckAppUpdates}" />
-            </c:UniformWrapPanel>
           </StackPanel>
         </Border>
 

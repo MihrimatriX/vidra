@@ -30,6 +30,27 @@ public class StorageTests
 
     /// <summary>Önceki sürümün yazdığı ayar/bekleyen iş: yeni alanlar eksik, eski değerler korunur.</summary>
     [Fact]
+    public async Task Density_and_library_view_round_trip_and_default_to_compact_grid()
+    {
+        Assert.Equal(UiDensity.Compact, new AppSettings().Density);
+        Assert.False(new AppSettings().LibraryList);
+
+        var path = Path.Combine(Path.GetTempPath(), $"vidra-density-{Guid.NewGuid():N}.json");
+        try
+        {
+            await JsonStore.WriteAsync(path, new AppSettings { Density = UiDensity.Comfortable, LibraryList = true });
+            var back = JsonStore.Read<AppSettings>(path)!;
+            Assert.Equal(UiDensity.Comfortable, back.Density);
+            Assert.True(back.LibraryList);
+
+            // Eski ayar dosyası (alan yok): Kompakt ızgaraya düşer
+            await File.WriteAllTextAsync(path, """{"theme": "dark"}""");
+            Assert.Equal(UiDensity.Compact, JsonStore.Read<AppSettings>(path)!.Density);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
     public void Old_options_json_still_reads()
     {
         var o = System.Text.Json.JsonSerializer.Deserialize<DownloadOptions>(

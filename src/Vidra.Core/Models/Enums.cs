@@ -15,6 +15,9 @@ public enum BrowserKind { Firefox, Chrome, Edge, Brave, Opera, Vivaldi, Chromium
 
 public enum ThemeMode { Light, Dark, System }
 
+/// <summary>Arayüz yoğunluğu: Compact daha çok içerik sığdırır (varsayılan), Comfortable eski geniş boşluklar.</summary>
+public enum UiDensity { Compact, Comfortable }
+
 public enum UpdateChannel { Stable, Nightly }
 
 public enum JobStatus { Queued, Running, Processing, Paused, Done, Error, Canceled }

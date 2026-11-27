@@ -4,7 +4,7 @@
              xmlns:c="clr-namespace:Vidra.App.Controls"
              x:Name="Root">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="{StaticResource PagePad}" MaxWidth="1120" HorizontalAlignment="Left">
+    <StackPanel Margin="{DynamicResource PagePad}" MaxWidth="1120" HorizontalAlignment="Left">
       <TextBlock Style="{StaticResource H1}" Text="Hesabım" Margin="0,0,0,6" />
       <TextBlock Style="{StaticResource Body2}" Margin="0,0,0,20" MaxWidth="760" HorizontalAlignment="Left"
                  Text="YouTube hesabını bağlayınca üyelere özel, yaş sınırlı ve sana özel videolar indirilebilir; abonelik akışın ve kayıtlı listelerin burada açılır." />
@@ -14,7 +14,7 @@
       </Border>
 
       <!-- ===== Oturum kartı ===== -->
-      <Border Style="{StaticResource Card}" Padding="22" Margin="0,0,0,20">
+      <Border Style="{StaticResource Card}" Padding="{DynamicResource CardPad}" Margin="0,0,0,20">
         <StackPanel>
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -87,7 +87,7 @@
       </Border>
 
       <!-- ===== Tarayıcı eklentisi: oturumun tek sahibi gerçek tarayıcı olur, dışa aktarılmış kopya bayatlamaz ===== -->
-      <Border Style="{StaticResource Card}" Padding="22" Margin="0,0,0,20">
+      <Border Style="{StaticResource Card}" Padding="{DynamicResource CardPad}" Margin="0,0,0,20">
         <StackPanel>
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">

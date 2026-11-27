@@ -85,7 +85,7 @@
   <Grid>
     <!-- ============ Başlangıç: bağlantı kutusu + sabitlenen kanallar + son açılanlar + hesap akışları ============ -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding HasInfo, Converter={StaticResource Vis}, ConverterParameter=!}">
-      <StackPanel Margin="{StaticResource PagePad}" MaxWidth="1320">
+      <StackPanel Margin="{DynamicResource PagePad}" MaxWidth="1320">
         <TextBlock Style="{StaticResource H1}" Text="Playlist &amp; kanal" />
         <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,4,0,12"
                    Text="Bir playlist, kurs, kanal ya da hesap akışı aç; üye kanallarını sabitleyip doğrudan Kurslar veya Üyeler sekmesine atla." />
@@ -237,7 +237,7 @@
     </ScrollViewer>
 
     <!-- ============ Açık liste ============ -->
-    <Grid Margin="{StaticResource PagePadFill}" Visibility="{Binding HasInfo, Converter={StaticResource Vis}}">
+    <Grid Margin="{DynamicResource PagePadFill}" Visibility="{Binding HasInfo, Converter={StaticResource Vis}}">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />

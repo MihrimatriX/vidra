@@ -94,7 +94,8 @@ public sealed partial class Toggle(string id, string label, string? hint, bool o
 /// </summary>
 public sealed partial class CardGrid : ObservableObject
 {
-    private const double MinCard = 250;
+    /// <summary>En küçük kart genişliği; yoğunluk ayarı değiştirir (Kompakt 210, Rahat 250).</summary>
+    public static double MinCard { get; set; } = 250;
     private IReadOnlyList<object> _items = [];
 
     public Vidra.Core.BulkObservableCollection<object[]> Rows { get; } = [];

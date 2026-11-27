@@ -9,6 +9,8 @@
       <ResourceDictionary.MergedDictionaries>
         <!-- İlk sözlük renk paletidir; ThemeService bunu Light/Dark arasında değiştirir -->
         <ResourceDictionary Source="Themes/Light.xaml" />
+        <!-- Yoğunluk (boşluklar, kontrol yükseklikleri); ThemeService.ApplyDensity Compact/Comfortable arasında değiştirir -->
+        <ResourceDictionary Source="Themes/Density.Compact.xaml" />
         <ResourceDictionary Source="Themes/Icons.xaml" />
         <ResourceDictionary Source="Themes/Styles.xaml" />
         <ResourceDictionary Source="Themes/Generic.xaml" />

@@ -50,6 +50,11 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _activeCount;
     [ObservableProperty] private string _speedLabel = "";
 
+    /// <summary>Dar pencere: kenar menüsü yalnızca ikon (MainWindow genişliğe göre ayarlar).</summary>
+    [ObservableProperty] private bool _navCompact;
+
+    /// <summary>Hesabım son açıldığından beri takip edilen listelerden kuyruğa eklenen yeni video sayısı (hesap satırında rozet).</summary>
+    [ObservableProperty] private int _followNew;
     /// <summary>"YouTube durumu": soğuma, saatlik bütçe, yt-dlp yaşı. Level: ok / warn / bad.</summary>
     [ObservableProperty] private string _healthLabel = "YouTube: normal";
     [ObservableProperty] private string _healthLevel = "ok";
@@ -60,7 +65,10 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _updatingYtDlp;
 
     /// <summary>Pano izleme: kopyalanan bağlantı için üstte çıkan şerit.</summary>
-    [ObservableProperty] private string? _clipboardLink;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ClipboardIsVideo))] private string? _clipboardLink;
+
+    /// <summary>Şeritteki "Hemen indir" yalnızca tek video için (liste/kanal seçim ister).</summary>
+    public bool ClipboardIsVideo => ClipboardLink is { } l && YouTubeUrl.Classify(l) == LinkKind.Video;
 
     /// <summary>Tüm kuyruğun ilerlemesi (görev çubuğu, tepsi ipucu); saniyede bir yenilenir.</summary>
     [ObservableProperty] private QueueProgress _progress = QueueProgress.From([]);
@@ -97,6 +105,7 @@ public sealed partial class MainViewModel : ObservableObject
         _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); Toast = null; };
 
         host.SettingsStore.Changed += (_, _) => RefreshStatus();
+        host.Follow.Checked += (_, e) => { if (e.NewCount > 0) AppHost.Dispatch(() => { if (Page != Page.Account) FollowNew += e.NewCount; }); };
         var refreshStatus = Ui.Coalesce(RefreshStatus);
         host.Queue.Jobs.CollectionChanged += (_, _) => refreshStatus();
         host.Clipboard.LinkCopied += (_, link) =>
@@ -424,7 +433,7 @@ public sealed partial class MainViewModel : ObservableObject
             Page.Log => LogVm,
             _ => Download,
         };
-        if (value == Page.Account) _ = Account.RefreshAsync();
+        if (value == Page.Account) { FollowNew = 0; _ = Account.RefreshAsync(); }
         if (value == Page.Settings) _ = Settings.RefreshToolsAsync();
         if (value == Page.Stats) Stats.Refresh(); // "bu hafta" gibi pencereler gün dönünce kayar
         if (value == Page.Library) Library.Refresh(); // silinen/taşınan dosyalar düşsün
@@ -432,6 +441,14 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public void Go(Page p) => Page = p;
+
+    /// <summary>Ayarlar'ı belirli bir bölümde açar (SettingsView'daki x:Name: SecAccount, SecNet, SecTools…).</summary>
+    public void OpenSettingsSection(string section)
+    {
+        Settings.PendingSection = section;
+        if (Page == Page.Settings) Page = Page.Download; // aynı sayfadaysa görünüm yeniden yüklensin
+        Go(Page.Settings);
+    }
 
     /// <summary>Ctrl+1…9 ve palet: sayfa adıyla geçiş.</summary>
     [RelayCommand]
@@ -519,13 +536,9 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private Task OpenChannel(string? url) => url is not null && YouTubeUrl.Classify(url) == LinkKind.Channel ? OpenLinkAsync(url) : Task.CompletedTask;
 
-    /// <summary>Kenar çubuğundaki hesap satırı: bağlıysa Hesabım'ı açar, değilse girişi başlatır.</summary>
+    /// <summary>Kenar çubuğundaki hesap satırı: Hesabım (oturum, akışlar, takip edilenler) artık yalnızca buradan ve Ctrl+8'den açılır.</summary>
     [RelayCommand]
-    private async Task AccountStatus()
-    {
-        if (CookieActive) Go(Page.Account);
-        else await Account.SignInCommand.ExecuteAsync(null);
-    }
+    private void AccountStatus() => Go(Page.Account);
 
     /// <summary>Herhangi bir ekrandan bağlantı açma: türüne göre doğru ekrana yönlendirir.</summary>
     public async Task OpenLinkAsync(string url)
@@ -561,6 +574,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void DismissClipboard() => ClipboardLink = null;
+
+    /// <summary>Panodaki videoyu analiz etmeden, Ayarlar'daki varsayılan biçimle kuyruğa ekler; bulunulan ekran değişmez.</summary>
+    [RelayCommand]
+    private void QuickDownload()
+    {
+        if (ClipboardLink is not { } link || YouTubeUrl.Classify(link) != LinkKind.Video) return;
+        ClipboardLink = null;
+        _host.Queue.Enqueue([new NewJob(link, link, _host.Settings.Defaults, Source: "Pano")]);
+        ShowToast($"Kuyruğa eklendi · {_host.Settings.Defaults.Describe()}", "Kuyruğu aç", () => Go(Page.Queue));
+    }
 
     public string Version { get; } = "v" + typeof(MainViewModel).Assembly.GetName().Version?.ToString(3);
 

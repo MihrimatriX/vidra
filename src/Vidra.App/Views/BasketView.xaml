@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:Vidra.App.Controls"
              x:Name="Root">
-  <Grid Margin="{StaticResource PagePadFill}">
+  <Grid Margin="{DynamicResource PagePadFill}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
