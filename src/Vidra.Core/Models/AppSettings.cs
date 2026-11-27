@@ -43,6 +43,7 @@ public sealed class AppSettings
     public List<string> SponsorCategories { get; set; } = ["sponsor", "selfpromo", "interaction"];
 
     public ThemeMode Theme { get; set; } = ThemeMode.Dark;
+    public UiDensity Density { get; set; } = UiDensity.Compact;
     public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
 
     public bool WatchClipboard { get; set; } = true;

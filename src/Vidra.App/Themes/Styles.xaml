@@ -13,14 +13,13 @@
   <CornerRadius x:Key="RSm">10</CornerRadius>
   <CornerRadius x:Key="RMd">14</CornerRadius>
   <CornerRadius x:Key="RLg">18</CornerRadius>
-  <!-- Sayfa kenar boşlukları: kayan sayfalar (PagePad) ve kendi listesi kayan, pencereyi dolduran sayfalar (PagePadFill) -->
-  <Thickness x:Key="PagePad">32,18,32,32</Thickness>
-  <Thickness x:Key="PagePadFill">32,18,32,18</Thickness>
+  <!-- Sayfa kenar boşlukları (PagePad, PagePadFill), kontrol yükseklikleri ve kart iç boşlukları yoğunluk sözlüğünde:
+       Density.Compact.xaml / Density.Comfortable.xaml. Bu değerler her yerde DynamicResource ile okunur. -->
 
   <!-- ============ Metin ============ -->
   <Style x:Key="H1" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
-    <Setter Property="FontSize" Value="26" />
+    <Setter Property="FontSize" Value="{DynamicResource H1Size}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
   </Style>
@@ -64,7 +63,7 @@
   </Style>
   <Style x:Key="Tile" TargetType="Border" BasedOn="{StaticResource Card}">
     <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
-    <Setter Property="Padding" Value="14" />
+    <Setter Property="Padding" Value="{DynamicResource TilePad}" />
   </Style>
   <Style x:Key="Notice" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource WarnSoft}" />
@@ -118,7 +117,7 @@
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Padding" Value="14,0" />
-    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="MinHeight" Value="{DynamicResource CtlH}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="FontSize" Value="14" />
     <Setter Property="Cursor" Value="Hand" />
@@ -168,17 +167,17 @@
     <Setter Property="BorderThickness" Value="0" />
   </Style>
   <Style x:Key="BtnLg" TargetType="Button" BasedOn="{StaticResource Btn}">
-    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="MinHeight" Value="{DynamicResource CtlHLg}" />
     <Setter Property="Padding" Value="16,0" />
     <Setter Property="Tag" Value="12" />
   </Style>
   <Style x:Key="BtnPrimaryLg" TargetType="Button" BasedOn="{StaticResource BtnPrimary}">
-    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="MinHeight" Value="{DynamicResource CtlHLg}" />
     <Setter Property="Padding" Value="18,0" />
     <Setter Property="Tag" Value="12" />
   </Style>
   <Style x:Key="BtnSm" TargetType="Button" BasedOn="{StaticResource Btn}">
-    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="MinHeight" Value="{DynamicResource CtlHSm}" />
     <Setter Property="Padding" Value="10,0" />
     <Setter Property="FontSize" Value="12.5" />
     <Setter Property="FontWeight" Value="Medium" />
@@ -186,8 +185,8 @@
   </Style>
   <Style x:Key="BtnIcon" TargetType="Button" BasedOn="{StaticResource Btn}">
     <Setter Property="Width" Value="40" />
-    <Setter Property="Height" Value="34" />
-    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="Height" Value="{DynamicResource CtlH}" />
+    <Setter Property="MinHeight" Value="{DynamicResource CtlH}" />
     <Setter Property="Padding" Value="0" />
   </Style>
   <Style x:Key="BtnGhostIcon" TargetType="Button" BasedOn="{StaticResource BtnIcon}">
@@ -282,7 +281,7 @@
       <Setter.Value>
         <ControlTemplate TargetType="RadioButton">
           <Grid>
-            <Border x:Name="Bd" Background="Transparent" CornerRadius="10" MinHeight="38" Padding="12,0">
+            <Border x:Name="Bd" Background="Transparent" CornerRadius="10" MinHeight="{DynamicResource NavH}" Padding="12,0">
               <ContentPresenter VerticalAlignment="Center" />
             </Border>
             <Border x:Name="Bar" Width="3" Height="18" CornerRadius="1.5" HorizontalAlignment="Left" Background="{DynamicResource Accent}" Visibility="Hidden" />
@@ -314,7 +313,7 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ToggleButton">
-          <Border x:Name="Bd" MinHeight="30" Padding="11,0" CornerRadius="15" BorderThickness="1.5"
+          <Border x:Name="Bd" MinHeight="{DynamicResource PillH}" Padding="11,0" CornerRadius="15" BorderThickness="1.5"
                   BorderBrush="{DynamicResource Line2}" Background="{DynamicResource Surface}">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
               <c:Icon x:Name="Tick" Data="{StaticResource I.Check}" Size="14" Thickness="3" Margin="0,0,6,0"
@@ -345,7 +344,7 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ToggleButton">
-          <Border x:Name="Bd" MinHeight="30" Padding="11,0" CornerRadius="15" BorderThickness="1.5"
+          <Border x:Name="Bd" MinHeight="{DynamicResource PillH}" Padding="11,0" CornerRadius="15" BorderThickness="1.5"
                   BorderBrush="{DynamicResource Line2}" Background="{DynamicResource Surface}">
             <ContentPresenter VerticalAlignment="Center" />
           </Border>
@@ -410,7 +409,7 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="CheckBox">
-          <Border x:Name="Bd" MinHeight="46" Padding="12,6" CornerRadius="12" BorderThickness="1"
+          <Border x:Name="Bd" MinHeight="{DynamicResource SwitchCardH}" Padding="12,6" CornerRadius="12" BorderThickness="1"
                   BorderBrush="{DynamicResource Line}" Background="{DynamicResource Surface2}">
             <Grid>
               <Grid.ColumnDefinitions>
@@ -525,7 +524,7 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ListBoxItem">
-          <Border x:Name="Bd" MinHeight="54" Padding="12,8" CornerRadius="12" BorderThickness="1.5"
+          <Border x:Name="Bd" MinHeight="{DynamicResource OptionH}" Padding="12,8" CornerRadius="12" BorderThickness="1.5"
                   BorderBrush="{DynamicResource Line}" Background="{DynamicResource Surface}">
             <ContentPresenter />
           </Border>
@@ -636,7 +635,7 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ListBoxItem">
-          <Border x:Name="Bd" MinHeight="40" Padding="14,0" BorderThickness="0,0,0,2.5" BorderBrush="Transparent" Background="Transparent">
+          <Border x:Name="Bd" MinHeight="{DynamicResource TabH}" Padding="14,0" BorderThickness="0,0,0,2.5" BorderBrush="Transparent" Background="Transparent">
             <ContentPresenter VerticalAlignment="Center" />
           </Border>
           <ControlTemplate.Triggers>
@@ -673,7 +672,7 @@
     <Setter Property="CaretBrush" Value="{DynamicResource Text}" />
     <Setter Property="SelectionBrush" Value="{DynamicResource AccentStrong}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="MinHeight" Value="{DynamicResource CtlH}" />
     <Setter Property="Padding" Value="10,0" />
     <Setter Property="FontSize" Value="14" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -764,7 +763,7 @@
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
     <Setter Property="Background" Value="{DynamicResource Surface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line2}" />
-    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="MinHeight" Value="{DynamicResource CtlH}" />
     <Setter Property="FontSize" Value="14" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">

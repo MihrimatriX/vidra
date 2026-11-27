@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:Vidra.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="{StaticResource PagePad}" MaxWidth="1440">
+    <StackPanel Margin="{DynamicResource PagePad}" MaxWidth="1440">
       <TextBlock Style="{StaticResource H1}" Text="İstatistik" />
       <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,6,0,20"
                  Text="Tamamlanan indirmelerin özeti (geçmişte tutulan son 1000 kayda göre)." />
@@ -22,25 +22,25 @@
       <StackPanel Visibility="{Binding HasData, Converter={StaticResource Vis}}">
         <!-- Öne çıkan sayılar -->
         <UniformGrid Columns="4" Margin="0,0,-14,0">
-          <Border Style="{StaticResource Tile}" Padding="20,18" Margin="0,0,16,16">
+          <Border Style="{StaticResource Tile}" Padding="{DynamicResource CardPad}" Margin="0,0,16,16">
             <StackPanel>
               <TextBlock Style="{StaticResource Small}" Text="Toplam indirme" />
               <TextBlock Text="{Binding CountText}" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Margin="0,4,0,0" />
             </StackPanel>
           </Border>
-          <Border Style="{StaticResource Tile}" Padding="20,18" Margin="0,0,16,16">
+          <Border Style="{StaticResource Tile}" Padding="{DynamicResource CardPad}" Margin="0,0,16,16">
             <StackPanel>
               <TextBlock Style="{StaticResource Small}" Text="Toplam boyut" />
               <TextBlock Text="{Binding BytesText}" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Margin="0,4,0,0" />
             </StackPanel>
           </Border>
-          <Border Style="{StaticResource Tile}" Padding="20,18" Margin="0,0,16,16">
+          <Border Style="{StaticResource Tile}" Padding="{DynamicResource CardPad}" Margin="0,0,16,16">
             <StackPanel>
               <TextBlock Style="{StaticResource Small}" Text="İçerik süresi" />
               <TextBlock Text="{Binding DurationText}" FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Margin="0,4,0,0" />
             </StackPanel>
           </Border>
-          <Border Style="{StaticResource Tile}" Padding="20,18" Margin="0,0,16,16">
+          <Border Style="{StaticResource Tile}" Padding="{DynamicResource CardPad}" Margin="0,0,16,16">
             <StackPanel>
               <TextBlock Style="{StaticResource Small}" Text="Son 7 gün" />
               <TextBlock FontFamily="{StaticResource DisplayFont}" Margin="0,4,0,0">
@@ -59,7 +59,7 @@
           </Grid.ColumnDefinitions>
 
           <!-- Son 14 gün: tek seri, tek renk; değer ipucunda -->
-          <Border Style="{StaticResource Card}" Padding="22" VerticalAlignment="Top">
+          <Border Style="{StaticResource Card}" Padding="{DynamicResource CardPad}" VerticalAlignment="Top">
             <StackPanel>
               <TextBlock Style="{StaticResource H3}" Text="Günlük indirme · son 14 gün" />
               <TextBlock Style="{StaticResource Small}" Text="Çubuğun üzerine gel: adet ve boyut" Margin="0,2,0,16" />
@@ -97,7 +97,7 @@
 
           <StackPanel Grid.Column="2">
             <!-- Tür dağılımı: iki sayı, grafik gerekmez -->
-            <Border Style="{StaticResource Card}" Padding="22" Margin="0,0,0,16">
+            <Border Style="{StaticResource Card}" Padding="{DynamicResource CardPad}" Margin="0,0,0,16">
               <StackPanel>
                 <TextBlock Style="{StaticResource H3}" Text="Tür" Margin="0,0,0,14" />
                 <UniformGrid Columns="2">
@@ -123,7 +123,7 @@
               </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource Card}" Padding="22">
+            <Border Style="{StaticResource Card}" Padding="{DynamicResource CardPad}">
               <StackPanel>
                 <TextBlock Style="{StaticResource H3}" Text="En çok indirilen kanallar" Margin="0,0,0,14" />
                 <ItemsControl ItemsSource="{Binding Channels}">

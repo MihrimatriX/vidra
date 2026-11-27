@@ -5,8 +5,8 @@
              x:Name="Root">
   <UserControl.Resources>
     <Style x:Key="Section" TargetType="Border" BasedOn="{StaticResource Card}">
-      <Setter Property="Padding" Value="26" />
-      <Setter Property="Margin" Value="0,0,0,20" />
+      <Setter Property="Padding" Value="{DynamicResource CardPad}" />
+      <Setter Property="Margin" Value="{DynamicResource SectionGap}" />
     </Style>
     <Style x:Key="SectionLink" TargetType="Button" BasedOn="{StaticResource Btn}">
       <Setter Property="Background" Value="Transparent" />
@@ -14,15 +14,15 @@
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="FontWeight" Value="Normal" />
       <Setter Property="Foreground" Value="{DynamicResource Text2}" />
-      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="MinHeight" Value="{DynamicResource NavH}" />
       <Setter Property="Padding" Value="12,0" />
     </Style>
   </UserControl.Resources>
 
-  <Grid Margin="32,18,32,0">
+  <Grid Margin="{DynamicResource PagePadFill}">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="220" />
-      <ColumnDefinition Width="32" />
+      <ColumnDefinition Width="200" />
+      <ColumnDefinition Width="24" />
       <ColumnDefinition Width="*" MaxWidth="1000" />
     </Grid.ColumnDefinitions>
 
@@ -218,6 +218,11 @@
             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
               <TextBlock Text="Tema" Width="80" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource Text2}" />
               <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Themes}" SelectedValue="{Binding Theme}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+              <TextBlock Text="Yoğunluk" Width="80" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource Text2}" />
+              <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding Densities}" SelectedValue="{Binding Density}" />
+              <TextBlock Style="{StaticResource Small}" VerticalAlignment="Center" Margin="12,0,0,0" Text="Kompakt: ekrana daha çok iş, kart ve ayar sığar" />
             </StackPanel>
             <c:UniformWrapPanel MinItemWidth="240">
               <CheckBox Style="{StaticResource SwitchCard}" IsChecked="{Binding WatchClipboard}" Content="Pano izleme" Tag="Kopyalanan YouTube bağlantısını yakala" />

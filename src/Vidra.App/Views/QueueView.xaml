@@ -81,7 +81,7 @@
   </UserControl.Resources>
 
   <!-- Kuyruk ve geçmiş ayrı sekmelerde; ikisi de pencereyi doldurur ve kendi içinde kayar (iç içe kaydırma yok) -->
-  <Grid Margin="{StaticResource PagePadFill}">
+  <Grid Margin="{DynamicResource PagePadFill}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
@@ -190,7 +190,7 @@
 
     <!-- ============ Kuyruk ============ -->
     <Grid Grid.Row="3" Visibility="{Binding IsHistory, Converter={StaticResource Vis}, ConverterParameter=!}">
-      <Border Style="{StaticResource Tile}" Padding="18" VerticalAlignment="Top" Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}, ConverterParameter=!}">
+      <Border Style="{StaticResource Tile}" Padding="{DynamicResource CardPad}" VerticalAlignment="Top" Visibility="{Binding Queue.Jobs.Count, Converter={StaticResource Vis}, ConverterParameter=!}">
         <StackPanel>
           <TextBlock Style="{StaticResource Body2}" Text="Kuyruk boş. İndir ekranından ya da bir playlist'ten video ekleyebilir, bağlantıyı pencereye sürükleyip bırakabilirsin." />
           <Button Style="{StaticResource BtnLink}" HorizontalAlignment="Left" Padding="0" Margin="0,8,0,0" Command="{Binding ShowHistoryCommand}"

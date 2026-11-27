@@ -76,6 +76,7 @@ public partial class App : Application
             });
 #endif
         ThemeService.Apply(_host.Settings.Theme);
+        ThemeService.ApplyDensity(_host.Settings.Density);
 
         var vm = new MainViewModel(_host);
         var window = new MainWindow(vm, _host);

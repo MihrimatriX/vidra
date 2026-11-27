@@ -34,6 +34,19 @@ public static class ThemeService
         foreach (Window w in Application.Current.Windows) ApplyTitleBar(w);
     }
 
+    private static readonly Uri Compact = new("pack://application:,,,/Themes/Density.Compact.xaml");
+    private static readonly Uri Comfortable = new("pack://application:,,,/Themes/Density.Comfortable.xaml");
+
+    /// <summary>Yoğunluk sözlüğünü değiştirir; boşluk ve yükseklikler DynamicResource olduğu için açık ekranlar da anında güncellenir.</summary>
+    public static void ApplyDensity(UiDensity density)
+    {
+        var dicts = Application.Current.Resources.MergedDictionaries;
+        var next = new ResourceDictionary { Source = density == UiDensity.Comfortable ? Comfortable : Compact };
+        var old = dicts.FirstOrDefault(d => d.Source?.OriginalString is { } o && o.Contains("Density.", StringComparison.OrdinalIgnoreCase));
+        if (old is not null) dicts[dicts.IndexOf(old)] = next;
+        else dicts.Insert(Math.Min(1, dicts.Count), next);
+    }
+
     /// <summary>Windows 10 1809+ / 11'de başlık çubuğunu temaya uydurur.</summary>
     public static void ApplyTitleBar(Window w)
     {

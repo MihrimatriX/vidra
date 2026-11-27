@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:Vidra.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="{StaticResource PagePad}" MaxWidth="1120">
+    <StackPanel Margin="{DynamicResource PagePad}" MaxWidth="1120">
 
       <!-- ===== Tek kutu: bağlantı yapıştır ya da ara ===== -->
       <Border Background="{DynamicResource Surface}" BorderThickness="1" CornerRadius="12" Padding="12,5,5,5">
@@ -136,7 +136,7 @@
       </StackPanel>
 
       <!-- ===== Yükleniyor ===== -->
-      <Border Style="{StaticResource Card}" Margin="0,18,0,0" Padding="20" Visibility="{Binding IsLoading, Converter={StaticResource Vis}}">
+      <Border Style="{StaticResource Card}" Margin="0,18,0,0" Padding="{DynamicResource CardPad}" Visibility="{Binding IsLoading, Converter={StaticResource Vis}}">
         <DockPanel>
           <Border DockPanel.Dock="Left" Width="176" Height="99" CornerRadius="10" Background="{DynamicResource Raised}" />
           <StackPanel Margin="18,4,0,0">

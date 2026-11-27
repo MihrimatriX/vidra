@@ -236,6 +236,14 @@ public sealed partial class SettingsViewModel : ObservableObject
         set { Set(s => s.Theme = value); ThemeService.Apply(value); }
     }
 
+    public IReadOnlyList<Choice> Densities { get; } = [new(UiDensity.Compact, "Kompakt"), new(UiDensity.Comfortable, "Rahat")];
+
+    public UiDensity Density
+    {
+        get => S.Density;
+        set { Set(s => s.Density = value); ThemeService.ApplyDensity(value); }
+    }
+
     public bool WatchClipboard
     {
         get => S.WatchClipboard;

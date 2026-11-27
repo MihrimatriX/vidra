@@ -4,7 +4,7 @@
              xmlns:c="clr-namespace:Vidra.App.Controls"
              x:Name="Root">
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="{StaticResource PagePad}" MaxWidth="1440">
+    <StackPanel Margin="{DynamicResource PagePad}" MaxWidth="1440">
       <TextBlock Style="{StaticResource H1}" Text="Ara" />
       <TextBlock Style="{StaticResource Body2}" HorizontalAlignment="Left" Margin="0,6,0,18"
                  Text="YouTube'da tarayıcı açmadan ara; sonuçları tek tıkla MP3 ya da video olarak kuyruğa al. Bağlantı yapıştırırsan doğrudan açılır." />
